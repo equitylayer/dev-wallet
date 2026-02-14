@@ -190,9 +190,15 @@ function Account() {
           {account && (
             <HeaderItem label="Account">
               <Box title={account.address}>
-                <Text.Truncated key={key} size="11px">
-                  {account.address}
-                </Text.Truncated>
+                {account.displayName ? (
+                  <Text.Truncated key={key} size="11px">
+                    {account.displayName}
+                  </Text.Truncated>
+                ) : (
+                  <Text.Truncated key={key} size="11px">
+                    {account.address}
+                  </Text.Truncated>
+                )}
               </Box>
             </HeaderItem>
           )}

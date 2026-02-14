@@ -129,13 +129,44 @@ function Accounts() {
 }
 
 function AccountRow({ account }: { account: Account }) {
-  const { account: activeAccount, removeAccount } = useAccountStore()
+  const {
+    account: activeAccount,
+    removeAccount,
+    upsertAccount,
+  } = useAccountStore()
   const { mutateAsync: setAccount } = useSetAccount()
+
+  const [isEditingAlias, setIsEditingAlias] = useState(false)
+  const [aliasValue, setAliasValue] = useState(account.displayName ?? '')
+  const aliasInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (isEditingAlias) aliasInputRef.current?.focus()
+  }, [isEditingAlias])
+
+  const saveAlias = () => {
+    const trimmed = aliasValue.trim()
+    upsertAccount({
+      account: {
+        ...account,
+        displayName: trimmed || undefined,
+      },
+    })
+    setIsEditingAlias(false)
+  }
+
+  const cancelAlias = () => {
+    setAliasValue(account.displayName ?? '')
+    setIsEditingAlias(false)
+  }
 
   const active = activeAccount?.address === account.address
   const truncatedAddress =
     account.address && account.address.length > 0
-      ? truncate(account.address, { start: 5, end: 5 })
+      ? truncate(
+          account.address,
+          account.displayName ? { start: 5, end: 4 } : { start: 8, end: 6 },
+        )
       : undefined
   return (
     <Box
@@ -192,34 +223,66 @@ function AccountRow({ account }: { account: Account }) {
       )}
       <Stack gap="16px">
         <Box width="fit" position="relative">
-          <Inline gap="8px">
-            {account.state === 'loading' && (
-              <Text color="text/tertiary" size="12px">
-                {truncate(account.key, { start: 20, end: 20 })}
-              </Text>
-            )}
-            {account.displayName && (
-              <Text size="12px">{account.displayName}</Text>
-            )}
-            <Box title={account.address}>
-              <Text
-                color={account.displayName ? 'text/tertiary' : undefined}
-                family="address"
-                size="12px"
-              >
-                {truncatedAddress ?? account.address}
-              </Text>
-            </Box>
-            {account.address && (
-              <Box position="absolute" style={{ right: -24, top: -6 }}>
-                <Button.Copy
-                  height="20px"
-                  text={account.address!}
-                  variant="ghost primary"
-                />
+          {isEditingAlias ? (
+            <Input
+              ref={aliasInputRef}
+              height="24px"
+              placeholder="Address alias..."
+              value={aliasValue}
+              onChange={(e) => setAliasValue(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              onBlur={saveAlias}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveAlias()
+                if (e.key === 'Escape') cancelAlias()
+              }}
+              style={{ maxWidth: '200px' }}
+            />
+          ) : (
+            <Inline gap="8px">
+              {account.state === 'loading' && (
+                <Text color="text/tertiary" size="12px">
+                  {truncate(account.key, { start: 20, end: 20 })}
+                </Text>
+              )}
+              {account.displayName && (
+                <Text size="12px">{account.displayName}</Text>
+              )}
+              <Box title={account.address}>
+                <Text
+                  color={account.displayName ? 'text/tertiary' : undefined}
+                  family="address"
+                  size="12px"
+                >
+                  {truncatedAddress ?? account.address}
+                </Text>
               </Box>
-            )}
-          </Inline>
+              {account.state === 'loaded' && (
+                <Box style={{ marginTop: '-4px' }}>
+                  <Button.Symbol
+                    label="Edit Alias"
+                    symbol="square.and.pencil"
+                    height="20px"
+                    variant="ghost primary"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setAliasValue(account.displayName ?? '')
+                      setIsEditingAlias(true)
+                    }}
+                  />
+                </Box>
+              )}
+              {account.address && (
+                <Box position="absolute" style={{ right: -24, top: -6 }}>
+                  <Button.Copy
+                    height="20px"
+                    text={account.address!}
+                    variant="ghost primary"
+                  />
+                </Box>
+              )}
+            </Inline>
+          )}
         </Box>
         <Inline gap="4px">
           <Box style={{ width: '100px' }}>

@@ -70,18 +70,25 @@ export const accountStore = createStore<AccountStore>(
       })
     },
     setJsonRpcAccounts({ addresses, rpcUrl }) {
-      const accounts = addresses.map(
-        (address) =>
-          ({
+      set((state) => {
+        const existingByAddress = new Map(
+          state.accounts.map((a) => [a.address.toLowerCase(), a]),
+        )
+
+        const accounts = addresses.map((address) => {
+          const existing = existingByAddress.get(address.toLowerCase())
+          return {
             address,
             key: `${rpcUrl}.${address}`,
             rpcUrl,
             state: 'loaded',
             type: 'json-rpc',
-          }) as const,
-      )
+            ...(existing?.displayName && {
+              displayName: existing.displayName,
+            }),
+          } as const
+        })
 
-      set((state) => {
         return {
           ...state,
           account: get().account || accounts[0],

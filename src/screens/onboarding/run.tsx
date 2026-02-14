@@ -62,7 +62,6 @@ export default function OnboardingRun() {
           paddingLeft="12px"
           paddingRight="12px"
           position="relative"
-          // @ts-expect-error
           style={{ textWrap: 'wrap' }}
         >
           <Text family="mono" size="12px">
