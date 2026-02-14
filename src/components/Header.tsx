@@ -12,6 +12,7 @@ import { type Hex, formatGwei } from 'viem'
 import { History, Pickaxe } from 'lucide-react'
 
 import { Tooltip } from '~/components'
+import { truncate } from '~/utils'
 import { DWLogo } from '~/components/svgs/DWLogo'
 import { useAppMeta } from '~/contexts'
 import {
@@ -190,9 +191,22 @@ function Account() {
           {account && (
             <HeaderItem label="Account">
               <Box title={account.address}>
-                <Text.Truncated key={key} size="11px">
-                  {account.address}
-                </Text.Truncated>
+                {account.displayName ? (
+                  <Inline key={key} gap="4px" alignVertical="center" wrap={false}>
+                    <Text size="11px" wrap={false}>
+                      {account.displayName.length > 20
+                        ? `${account.displayName.slice(0, 20)}…`
+                        : account.displayName}
+                    </Text>
+                    <Text color="text/tertiary" family="address" size="9px" wrap={false}>
+                      {truncate(account.address, { start: 5, end: 3 })}
+                    </Text>
+                  </Inline>
+                ) : (
+                  <Text.Truncated key={key} size="11px">
+                    {account.address}
+                  </Text.Truncated>
+                )}
               </Box>
             </HeaderItem>
           )}

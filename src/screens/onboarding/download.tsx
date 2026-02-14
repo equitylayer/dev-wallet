@@ -29,7 +29,6 @@ export default function OnboardingDownload() {
           paddingLeft="12px"
           paddingRight="32px"
           position="relative"
-          // @ts-expect-error
           style={{ textWrap: 'wrap' }}
         >
           <Text family="mono" size="12px">
