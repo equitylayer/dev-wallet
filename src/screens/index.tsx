@@ -129,8 +129,11 @@ function Accounts() {
 }
 
 function AccountRow({ account }: { account: Account }) {
-  const { account: activeAccount, removeAccount, upsertAccount } =
-    useAccountStore()
+  const {
+    account: activeAccount,
+    removeAccount,
+    upsertAccount,
+  } = useAccountStore()
   const { mutateAsync: setAccount } = useSetAccount()
 
   const [isEditingAlias, setIsEditingAlias] = useState(false)
@@ -160,7 +163,10 @@ function AccountRow({ account }: { account: Account }) {
   const active = activeAccount?.address === account.address
   const truncatedAddress =
     account.address && account.address.length > 0
-      ? truncate(account.address, account.displayName ? { start: 5, end: 4 } : { start: 8, end: 6 })
+      ? truncate(
+          account.address,
+          account.displayName ? { start: 5, end: 4 } : { start: 8, end: 6 },
+        )
       : undefined
   return (
     <Box
