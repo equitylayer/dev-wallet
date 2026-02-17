@@ -17,13 +17,13 @@
 
 Forked and modified from [Rivet](https://github.com/paradigmxyz/rivet) (MIT licensed) by Paradigm. Original license retained.
 
-## What is DW: DevWallet?
+## What is DevWallet?
 
-DW: DevWallet is a developer Wallet & DevTools for Anvil (akin to [Browser DevTools](https://developer.mozilla.org/en-US/docs/Learn/Common_questions/Tools_and_setup/What_are_browser_developer_tools#how_to_open_the_devtools_in_your_browser) or [React DevTools](https://react.dev/learn/react-developer-tools)). It is a browser extension that enables developers to inspect, debug, modify, and manipulate the state of Ethereum: accounts, blocks, contracts & the node itself. DW: DevWallet is also compatible with any production dApp, meaning you can simulate any type of action from either an Account attached on the Anvil instance, or by "impersonating" another Account on the network.
+DevWallet is a developer Wallet & DevTools for Anvil (akin to [Browser DevTools](https://developer.mozilla.org/en-US/docs/Learn/Common_questions/Tools_and_setup/What_are_browser_developer_tools#how_to_open_the_devtools_in_your_browser) or [React DevTools](https://react.dev/learn/react-developer-tools)). It is a browser extension that enables developers to inspect, debug, modify, and manipulate the state of Ethereum: accounts, blocks, contracts & the node itself. DevWallet is also compatible with any production dApp, meaning you can simulate any type of action from either an Account attached on the Anvil instance, or by "impersonating" another Account on the network.
 
-By integrating [EIP-6963: Multi Injected Provider Discovery](https://eips.ethereum.org/EIPS/eip-6963), DW: DevWallet is designed to be used alongside and with other consumer browser wallets like MetaMask or Rainbow to provide more engrained developer tooling and workflows for Ethereum.
+By integrating [EIP-6963: Multi Injected Provider Discovery](https://eips.ethereum.org/EIPS/eip-6963), DevWallet is designed to be used alongside and with other consumer browser wallets like MetaMask or Rainbow to provide more engrained developer tooling and workflows for Ethereum.
 
-DW: DevWallet is aimed to be **contributor first & friendly**. If you would like to contribute, check out the [Contributing Guide](/.github/CONTRIBUTING.md).
+DevWallet is aimed to be **contributor first & friendly**. If you would like to contribute, check out the [Contributing Guide](/.github/CONTRIBUTING.md).
 
 ## Why was it forked?
 
@@ -53,7 +53,7 @@ DevWallet is currently in active development. If you would like to try out the l
     <li>Enable <code>Developer Mode</code> in the top right corner</li>
     <li>Click <code>Load Unpacked</code> in the top left corner</li>
     <li>Select the unzipped folder</li>
-    <li>Done! You should now see the DW: DevWallet extension in your browser</li>
+    <li>Done! You should now see the DevWallet extension in your browser</li>
   </ol>
 </details>
 
@@ -117,7 +117,7 @@ git clone https://github.com/D01-DayOne/dev-wallet.git
 
 ### 2. Install Bun
 
-DW: DevWallet uses [Bun](https://bun.sh). You need to install **Bun v1 or higher**.
+DevWallet uses [Bun](https://bun.sh). You need to install **Bun v1 or higher**.
 
 You can run the following commands in your terminal to check your local Bun version:
 
@@ -149,7 +149,7 @@ This will run a script that will build the Web Extension, start a dev server for
 
 ## Multi-Wallet Support
 
-DW: DevWallet supports both legacy `window.ethereum` injection and modern [EIP-6963](https://eips.ethereum.org/EIPS/eip-6963) multi-wallet discovery.
+DevWallet supports both legacy `window.ethereum` injection and modern [EIP-6963](https://eips.ethereum.org/EIPS/eip-6963) multi-wallet discovery.
 
 **EIP-6963 Support:**
 - DevWallet announces itself via EIP-6963, allowing dapps to discover it alongside other wallets
@@ -167,7 +167,7 @@ Helpful note: A fresh Chrome profile gets instantiated when running the dev scri
 
 If you're interested in contributing, please read the [contributing docs](/.github/CONTRIBUTING.md) **before submitting a pull request**.
 
-## DW: DevWallet Authors
+## DevWallet Authors
 - [@sideris](https://github.com/sideris) (PGSideris, [Twitter](https://twitter.com/PGSideris))
 
 ## Rivet Authors

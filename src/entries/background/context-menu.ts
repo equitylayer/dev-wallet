@@ -16,10 +16,10 @@ export async function setupContextMenu() {
     .setPanelBehavior({ openPanelOnActionClick: true })
     .catch((error) => console.error(error))
 
-  // TODO: Only create context menu if selected text is "openable" in DW: DevWallet.
+  // TODO: Only create context menu if selected text is "openable" in DevWallet.
   // chrome.contextMenus.create({
   //   id: 'open',
-  //   title: 'Open in DW: DevWallet',
+  //   title: 'Open in DevWallet',
   //   contexts: ['selection'],
   // })
 

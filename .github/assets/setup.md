@@ -6,4 +6,4 @@
 4. Enable `Developer Mode` in the top right corner
 5. Click `Load Unpacked` in the top left corner
 6. Select the unzipped folder
-7. Done! You should now see the DW: DevWallet extension in your browser
+7. Done! You should now see the DevWallet extension in your browser

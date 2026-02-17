@@ -25,7 +25,7 @@ export default function OnboardingStart() {
           <Stack gap="32px">
             <Stack gap="20px">
               <Text size="32px" weight="medium">
-                DW: DevWallet
+                DevWallet
               </Text>
               <Text color="text/tertiary" size="18px" weight="light">
                 Developer Wallet & DevTools for Anvil designed to supercharge
