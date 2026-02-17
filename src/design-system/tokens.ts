@@ -1,5 +1,4 @@
 import { createStyleObject as capsize } from '@capsizecss/core'
-import type { CapsizeOptions } from '@capsizecss/core/dist/declarations/src/types'
 
 export type Theme = 'light' | 'dark'
 export type ColorScheme = 'light' | 'dark'
@@ -510,7 +509,7 @@ const fontMetrics = {
   descent: -494,
   lineGap: 0,
   unitsPerEm: 2048,
-} satisfies CapsizeOptions['fontMetrics']
+} as const
 
 function defineType(fontAttributes: FontAttributes, inline: boolean) {
   const { fontSize, lineHeight, letterSpacing } = fontAttributes
