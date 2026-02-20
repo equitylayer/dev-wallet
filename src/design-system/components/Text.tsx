@@ -194,7 +194,9 @@ export const TextTruncated = forwardRef<HTMLDivElement, TextTruncatedProps>(
       setWidth(
         Math.floor(
           (
-            (wrapperRef.current as any).getBoundingClientRect() as DOMRectReadOnly
+            (
+              wrapperRef.current as any
+            ).getBoundingClientRect() as DOMRectReadOnly
           ).width,
         ),
       )
