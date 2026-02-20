@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { useSyncExternalStoreWithSelector } from 'use-sync-external-store/shim/with-selector.js'
+import { useSyncExternalStoreWithSelector } from 'use-sync-external-store/shim/with-selector'
 
 import { deepEqual } from '~/utils'
 

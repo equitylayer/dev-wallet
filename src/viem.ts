@@ -47,7 +47,7 @@ export type Client = Client_Base<
     TestActions & { mode: 'anvil'; rpcUrl: string }
 >
 
-const clientCache = new Map()
+const clientCache = new Map<string, Client>()
 export function getClient({ rpcUrl }: { rpcUrl: string }): Client {
   const cachedClient = clientCache.get(rpcUrl)
   if (cachedClient) return cachedClient

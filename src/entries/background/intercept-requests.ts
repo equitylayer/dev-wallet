@@ -9,7 +9,9 @@ export async function interceptJsonRpcRequests() {
     redirectUrl,
     sessions,
   }: { redirectUrl: string; sessions: SessionsStore['sessions'] }) {
-    const handler = (details: chrome.webRequest.WebRequestBodyDetails) => {
+    const handler = (
+      details: chrome.webRequest.OnBeforeRequestDetails,
+    ): chrome.webRequest.BlockingResponse | undefined => {
       ;(async () => {
         try {
           const url = new URL(details.url).host
@@ -84,6 +86,7 @@ export async function interceptJsonRpcRequests() {
           }
         } catch {}
       })()
+      return undefined
     }
 
     chrome.webRequest.onBeforeRequest.addListener(
@@ -132,7 +135,7 @@ export async function interceptJsonRpcRequests() {
   })
 }
 
-function isJsonRpcRequest(details: chrome.webRequest.WebRequestBodyDetails) {
+function isJsonRpcRequest(details: chrome.webRequest.OnBeforeRequestDetails) {
   const rawBody = details.requestBody?.raw
   if (!rawBody?.[0]) return false
 
