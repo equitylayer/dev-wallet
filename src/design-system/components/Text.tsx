@@ -192,13 +192,20 @@ export const TextTruncated = forwardRef<HTMLDivElement, TextTruncatedProps>(
 
     useLayoutEffect(() => {
       setWidth(
-        ((wrapperRef.current as any).getBoundingClientRect() as DOMRectReadOnly)
-          .width,
+        Math.floor(
+          (
+            (wrapperRef.current as any).getBoundingClientRect() as DOMRectReadOnly
+          ).width,
+        ),
       )
     }, [])
-    useResizeObserver(wrapperRef, (entry) =>
-      mounted ? setWidth(entry.contentRect.width) : undefined,
-    )
+    useResizeObserver(wrapperRef, (entry) => {
+      if (!mounted) return
+      const newWidth = Math.floor(entry.contentRect.width)
+      setWidth((prev) =>
+        prev !== undefined && Math.abs(prev - newWidth) < 2 ? prev : newWidth,
+      )
+    })
 
     const truncatedText = useMemo(() => {
       const letterWidth = fontAttributes[size].letterWidth

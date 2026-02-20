@@ -1,4 +1,4 @@
-import { uniqueBy } from 'remeda';
+import { uniqueBy } from 'remeda'
 import type { Address } from 'viem'
 import { useSyncExternalStoreWithTracked } from '~/hooks/useSyncExternalStoreWithTracked'
 import { createStore, getKey } from './utils'

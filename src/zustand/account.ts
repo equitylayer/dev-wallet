@@ -1,5 +1,9 @@
 import { uniqueBy } from 'remeda'
-import type { Address, JsonRpcAccount as JsonRpcAccount_, LocalAccount, } from 'viem'
+import type {
+  Address,
+  JsonRpcAccount as JsonRpcAccount_,
+  LocalAccount,
+} from 'viem'
 import { useSyncExternalStoreWithTracked } from '~/hooks/useSyncExternalStoreWithTracked'
 import type { OneOf } from '~/types/utils'
 

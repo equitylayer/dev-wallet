@@ -1,8 +1,8 @@
 import * as chains from 'viem/chains'
 
+import { uniqueBy } from 'remeda'
 import { useSyncExternalStoreWithTracked } from '~/hooks/useSyncExternalStoreWithTracked'
 import { getClient } from '~/viem'
-import { uniqueBy } from 'remeda'
 import { createStore } from './utils'
 
 type RpcUrl = string
