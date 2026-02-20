@@ -324,16 +324,18 @@ function CalldataResult({
   const abi = useCalldataAbi({
     data: `${getFunctionSelector(abiFunction)}${data.slice(2)}`,
   })
-  if (!abi) return data
 
-  const abiItem = abi[0] as AbiFunction
+  const abiItem = abi?.[0] as AbiFunction | undefined
   const value = useMemo(() => {
+    if (!abiItem) return undefined
     try {
       return decodeAbiParameters(abiItem.inputs, data)
     } catch {}
   }, [abi, data])
 
-  return <Result outputs={abiItem.inputs as AbiParameter[]} value={value} />
+  if (!abi) return data
+
+  return <Result outputs={abiItem!.inputs as AbiParameter[]} value={value} />
 }
 
 function Result({

@@ -58,7 +58,6 @@ export const Columns = forwardRef<HTMLDivElement, ColumnsProps>(
           const columnProps = getColumnProps(child)
 
           return columnProps ? (
-            // eslint-disable-next-line react/jsx-props-no-spreading
             <PrivateColumn key={index} {...columnProps} />
           ) : (
             <PrivateColumn key={index}>{child}</PrivateColumn>
@@ -77,7 +76,6 @@ type ColumnProps = {
   children?: ReactNode
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function Column(_props: ColumnProps): JSX.Element {
   // We use this pattern to ensure that Column can only be used within Columns.
   // Columns detects when this element has been used and replaces it with an

@@ -55,7 +55,6 @@ export const Rows = forwardRef<HTMLDivElement, RowsProps>(function Rows(
           const rowProps = getRowProps(child)
 
           return rowProps ? (
-            // eslint-disable-next-line react/jsx-props-no-spreading
             <PrivateRow key={index} {...rowProps} />
           ) : (
             <PrivateRow key={index}>{child}</PrivateRow>
@@ -74,7 +73,6 @@ export type RowProps = {
   style?: React.CSSProperties
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function Row(_props: RowProps): JSX.Element {
   // We use this pattern to ensure that Row can only be used within Rows.
   // Rows detects when this element has been used and replaces it with an

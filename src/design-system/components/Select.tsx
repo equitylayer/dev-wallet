@@ -59,7 +59,7 @@ export const textStylesForHeight = {
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   (
-    { placeholder, height = '36px', variant = 'solid', testId, ...selectProps },
+    { placeholder: _placeholder, height = '36px', variant = 'solid', testId, ...selectProps },
     ref,
   ) => {
     return (
