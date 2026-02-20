@@ -1,4 +1,4 @@
-import { uniqBy } from 'remeda'
+import { uniqueBy } from 'remeda';
 import type { Address } from 'viem'
 import { useSyncExternalStoreWithTracked } from '~/hooks/useSyncExternalStoreWithTracked'
 import { createStore, getKey } from './utils'
@@ -59,7 +59,7 @@ export const tokensStore = createStore<TokensStore>(
 
       set((state) => {
         const tokens = { ...state.tokens }
-        tokens[serializedKey] = uniqBy(
+        tokens[serializedKey] = uniqueBy(
           [
             { address: tokenAddress, visible: true },
             ...(state.tokens[serializedKey] || []),

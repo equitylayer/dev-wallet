@@ -1,9 +1,5 @@
-import { uniqBy } from 'remeda'
-import type {
-  Address,
-  JsonRpcAccount as JsonRpcAccount_,
-  LocalAccount,
-} from 'viem'
+import { uniqueBy } from 'remeda'
+import type { Address, JsonRpcAccount as JsonRpcAccount_, LocalAccount, } from 'viem'
 import { useSyncExternalStoreWithTracked } from '~/hooks/useSyncExternalStoreWithTracked'
 import type { OneOf } from '~/types/utils'
 
@@ -92,7 +88,7 @@ export const accountStore = createStore<AccountStore>(
         return {
           ...state,
           account: get().account || accounts[0],
-          accounts: uniqBy(
+          accounts: uniqueBy(
             [
               ...state.accounts.filter(
                 (x) => x.rpcUrl !== rpcUrl || x.impersonate,
@@ -132,7 +128,7 @@ export const accountStore = createStore<AccountStore>(
           ...(key === state.account?.key && {
             account,
           }),
-          accounts: uniqBy(accounts, (x) => x.key),
+          accounts: uniqueBy(accounts, (x) => x.key),
         }
       })
     },
