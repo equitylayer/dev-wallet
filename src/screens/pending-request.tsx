@@ -870,11 +870,9 @@ function SignMessageRequest({
     >
       <Stack gap="20px">
         <Columns gap="12px">
-          <Column width="1/4">
+          <Column>
             <LabelledContent label="Address">
-              <Tooltip label={address}>
-                <Text.Truncated size="12px">{address}</Text.Truncated>
-              </Tooltip>
+              <Text family="address" size="12px" wrap={false}>{address}</Text>
             </LabelledContent>
           </Column>
         </Columns>
@@ -922,11 +920,9 @@ function SignTypedDataRequest({
     >
       <Stack gap="20px">
         <Columns gap="12px">
-          <Column width="1/4">
+          <Column>
             <LabelledContent label="Address">
-              <Tooltip label={address}>
-                <Text.Truncated size="12px">{address}</Text.Truncated>
-              </Tooltip>
+              <Text family="address" size="12px" wrap={false}>{address}</Text>
             </LabelledContent>
           </Column>
         </Columns>
