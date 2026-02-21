@@ -2,6 +2,7 @@
   "name": "devwallet",
   "version": "0.13.0",
   "private": true,
+  "type": "module",
   "extension": {
     "name": "DevWallet",
     "description": "DevWallet enhances your Solidity development workflow. Works great with Forge"
