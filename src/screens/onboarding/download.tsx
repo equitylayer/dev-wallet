@@ -14,7 +14,7 @@ export default function OnboardingDownload() {
     >
       <Stack gap="20px">
         <Text color="text/secondary" size="14px">
-          DW: DevWallet requires Foundry Anvil to run a local chain.
+          DevWallet requires Foundry Anvil to run a local chain.
         </Text>
         <Text color="text/secondary" size="14px">
           Run the following command in your CLI to install Foundry:

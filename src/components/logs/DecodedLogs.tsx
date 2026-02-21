@@ -1,5 +1,5 @@
 import * as Accordion from '@radix-ui/react-accordion'
-import type { AbiEvent } from 'abitype'
+import type { AbiEvent } from 'viem'
 import { useMemo } from 'react'
 import {
   DecodeLogTopicsMismatch,

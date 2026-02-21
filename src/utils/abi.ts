@@ -1,6 +1,6 @@
 // TODO: rewrite abi-guesser in viem
 import { guessFragment } from '@openchainxyz/abi-guesser'
-import type { AbiEvent } from 'abitype'
+import type { AbiEvent } from 'viem'
 import { FunctionFragment } from 'ethers'
 import {
   type AbiItem,

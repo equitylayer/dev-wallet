@@ -13,9 +13,10 @@ export type WebextStorage = {
 
 const noopStorage: (typeof chrome.storage)['local'] = {
   getBytesInUse: () => Promise.resolve(0),
-  QUOTA_BYTES: 0,
+  QUOTA_BYTES: 10485760,
   clear: () => Promise.resolve(),
   get: () => Promise.resolve({}),
+  getKeys: () => Promise.resolve([]),
   set: () => Promise.resolve(),
   setAccessLevel: () => Promise.resolve(),
   remove: () => Promise.resolve(),
@@ -56,7 +57,7 @@ function createWebextStorage({
       const result = await storage.get(getKey(key))
       const value = result[getKey(key)]
       try {
-        return value ? (JSON.parse(value, reviver) as any) : defaultState
+        return value ? (JSON.parse(value as string, reviver) as any) : defaultState
       } catch (error) {
         console.warn(error)
         return defaultState
@@ -79,8 +80,8 @@ function createWebextStorage({
         changes: Record<string, chrome.storage.StorageChange>,
       ) => {
         if (!changes[getKey(key)]) return
-        const newValue = changes[getKey(key)]?.newValue
-        const oldValue = changes[getKey(key)]?.oldValue
+        const newValue = changes[getKey(key)]?.newValue as any
+        const oldValue = changes[getKey(key)]?.oldValue as any
         callback(newValue, oldValue)
       }
       storage.onChanged.addListener(listener)

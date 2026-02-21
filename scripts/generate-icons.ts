@@ -1,5 +1,5 @@
 /*
-  Generates PNG icons from the DW: DevWallet SVG logo for all required sizes, replacing existing icon@* files.
+  Generates PNG icons from the DevWallet SVG logo for all required sizes, replacing existing icon@* files.
   Requires `sharp` as a dependency. Install with: yarn add -D sharp
 */
 

@@ -8,7 +8,7 @@ import {
 
 import { createQueryKey } from '~/react-query'
 
-import type { AbiEvent } from 'abitype'
+import type { AbiEvent } from 'viem'
 import type { Client } from '../viem'
 import { useClient } from './useClient'
 

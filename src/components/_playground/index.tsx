@@ -1,6 +1,6 @@
 import '../../hmr'
 
-import { parseAbiItem } from 'abitype'
+import { parseAbiItem } from 'viem'
 import { useState } from 'react'
 import ReactDOM from 'react-dom/client'
 

@@ -1,14 +1,16 @@
 import * as Accordion from '@radix-ui/react-accordion'
+import { formatAbiItem } from 'abitype'
+import { useEffect, useMemo, useState } from 'react'
+import { FormProvider, useForm } from 'react-hook-form'
 import {
   type Abi,
   type AbiFunction,
   type AbiParameter,
   type Address,
-  formatAbiItem,
-} from 'abitype'
-import { useEffect, useMemo, useState } from 'react'
-import { FormProvider, useForm } from 'react-hook-form'
-import { type Hex, decodeAbiParameters, getFunctionSelector } from 'viem'
+  type Hex,
+  decodeAbiParameters,
+  getFunctionSelector,
+} from 'viem'
 
 import * as Form from '~/components/form'
 import {
@@ -324,16 +326,18 @@ function CalldataResult({
   const abi = useCalldataAbi({
     data: `${getFunctionSelector(abiFunction)}${data.slice(2)}`,
   })
-  if (!abi) return data
 
-  const abiItem = abi[0] as AbiFunction
+  const abiItem = abi?.[0] as AbiFunction | undefined
   const value = useMemo(() => {
+    if (!abiItem) return undefined
     try {
       return decodeAbiParameters(abiItem.inputs, data)
     } catch {}
   }, [abi, data])
 
-  return <Result outputs={abiItem.inputs as AbiParameter[]} value={value} />
+  if (!abi) return data
+
+  return <Result outputs={abiItem!.inputs as AbiParameter[]} value={value} />
 }
 
 function Result({

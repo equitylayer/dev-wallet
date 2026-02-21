@@ -1,5 +1,5 @@
 import * as Tabs from '@radix-ui/react-tabs'
-import type { AbiEvent } from 'abitype'
+import type { AbiEvent } from 'viem'
 import { Fragment, useMemo } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { type Hash, type Log, formatEther, formatGwei, hexToBigInt } from 'viem'

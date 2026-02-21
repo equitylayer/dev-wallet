@@ -1,9 +1,6 @@
 import * as Accordion from '@radix-ui/react-accordion'
-import type {
-  AbiParameter,
-  AbiParameterToPrimitiveType,
-  AbiParametersToPrimitiveTypes,
-} from 'abitype'
+import type { AbiParametersToPrimitiveTypes } from 'abitype'
+import type { AbiParameter, AbiParameterToPrimitiveType } from 'viem'
 import type React from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { type Hex, concat, decodeAbiParameters, stringify } from 'viem'

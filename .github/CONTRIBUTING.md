@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in contributing to DW: DevWallet! Please take a moment to review this document **before submitting a pull request.** If you want to contribute, but aren't sure where to start, you can create a [new discussion](https://github.com/D01-DayOne/dev-wallet/discussions).
+Thanks for your interest in contributing to DevWallet! Please take a moment to review this document **before submitting a pull request.** If you want to contribute, but aren't sure where to start, you can create a [new discussion](https://github.com/D01-DayOne/dev-wallet/discussions).
 
 > **Note** **Please ask first before starting work on any significant new features.**
 >
@@ -14,11 +14,11 @@ Here is a [great primer](https://developer.chrome.com/docs/extensions/mv3/getsta
 
 ### Contexts
 
-DW: DevWallet has four isolated contexts:
+DevWallet has four isolated contexts:
 
 - **Wallet** app:
   - A Single Page Application (SPA).
-  - The main UI of DW: DevWallet (a React app).
+  - The main UI of DevWallet (a React app).
   - It is exposed to the global [Web Extension APIs](https://developer.chrome.com/docs/extensions/reference/) (ie. `chrome.runtime`).
 - **Background** service worker:
   - A service worker that runs in isolation in the background. The **Background** context is responsible for: handling RPC requests, external network requests, initializing the extension context menu, registering content scripts, etc.
@@ -143,7 +143,7 @@ If the versions are not correct or you don't have Bun installed, download and fo
 
 ### Installing Anvil
 
-DW: DevWallet uses [Anvil](https://book.getfoundry.sh/anvil/) to spin up a forked Ethereum node.
+DevWallet uses [Anvil](https://book.getfoundry.sh/anvil/) to spin up a forked Ethereum node.
 
 Install Anvil using the following command:
 
@@ -188,7 +188,7 @@ You can install the Web Extension separately in your browser. To do so, follow t
 1. Open your browser's Extensions page
 2. Enable "Developer mode" in the top right corner
 3. Click "Load unpacked" in the top left corner
-4. Select the `dist/dev` folder in DW: DevWallet's root directory
+4. Select the `dist/dev` folder in DevWallet's root directory
 5. You're good to go! Don't forget to pin the Extension to your browser's toolbar for easy access. 🎉
 
 <div align="right">
@@ -213,7 +213,7 @@ When you submit a pull request, GitHub will automatically lint, build, and test 
 ---
 
 <div align="center">
-  ✅ Now you're ready to contribute to DW: DevWallet!
+  ✅ Now you're ready to contribute to DevWallet!
 </div>
 
 ---

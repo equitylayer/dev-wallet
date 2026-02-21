@@ -1,9 +1,8 @@
 import * as chains from 'viem/chains'
 
+import { uniqueBy } from 'remeda'
 import { useSyncExternalStoreWithTracked } from '~/hooks/useSyncExternalStoreWithTracked'
 import { getClient } from '~/viem'
-
-import { uniqBy } from 'remeda'
 import { createStore } from './utils'
 
 type RpcUrl = string
@@ -118,7 +117,7 @@ export const networkStore = createStore<NetworkStore>(
           ...(rpcUrl === state.network.rpcUrl && {
             network,
           }),
-          networks: uniqBy(networks, (x) => x.rpcUrl),
+          networks: uniqueBy(networks, (x) => x.rpcUrl),
         }
       })
     },

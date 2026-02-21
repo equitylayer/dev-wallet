@@ -45,7 +45,7 @@ export function injectProvider() {
   announceProvider({
     info: {
       icon: generateBrandIcon(),
-      name: 'DW: DevWallet',
+      name: 'DevWallet',
       rdns: 'wallet.devwallet',
       uuid: uuidv4(),
     },

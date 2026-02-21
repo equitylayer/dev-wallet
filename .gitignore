@@ -32,3 +32,5 @@ test/contracts/out
 
 .idea/
 .claude/
+
+*.pem

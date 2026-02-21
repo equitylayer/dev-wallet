@@ -1,4 +1,4 @@
-import type { AbiParameter } from 'abitype'
+import type { AbiParameter } from 'viem'
 import { Fragment } from 'react'
 import type { AbiItem } from 'viem'
 

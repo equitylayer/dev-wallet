@@ -1,4 +1,4 @@
-import { uniqBy } from 'remeda'
+import { uniqueBy } from 'remeda'
 import type {
   Address,
   JsonRpcAccount as JsonRpcAccount_,
@@ -92,7 +92,7 @@ export const accountStore = createStore<AccountStore>(
         return {
           ...state,
           account: get().account || accounts[0],
-          accounts: uniqBy(
+          accounts: uniqueBy(
             [
               ...state.accounts.filter(
                 (x) => x.rpcUrl !== rpcUrl || x.impersonate,
@@ -132,7 +132,7 @@ export const accountStore = createStore<AccountStore>(
           ...(key === state.account?.key && {
             account,
           }),
-          accounts: uniqBy(accounts, (x) => x.key),
+          accounts: uniqueBy(accounts, (x) => x.key),
         }
       })
     },

@@ -1,6 +1,6 @@
 import * as Tabs from '@radix-ui/react-tabs'
 import { useMutation } from '@tanstack/react-query'
-import type { Abi, AbiFunction } from 'abitype'
+import type { Abi, AbiFunction } from 'viem'
 import { useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { useParams } from 'react-router'

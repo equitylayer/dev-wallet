@@ -1,4 +1,4 @@
-import type { Address } from 'abitype'
+import type { Address } from 'viem'
 import type { GetLogsParameters } from 'viem'
 import { erc20Abi } from 'viem'
 

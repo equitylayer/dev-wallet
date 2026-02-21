@@ -495,7 +495,7 @@ function Blocks() {
         ),
         { size: 40, type: 'load-more' },
       ],
-      [blocks],
+      [blocks.length],
     ),
   })
 
@@ -719,7 +719,7 @@ function Transactions() {
         ),
         !debouncedSearchText ? { size: 40, type: 'load-more' } : undefined,
       ],
-      [isLoading, isEmpty, transactions, debouncedSearchText],
+      [isLoading, isEmpty, transactions.length, debouncedSearchText],
     ),
   })
 
@@ -950,7 +950,7 @@ function Contracts() {
             }) as const,
         ),
       ],
-      [contracts],
+      [contracts.length],
     ),
   })
 

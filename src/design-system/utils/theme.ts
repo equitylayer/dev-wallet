@@ -9,7 +9,6 @@ export function getTheme(): {
       ? (localStorage.getItem('theme') as Theme)
       : null
   const systemTheme =
-    // eslint-disable-next-line no-nested-ternary
     typeof window !== 'undefined'
       ? window.matchMedia('(prefers-color-scheme: light)').matches
         ? 'light'
