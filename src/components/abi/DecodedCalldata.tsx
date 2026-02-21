@@ -1,4 +1,4 @@
-import type { AbiFunction } from 'abitype'
+import type { AbiFunction } from 'viem'
 import { type ReactNode, useMemo } from 'react'
 import {
   type Abi,

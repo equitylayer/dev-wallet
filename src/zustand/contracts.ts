@@ -1,5 +1,5 @@
 import { selectorsFromBytecode } from '@shazow/whatsabi'
-import type { Abi, Address } from 'abitype'
+import type { Abi, Address } from 'viem'
 import type { Hex, TransactionReceipt } from 'viem'
 import { useStore } from 'zustand'
 
