@@ -245,9 +245,12 @@ function SyncJsonRpcAccounts() {
   const { getAccounts, setJsonRpcAccounts } = useAccountStore()
 
   useEffect(() => {
+    if (!chainId) return
     ;(async () => {
-      const addresses = await client.getAddresses()
-      setJsonRpcAccounts({ addresses, rpcUrl: client.rpcUrl })
+      try {
+        const addresses = await client.getAddresses()
+        setJsonRpcAccounts({ addresses, rpcUrl: client.rpcUrl })
+      } catch {}
     })()
   }, [getAccounts, chainId, setJsonRpcAccounts, client])
 

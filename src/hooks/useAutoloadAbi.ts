@@ -2,7 +2,7 @@ import { loaders, whatsabi } from '@shazow/whatsabi'
 import { queryOptions, useQuery } from '@tanstack/react-query'
 import type { Address, Client } from 'viem'
 import { createQueryKey } from '~/react-query'
-import { etherscanApiUrls } from '../constants/etherscan'
+import { settingsStore } from '~/zustand'
 import { useClient } from './useClient'
 
 type AutoloadAbiParameters = {
@@ -28,6 +28,7 @@ export function useAutoloadAbiQueryOptions({
     async queryFn() {
       if (!address) throw new Error('address is required')
       if (!client) throw new Error('client is required')
+      const { etherscanApiKey } = settingsStore.getState()
       const result = await whatsabi.autoload(address, {
         provider: client,
         followProxies: true,
@@ -35,9 +36,9 @@ export function useAutoloadAbiQueryOptions({
           new loaders.SourcifyABILoader({
             chainId: client.chain.id,
           }),
-          new loaders.EtherscanABILoader({
-            baseURL:
-              (etherscanApiUrls as any)[client.chain.id] || etherscanApiUrls[1],
+          new loaders.EtherscanV2ABILoader({
+            apiKey: etherscanApiKey ?? '',
+            chainId: client.chain.id,
           }),
         ]),
       })
