@@ -9,9 +9,10 @@ export default defineConfig({
       name: 'theme',
       entry: [join(__dirname, './utils/initializeTheme.critical.ts')],
     },
-    copyPublicDir: true,
+    copyPublicDir: false,
     minify: true,
     outDir: 'public',
     emptyOutDir: false,
   },
+  publicDir: false,
 })

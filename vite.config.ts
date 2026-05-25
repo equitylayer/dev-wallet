@@ -2,7 +2,6 @@ import webExtension from '@samrum/vite-plugin-web-extension'
 import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
-import tsconfigPaths from 'vite-tsconfig-paths'
 
 import { getManifest } from './manifest.config'
 
@@ -19,8 +18,10 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['mipd', 'viem', '@vanilla-extract/css'],
   },
+  resolve: {
+    tsconfigPaths: true,
+  },
   plugins: [
-    tsconfigPaths(),
     react(),
     vanillaExtractPlugin(),
     webExtension({
