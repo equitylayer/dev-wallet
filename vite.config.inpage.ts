@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import tsconfigPaths from 'vite-tsconfig-paths'
 
 import { outDir } from './vite.config'
 
@@ -28,7 +29,5 @@ export default defineConfig({
       ],
     },
   },
-  resolve: {
-    tsconfigPaths: true,
-  },
+  plugins: [tsconfigPaths()],
 })

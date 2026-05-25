@@ -5,11 +5,13 @@ export type SettingsState = {
   bypassConnectAuth?: boolean
   bypassSignatureAuth?: boolean
   bypassTransactionAuth?: boolean
+  etherscanApiKey?: string
 }
 export type SettingsActions = {
   setBypassConnectAuth: (value?: boolean) => void
   setBypassSignatureAuth: (value?: boolean) => void
   setBypassTransactionAuth: (value?: boolean) => void
+  setEtherscanApiKey: (value?: string) => void
 }
 export type SettingsStore = SettingsState & SettingsActions
 
@@ -18,6 +20,7 @@ export const settingsStore = createStore<SettingsStore>(
     bypassConnectAuth: false,
     bypassSignatureAuth: false,
     bypassTransactionAuth: false,
+    etherscanApiKey: '',
     setBypassConnectAuth(value) {
       set({ bypassConnectAuth: value })
     },
@@ -27,11 +30,14 @@ export const settingsStore = createStore<SettingsStore>(
     setBypassTransactionAuth(value) {
       set({ bypassTransactionAuth: value })
     },
+    setEtherscanApiKey(value) {
+      set({ etherscanApiKey: value })
+    },
   }),
   {
     persist: {
       name: 'settings',
-      version: 0,
+      version: 1,
     },
   },
 )

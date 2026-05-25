@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Inline,
+  Input,
   Inset,
   Stack,
   Text,
@@ -17,10 +18,16 @@ export default function Settings() {
     bypassConnectAuth,
     bypassSignatureAuth,
     bypassTransactionAuth,
+    etherscanApiKey,
     setBypassConnectAuth,
     setBypassSignatureAuth,
     setBypassTransactionAuth,
+    setEtherscanApiKey,
   } = useSettingsStore()
+
+  const [etherscanApiKeyDraft, setEtherscanApiKeyDraft] = useState(
+    etherscanApiKey ?? '',
+  )
 
   const [currentTheme, setCurrentTheme] = useState(() => {
     const { storageTheme, systemTheme } = getTheme()
@@ -33,7 +40,41 @@ export default function Settings() {
   }
 
   return (
-    <Container dismissable fit header="Settings">
+    <Container
+      dismissable
+      fit
+      header="Settings"
+      footer={
+        <Inline alignHorizontal="justify" alignVertical="center" wrap={false}>
+          <Text color="text/tertiary" size="11px">
+            Version {chrome.runtime.getManifest().version}
+          </Text>
+          <a
+            href="https://github.com/equitylayer"
+            target="_blank"
+            rel="noreferrer noopener"
+            style={{ textDecoration: 'none' }}
+          >
+            <Inline gap="6px" alignVertical="center" wrap={false}>
+              <img
+                src={
+                  currentTheme === 'dark'
+                    ? '/logo-white.png'
+                    : '/obolos-logo.png'
+                }
+                alt=""
+                height={14}
+                width={14}
+                style={{ display: 'block' }}
+              />
+              <Text color="text/tertiary" size="11px">
+                by obolos ↗
+              </Text>
+            </Inline>
+          </a>
+        </Inline>
+      }
+    >
       <Stack gap="16px">
         <Text color="text/tertiary">Appearance</Text>
         <Inset right="4px">
@@ -78,6 +119,40 @@ export default function Settings() {
                 </Button>
               </Box>
             </Inline>
+          </Stack>
+        </Inset>
+        <Text color="text/tertiary">ABI Loaders</Text>
+        <Inset right="4px">
+          <Stack gap="6px">
+            <Inline
+              alignVertical="center"
+              alignHorizontal="justify"
+              wrap={false}
+            >
+              <Text size="12px">Etherscan API key</Text>
+              <a
+                href="https://etherscan.io/myapikey"
+                target="_blank"
+                rel="noreferrer noopener"
+                style={{ textDecoration: 'none' }}
+              >
+                <Text color="text/tertiary" size="11px">
+                  Get one ↗
+                </Text>
+              </a>
+            </Inline>
+            <Input
+              height="24px"
+              type="password"
+              placeholder="Paste key..."
+              value={etherscanApiKeyDraft}
+              onChange={(e) => setEtherscanApiKeyDraft(e.target.value)}
+              onBlur={() => setEtherscanApiKey(etherscanApiKeyDraft.trim())}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter')
+                  (e.target as HTMLInputElement).blur()
+              }}
+            />
           </Stack>
         </Inset>
         <Text color="text/tertiary">Cheats</Text>

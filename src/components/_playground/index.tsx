@@ -6,7 +6,8 @@ import ReactDOM from 'react-dom/client'
 
 import '~/design-system/styles/global.css'
 
-import { DecodedAbiParameters, FormattedAbiItem } from '~/components'
+import { DecodedAbiParameters } from '../abi/DecodedAbiParameters'
+import { FormattedAbiItem } from '../abi/FormattedAbiItem'
 import { Box, Stack, Text, type Theme } from '~/design-system'
 import { AbiParametersInputs } from '../abi/AbiParametersInputs.playground'
 import { fulfillAvailableAdvancedOrdersAbiItem } from './constants'

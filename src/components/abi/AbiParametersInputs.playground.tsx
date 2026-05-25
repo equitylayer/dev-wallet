@@ -1,6 +1,6 @@
 import { FormProvider, useForm } from 'react-hook-form'
 
-import { AbiParametersInputs as AbiParametersInputs_ } from '~/components'
+import { AbiParametersInputs as AbiParametersInputs_ } from './AbiParametersInputs'
 import * as Form from '~/components/form'
 import { Button, Stack } from '~/design-system'
 import { normalizeAbiParametersValues } from '~/utils/normalizeAbiParametersValues'

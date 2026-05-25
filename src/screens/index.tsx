@@ -1,64 +1,27 @@
 import * as Tabs from '@radix-ui/react-tabs'
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef } from 'react'
 import { useForm } from 'react-hook-form'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import {
-  type Address,
-  type Block,
-  type Hex,
-  type Transaction,
-  formatEther,
-  isAddress,
-  parseEther,
-} from 'viem'
+import { type Address, type Block, formatEther, type Hex, isAddress, type Transaction, } from 'viem'
+import { Container, LoadMore, TabsContent, TabsList, useVirtualList, } from '~/components'
 
-import {
-  Container,
-  LabelledContent,
-  LoadMore,
-  TabsContent,
-  TabsList,
-  useVirtualList,
-} from '~/components'
+import { AccountCard } from '~/components/AccountCard'
 import * as Form from '~/components/form'
-import { Spinner } from '~/components/svgs'
-import {
-  Bleed,
-  Box,
-  Button,
-  Column,
-  Columns,
-  Inline,
-  Input,
-  Inset,
-  SFSymbol,
-  Separator,
-  Stack,
-  Text,
-} from '~/design-system'
+import { Box, Button, Column, Columns, Inline, Input, Inset, Separator, SFSymbol, Stack, Text, } from '~/design-system'
 import { useAccounts } from '~/hooks/useAccounts'
-import { useBalance } from '~/hooks/useBalance'
 import { useClient } from '~/hooks/useClient'
 import { useContracts } from '~/hooks/useContracts'
 import { useDebounce } from '~/hooks/useDebounce'
-import { useInfiniteBlockTransactions } from '~/hooks/useInfiniteBlockTransactions'
 import { useInfiniteBlocks } from '~/hooks/useInfiniteBlocks'
-import { useNonce } from '~/hooks/useNonce'
+import { useInfiniteBlockTransactions } from '~/hooks/useInfiniteBlockTransactions'
 import { usePendingBlock } from '~/hooks/usePendingBlock'
 import { usePendingTransactions } from '~/hooks/usePendingTransactions'
 import { useSearchParamsState } from '~/hooks/useSearchParamsState'
 import { useSetAccount } from '~/hooks/useSetAccount'
-import { useSetBalance } from '~/hooks/useSetBalance'
-import { useSetNonce } from '~/hooks/useSetNonce'
 import { useTransaction } from '~/hooks/useTransaction'
-import { isDomain, truncate } from '~/utils'
-import {
-  useAccountStore,
-  useNetworkStore,
-  useScrollPositionStore,
-} from '~/zustand'
-import type { Account } from '~/zustand/account'
+import { isDomain } from '~/utils'
+import { useAccountStore, useNetworkStore, useScrollPositionStore, } from '~/zustand'
 
 import { useRevert } from '../hooks/useRevert'
 import { useSnapshot } from '../hooks/useSnapshot'
@@ -121,194 +84,13 @@ function Accounts() {
           <Box marginHorizontal="-8px">
             <Separator />
           </Box>
-          <AccountRow account={account} />
+          <AccountCard account={account} />
         </Fragment>
       ))}
     </>
   )
 }
 
-function AccountRow({ account }: { account: Account }) {
-  const {
-    account: activeAccount,
-    removeAccount,
-    upsertAccount,
-  } = useAccountStore()
-  const { mutateAsync: setAccount } = useSetAccount()
-
-  const [isEditingAlias, setIsEditingAlias] = useState(false)
-  const [aliasValue, setAliasValue] = useState(account.displayName ?? '')
-  const aliasInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (isEditingAlias) aliasInputRef.current?.focus()
-  }, [isEditingAlias])
-
-  const saveAlias = () => {
-    const trimmed = aliasValue.trim()
-    upsertAccount({
-      account: {
-        ...account,
-        displayName: trimmed || undefined,
-      },
-    })
-    setIsEditingAlias(false)
-  }
-
-  const cancelAlias = () => {
-    setAliasValue(account.displayName ?? '')
-    setIsEditingAlias(false)
-  }
-
-  const active = activeAccount?.address === account.address
-  const truncatedAddress =
-    account.address && account.address.length > 0
-      ? truncate(
-          account.address,
-          account.displayName ? { start: 5, end: 4 } : { start: 8, end: 6 },
-        )
-      : undefined
-  return (
-    <Box
-      backgroundColor={active ? 'surface/fill/tertiary' : undefined}
-      marginHorizontal="-8px"
-      paddingHorizontal="8px"
-      paddingVertical="12px"
-      position="relative"
-      style={{ height: '100px' }}
-    >
-      {account.state === 'loaded' && (
-        <Box position="absolute" style={{ top: '12px', right: '12px' }}>
-          <Inline gap="4px" wrap={false}>
-            {account.impersonate && (
-              <Button.Symbol
-                label="Remove"
-                symbol="trash"
-                height="24px"
-                variant="stroked red"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  removeAccount({ account })
-                }}
-              />
-            )}
-            {!active && (
-              <Button.Symbol
-                label="Select Account"
-                symbol="wallet.pass"
-                height="24px"
-                variant="stroked fill"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setAccount({ account, setActive: true })
-                }}
-              />
-            )}
-            <Link to={`account/${account.address}`}>
-              <Button.Symbol
-                label="View Details"
-                symbol="arrow.right"
-                height="24px"
-                variant={active ? 'solid invert' : 'stroked fill'}
-                onClick={() => {}}
-              />
-            </Link>
-          </Inline>
-        </Box>
-      )}
-      {account.state === 'loading' && (
-        <Box position="absolute" style={{ top: '12px', right: '12px' }}>
-          <Spinner size="12px" />
-        </Box>
-      )}
-      <Stack gap="16px">
-        <Box width="fit" position="relative">
-          {isEditingAlias ? (
-            <Input
-              ref={aliasInputRef}
-              height="24px"
-              placeholder="Address alias..."
-              value={aliasValue}
-              onChange={(e) => setAliasValue(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              onBlur={saveAlias}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') saveAlias()
-                if (e.key === 'Escape') cancelAlias()
-              }}
-              style={{ maxWidth: '200px' }}
-            />
-          ) : (
-            <Inline gap="8px">
-              {account.state === 'loading' && (
-                <Text color="text/tertiary" size="12px">
-                  {truncate(account.key, { start: 20, end: 20 })}
-                </Text>
-              )}
-              {account.displayName && (
-                <Text size="12px">{account.displayName}</Text>
-              )}
-              <Box title={account.address}>
-                <Text
-                  color={account.displayName ? 'text/tertiary' : undefined}
-                  family="address"
-                  size="12px"
-                >
-                  {truncatedAddress ?? account.address}
-                </Text>
-              </Box>
-              {account.state === 'loaded' && (
-                <Box style={{ marginTop: '-4px' }}>
-                  <Button.Symbol
-                    label="Edit Alias"
-                    symbol="square.and.pencil"
-                    height="20px"
-                    variant="ghost primary"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setAliasValue(account.displayName ?? '')
-                      setIsEditingAlias(true)
-                    }}
-                  />
-                </Box>
-              )}
-              {account.address && (
-                <Box position="absolute" style={{ right: -24, top: -6 }}>
-                  <Button.Copy
-                    height="20px"
-                    text={account.address!}
-                    variant="ghost primary"
-                  />
-                </Box>
-              )}
-            </Inline>
-          )}
-        </Box>
-        <Inline gap="4px">
-          <Box style={{ width: '100px' }}>
-            <Balance address={account.address} />
-          </Box>
-          <Box style={{ width: '50px' }}>
-            <Nonce address={account.address} />
-          </Box>
-        </Inline>
-      </Stack>
-      {active && (
-        <Text
-          color="text/accent/active"
-          size="9px"
-          style={{
-            position: 'absolute',
-            bottom: '8px',
-            left: '8px',
-          }}
-        >
-          ACTIVE
-        </Text>
-      )}
-    </Box>
-  )
-}
 
 function ImportAccount() {
   const {
@@ -397,73 +179,6 @@ function ImportAccount() {
   )
 }
 
-function Balance({ address }: { address?: Address }) {
-  const { data: balance, isSuccess } = useBalance({ address })
-  const { mutate } = useSetBalance()
-
-  const [value, setValue] = useState(balance ? formatEther(balance) : '0')
-  useEffect(() => {
-    if (balance) setValue(formatEther(balance))
-  }, [balance])
-
-  const disabled = !isSuccess || !address
-
-  return (
-    <LabelledContent label="Balance (ETH)">
-      <Bleed top="-2px">
-        <Input
-          disabled={disabled}
-          onChange={(e) => setValue(e.target.value)}
-          onClick={(e) => e.stopPropagation()}
-          onBlur={(e) =>
-            address
-              ? mutate({
-                  address,
-                  value: parseEther(e.target.value as `${number}`),
-                })
-              : undefined
-          }
-          height="24px"
-          value={disabled ? '' : value}
-        />
-      </Bleed>
-    </LabelledContent>
-  )
-}
-
-function Nonce({ address }: { address?: Address }) {
-  const { data: nonce, isSuccess } = useNonce({ address })
-  const { mutate } = useSetNonce()
-
-  const [value, setValue] = useState(nonce?.toString() ?? '0')
-  useEffect(() => {
-    if (nonce) setValue(nonce?.toString() ?? '0')
-  }, [nonce])
-
-  const disabled = !isSuccess || !address
-
-  return (
-    <LabelledContent label="Nonce">
-      <Bleed top="-2px">
-        <Input
-          disabled={disabled}
-          onChange={(e) => setValue(e.target.value)}
-          onClick={(e) => e.stopPropagation()}
-          value={disabled ? '' : value}
-          onBlur={(e) =>
-            address
-              ? mutate({
-                  address,
-                  nonce: Number(e.target.value),
-                })
-              : undefined
-          }
-          height="24px"
-        />
-      </Bleed>
-    </LabelledContent>
-  )
-}
 
 ////////////////////////////////////////////////////////////////////////
 // Blocks
