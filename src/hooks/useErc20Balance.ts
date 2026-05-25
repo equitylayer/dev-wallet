@@ -23,7 +23,7 @@ export function useErc20BalanceQueryOptions({
   const client = useClient()
 
   return queryOptions({
-    enabled: Boolean(address),
+    enabled: Boolean(address && tokenAddress),
     queryKey: getErc20BalanceQueryKey([client.key, { tokenAddress, address }]),
     async queryFn() {
       const contract = getContract({
