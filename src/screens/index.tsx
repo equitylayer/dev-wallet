@@ -139,6 +139,7 @@ function AccountRow({ account }: { account: Account }) {
   const [isEditingAlias, setIsEditingAlias] = useState(false)
   const [aliasValue, setAliasValue] = useState(account.displayName ?? '')
   const aliasInputRef = useRef<HTMLInputElement>(null)
+  const [isEditingValues, setIsEditingValues] = useState(false)
 
   useEffect(() => {
     if (isEditingAlias) aliasInputRef.current?.focus()
@@ -248,11 +249,11 @@ function AccountRow({ account }: { account: Account }) {
               {account.displayName && (
                 <Text size="12px">{account.displayName}</Text>
               )}
-              <Box title={account.address}>
+              <Box title={account.address} style={{ alignSelf: 'center' }}>
                 <Text
                   color={account.displayName ? 'text/tertiary' : undefined}
                   family="address"
-                  size="12px"
+                  size={account.displayName ? '11px' : '12px'}
                 >
                   {truncatedAddress ?? account.address}
                 </Text>
@@ -284,13 +285,35 @@ function AccountRow({ account }: { account: Account }) {
             </Inline>
           )}
         </Box>
-        <Inline gap="4px">
+        <Inline gap="8px" alignVertical="bottom">
           <Box style={{ width: '100px' }}>
-            <Balance address={account.address} />
+            <Balance
+              address={account.address}
+              isEditing={isEditingValues}
+              onDone={() => setIsEditingValues(false)}
+            />
           </Box>
           <Box style={{ width: '50px' }}>
-            <Nonce address={account.address} />
+            <Nonce
+              address={account.address}
+              isEditing={isEditingValues}
+              onDone={() => setIsEditingValues(false)}
+            />
           </Box>
+          {account.state === 'loaded' && (
+            <Box style={{ marginBottom: '-2px' }}>
+              <Button.Symbol
+                label={isEditingValues ? 'Done editing' : 'Edit balance and nonce'}
+                symbol={isEditingValues ? 'checkmark' : 'square.and.pencil'}
+                height="20px"
+                variant={isEditingValues ? 'solid invert' : 'ghost primary'}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsEditingValues((v) => !v)
+                }}
+              />
+            </Box>
+          )}
         </Inline>
       </Stack>
       {active && (
@@ -397,41 +420,92 @@ function ImportAccount() {
   )
 }
 
-function Balance({ address }: { address?: Address }) {
+function formatBalanceDisplay(formatted: string, maxDecimals = 2): string {
+  const [whole, decimal] = formatted.split('.')
+  if (!decimal) return whole
+  const trimmed = decimal.slice(0, maxDecimals).replace(/0+$/, '')
+  return trimmed ? `${whole}.${trimmed}` : whole
+}
+
+function Balance({
+  address,
+  isEditing,
+  onDone,
+}: {
+  address?: Address
+  isEditing?: boolean
+  onDone?: () => void
+}) {
   const { data: balance, isSuccess } = useBalance({ address })
   const { mutate } = useSetBalance()
 
   const [value, setValue] = useState(balance ? formatEther(balance) : '0')
+  const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (balance) setValue(formatEther(balance))
   }, [balance])
+  useEffect(() => {
+    if (isEditing) inputRef.current?.focus()
+  }, [isEditing])
 
   const disabled = !isSuccess || !address
+  const displayValue = disabled ? '—' : formatBalanceDisplay(value, 2)
 
   return (
     <LabelledContent label="Balance (ETH)">
       <Bleed top="-2px">
-        <Input
-          disabled={disabled}
-          onChange={(e) => setValue(e.target.value)}
-          onClick={(e) => e.stopPropagation()}
-          onBlur={(e) =>
-            address
-              ? mutate({
-                  address,
-                  value: parseEther(e.target.value as `${number}`),
-                })
-              : undefined
-          }
-          height="24px"
-          value={disabled ? '' : value}
-        />
+        {isEditing ? (
+          <Input
+            ref={inputRef}
+            disabled={disabled}
+            onChange={(e) => setValue(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onBlur={(e) =>
+              address
+                ? mutate({
+                    address,
+                    value: parseEther(e.target.value as `${number}`),
+                  })
+                : undefined
+            }
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === 'Escape') {
+                ;(e.target as HTMLInputElement).blur()
+                onDone?.()
+              }
+            }}
+            height="24px"
+            value={disabled ? '' : value}
+          />
+        ) : (
+          <Box
+            title={disabled ? undefined : value}
+            style={{
+              height: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              overflow: 'hidden',
+            }}
+          >
+            <Text family="numeric" size="12px" wrap={false}>
+              {displayValue}
+            </Text>
+          </Box>
+        )}
       </Bleed>
     </LabelledContent>
   )
 }
 
-function Nonce({ address }: { address?: Address }) {
+function Nonce({
+  address,
+  isEditing,
+  onDone,
+}: {
+  address?: Address
+  isEditing?: boolean
+  onDone?: () => void
+}) {
   const { data: nonce, isSuccess } = useNonce({ address })
   const { mutate } = useSetNonce()
 
@@ -445,21 +519,35 @@ function Nonce({ address }: { address?: Address }) {
   return (
     <LabelledContent label="Nonce">
       <Bleed top="-2px">
-        <Input
-          disabled={disabled}
-          onChange={(e) => setValue(e.target.value)}
-          onClick={(e) => e.stopPropagation()}
-          value={disabled ? '' : value}
-          onBlur={(e) =>
-            address
-              ? mutate({
-                  address,
-                  nonce: Number(e.target.value),
-                })
-              : undefined
-          }
-          height="24px"
-        />
+        {isEditing ? (
+          <Input
+            disabled={disabled}
+            onChange={(e) => setValue(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            value={disabled ? '' : value}
+            onBlur={(e) =>
+              address
+                ? mutate({
+                    address,
+                    nonce: Number(e.target.value),
+                  })
+                : undefined
+            }
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === 'Escape') {
+                ;(e.target as HTMLInputElement).blur()
+                onDone?.()
+              }
+            }}
+            height="24px"
+          />
+        ) : (
+          <Box style={{ height: '24px', display: 'flex', alignItems: 'center' }}>
+            <Text family="numeric" size="12px" wrap={false}>
+              {disabled ? '—' : value}
+            </Text>
+          </Box>
+        )}
       </Bleed>
     </LabelledContent>
   )

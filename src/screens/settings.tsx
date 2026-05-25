@@ -118,6 +118,11 @@ export default function Settings() {
             </Inline>
           </Stack>
         </Inset>
+        <Inline alignHorizontal="center">
+          <Text color="text/tertiary" size="11px">
+            Version {chrome.runtime.getManifest().version}
+          </Text>
+        </Inline>
       </Stack>
     </Container>
   )

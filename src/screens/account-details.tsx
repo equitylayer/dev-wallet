@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { type Address, type BaseError, formatUnits, isAddress } from 'viem'
+import { type Address, formatUnits, isAddress } from 'viem'
 
 import { TabsContent, TabsList, Tooltip } from '~/components'
 import * as Form from '~/components/form'
@@ -220,17 +220,7 @@ function TokenRow({ accountAddress, tokenAddress }: TokenRowProps) {
 
   useEffect(() => {
     if (!tokenAddress) return
-
-    if (balanceError) {
-      toast.error((balanceError as BaseError).shortMessage)
-      removeToken({ tokenAddress })
-      return
-    }
-    if (metadataError) {
-      toast.error((metadataError as BaseError).shortMessage)
-      removeToken({ tokenAddress })
-      return
-    }
+    if (balanceError || metadataError) removeToken({ tokenAddress })
   }, [metadataError, balanceError, tokenAddress, removeToken])
 
   const balance = isNative ? nativeBalance : erc20Balance
