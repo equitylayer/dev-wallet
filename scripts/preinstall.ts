@@ -1,6 +1,6 @@
-import whichPmRuns from 'which-pm-runs'
+import { whichPMRuns } from 'which-pm-runs'
 
-const pm = whichPmRuns()
+const pm = whichPMRuns()
 if (pm?.name !== 'bun')
   throw new Error(
     `\`${pm?.name} install\` is not supported. Please run \`bun install\``,
