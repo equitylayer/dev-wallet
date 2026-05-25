@@ -33,7 +33,41 @@ export default function Settings() {
   }
 
   return (
-    <Container dismissable fit header="Settings">
+    <Container
+      dismissable
+      fit
+      header="Settings"
+      footer={
+        <Inline alignHorizontal="justify" alignVertical="center" wrap={false}>
+          <Text color="text/tertiary" size="11px">
+            Version {chrome.runtime.getManifest().version}
+          </Text>
+          <a
+            href="https://github.com/equitylayer"
+            target="_blank"
+            rel="noreferrer noopener"
+            style={{ textDecoration: 'none' }}
+          >
+            <Inline gap="6px" alignVertical="center" wrap={false}>
+              <img
+                src={
+                  currentTheme === 'dark'
+                    ? '/logo-white.png'
+                    : '/obolos-logo.png'
+                }
+                alt=""
+                height={14}
+                width={14}
+                style={{ display: 'block' }}
+              />
+              <Text color="text/tertiary" size="11px">
+                by obolos ↗
+              </Text>
+            </Inline>
+          </a>
+        </Inline>
+      }
+    >
       <Stack gap="16px">
         <Text color="text/tertiary">Appearance</Text>
         <Inset right="4px">
@@ -118,11 +152,6 @@ export default function Settings() {
             </Inline>
           </Stack>
         </Inset>
-        <Inline alignHorizontal="center">
-          <Text color="text/tertiary" size="11px">
-            Version {chrome.runtime.getManifest().version}
-          </Text>
-        </Inline>
       </Stack>
     </Container>
   )
