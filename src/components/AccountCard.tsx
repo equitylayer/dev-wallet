@@ -50,8 +50,10 @@ function DrawerPull({
       display="flex"
       alignItems="center"
       justifyContent="center"
-      backgroundColor={{ hover: 'surface/fill/tertiary' }}
-      borderLeftWidth="1px"
+      backgroundColor={{
+        default: 'surface/fill/quarternary',
+        hover: 'surface/fill/tertiary',
+      }}
       onClick={onClick}
       style={{
         width: '44px',
@@ -190,7 +192,12 @@ export function AccountCard({ account }: { account: Account }) {
             </Box>
           </Box>
         ) : (
-          <Inline alignVertical="center" gap="6px" alignHorizontal="left">
+          <Inline
+            alignVertical="center"
+            gap="6px"
+            alignHorizontal="left"
+            wrap={false}
+          >
             {account.displayName ? (
               <Text size="12px" wrap={false}>
                 {account.displayName}
@@ -242,7 +249,12 @@ export function AccountCard({ account }: { account: Account }) {
 
         {/* ROW 2 (only when alias exists): address + copy */}
         {!isLoading && account.address && account.displayName && (
-          <Inline alignVertical="center" gap="6px" alignHorizontal="left">
+          <Inline
+            alignVertical="center"
+            gap="6px"
+            alignHorizontal="left"
+            wrap={false}
+          >
             <Box title={account.address}>
               <Text
                 color="text/tertiary"
@@ -268,7 +280,12 @@ export function AccountCard({ account }: { account: Account }) {
 
         {/* ROW 3: balance + nonce + edit pencil */}
         {!isLoading && (
-          <Inline alignVertical="center" gap="12px" alignHorizontal="left">
+          <Inline
+            alignVertical="center"
+            gap="12px"
+            alignHorizontal="left"
+            wrap={false}
+          >
             <Balance
               address={account.address}
               isEditing={isEditingValues}
