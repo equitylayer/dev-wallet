@@ -27,7 +27,9 @@ export function useAccountTokensQueryOptions(args: UseAccountTokensParameters) {
   const client = useClient()
 
   return queryOptions({
-    enabled: Boolean(address && network.forkBlockNumber),
+    enabled: Boolean(
+      address && typeof network.forkBlockNumber === 'bigint',
+    ),
     queryKey: getAccountTokensQueryKey([client.key, address, stringify(args)]),
     // Refetch tokens periodically to detect new transfers
     refetchInterval: 3000,

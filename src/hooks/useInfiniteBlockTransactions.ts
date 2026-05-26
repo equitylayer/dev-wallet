@@ -41,16 +41,14 @@ export function useInfiniteBlockTransactionsQueryOptions() {
         }
       }
 
-      let count = 0
       let transactions: Transaction[] = []
-      while (transactions.length < limit && count < 10 && blockNumber > 0n) {
+      while (transactions.length < limit && blockNumber > 0n) {
         const block_ = await client.getBlock({
           blockNumber,
           includeTransactions: true,
         })
         transactions = [...transactions, ...block_.transactions]
         blockNumber--
-        count++
       }
       return transactions
     },

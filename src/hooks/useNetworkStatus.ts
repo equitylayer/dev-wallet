@@ -50,14 +50,19 @@ export function useNetworkStatus({
             })
           }
 
-          // If there is no fork block number, update to the current block number.
           if (typeof network.forkBlockNumber !== 'bigint') {
-            ;(async () => {
+            upsertNetwork({
+              network: { forkBlockNumber: await client.getBlockNumber() },
+              rpcUrl: client.key,
+            })
+          } else {
+            const currentBlockNumber = await client.getBlockNumber()
+            if (currentBlockNumber < network.forkBlockNumber) {
               upsertNetwork({
-                network: { forkBlockNumber: await client.getBlockNumber() },
+                network: { forkBlockNumber: 0n },
                 rpcUrl: client.key,
               })
-            })()
+            }
           }
         }
 
