@@ -12,7 +12,7 @@ import { type Hex, formatGwei } from 'viem'
 import { History, Pickaxe } from 'lucide-react'
 
 import { Tooltip } from '~/components'
-import { DWLogo } from '~/components/svgs/DWLogo'
+import { DevWalletIcon } from '~/components/svgs/DevWalletIcon'
 import { useAppMeta } from '~/contexts'
 import {
   Box,
@@ -127,7 +127,7 @@ function HomeButton() {
         height="full"
         style={{ width: '36px' }}
       >
-        <DWLogo size="22px" />
+        <DevWalletIcon size="28px" />
       </Box>
     </Link>
   )

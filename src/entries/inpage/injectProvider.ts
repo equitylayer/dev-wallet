@@ -7,11 +7,24 @@ import { getProvider } from '~/provider'
 const backgroundMessenger = getMessenger('background:inpage')
 const walletMessenger = getMessenger('wallet:inpage')
 
-// Generate SVG icon based on DW logo
+// Generate SVG icon based on the extension app icon.
 function generateBrandIcon(): `data:image/${string}` {
-  const svg = `<svg viewBox="0 0 1108 1008" xmlns="http://www.w3.org/2000/svg">
-    <rect x="4" width="1000" height="1000" fill="black"/>
-    <path d="M130 755V395H430C441 395 451 397.667 460 403C469.333 408.333 476.667 415.667 482 425C487.333 434 490 444 490 455V695C490 706 487.333 716.167 482 725.5C476.667 734.5 469.333 741.667 460 747C451 752.333 441 755 430 755H130ZM190 714.5H430C435.333 714.5 439.833 712.667 443.5 709C447.5 705 449.5 700.333 449.5 695V455C449.5 449.667 447.5 445.167 443.5 441.5C439.833 437.5 435.333 435.5 430 435.5H190C184.667 435.5 180 437.5 176 441.5C172.333 445.167 170.5 449.667 170.5 455V695C170.5 700.333 172.333 705 176 709C180 712.667 184.667 714.5 190 714.5ZM666.492 755L535.492 395H578.492L683.992 684L788.992 395H837.992L943.492 684L1047.99 395H1091.99L960.992 755H925.492L813.492 447.5L701.492 755H666.492Z" fill="white"/>
+  const svg = `<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+    <rect x="32" y="32" width="960" height="960" rx="232" fill="url(#background)"/>
+    <path d="M230 244H506C660.773 244 790 363.837 790 512C790 660.163 660.773 780 506 780H230V244ZM376 390V634H506C581.994 634 644 579.918 644 512C644 444.082 581.994 390 506 390H376Z" fill="#F4F8EF" fill-rule="evenodd"/>
+    <path d="M474 456L542 512L474 568" stroke="url(#prompt)" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M572 604H670" stroke="#F4F8EF" stroke-width="58" stroke-linecap="round"/>
+    <defs>
+      <linearGradient id="background" x1="132" y1="84" x2="900" y2="956" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#172824"/>
+        <stop offset="0.5" stop-color="#10161A"/>
+        <stop offset="1" stop-color="#171B24"/>
+      </linearGradient>
+      <linearGradient id="prompt" x1="474" y1="456" x2="542" y2="568" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#83FFA1"/>
+        <stop offset="1" stop-color="#49DBE9"/>
+      </linearGradient>
+    </defs>
   </svg>`
   return `data:image/svg+xml,${encodeURIComponent(
     svg,
@@ -41,7 +54,6 @@ export function injectProvider() {
   })
 
   // Announce provider via EIP-6963 (modern multi-wallet support)
-  // This allows dapps to discover DevWallet even when other wallets are present
   announceProvider({
     info: {
       icon: generateBrandIcon(),

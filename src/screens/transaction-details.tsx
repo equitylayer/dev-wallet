@@ -292,6 +292,7 @@ export default function TransactionDetails() {
                   <DecodedCalldata
                     address={transaction.to || undefined}
                     data={transaction.input}
+                    showRawData
                   />
                 </TabsContent>
                 <TabsContent inset={false} scrollable={false} value="logs">

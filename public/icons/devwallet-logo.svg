@@ -1,18 +1,18 @@
-<svg width="1108" height="1008" viewBox="0 0 1108 1008" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g filter="url(#filter0_d_29_2)">
-<rect x="4" width="1000" height="1000" fill="black"/>
-</g>
-<path d="M130 755V395H430C441 395 451 397.667 460 403C469.333 408.333 476.667 415.667 482 425C487.333 434 490 444 490 455V695C490 706 487.333 716.167 482 725.5C476.667 734.5 469.333 741.667 460 747C451 752.333 441 755 430 755H130ZM190 714.5H430C435.333 714.5 439.833 712.667 443.5 709C447.5 705 449.5 700.333 449.5 695V455C449.5 449.667 447.5 445.167 443.5 441.5C439.833 437.5 435.333 435.5 430 435.5H190C184.667 435.5 180 437.5 176 441.5C172.333 445.167 170.5 449.667 170.5 455V695C170.5 700.333 172.333 705 176 709C180 712.667 184.667 714.5 190 714.5ZM666.492 755L535.492 395H578.492L683.992 684L788.992 395H837.992L943.492 684L1047.99 395H1091.99L960.992 755H925.492L813.492 447.5L701.492 755H666.492Z" fill="white"/>
-<defs>
-<filter id="filter0_d_29_2" x="0" y="0" width="1008" height="1008" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-<feFlood flood-opacity="0" result="BackgroundImageFix"/>
-<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
-<feOffset dy="4"/>
-<feGaussianBlur stdDeviation="2"/>
-<feComposite in2="hardAlpha" operator="out"/>
-<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
-<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_29_2"/>
-<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_29_2" result="shape"/>
-</filter>
-</defs>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>DevWallet Icon</title>
+  <rect x="32" y="32" width="960" height="960" rx="232" fill="url(#background)"/>
+  <path d="M230 244H506C660.773 244 790 363.837 790 512C790 660.163 660.773 780 506 780H230V244ZM376 390V634H506C581.994 634 644 579.918 644 512C644 444.082 581.994 390 506 390H376Z" fill="#F4F8EF" fill-rule="evenodd"/>
+  <path d="M474 456L542 512L474 568" stroke="url(#prompt)" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M572 604H670" stroke="#F4F8EF" stroke-width="58" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="background" x1="132" y1="84" x2="900" y2="956" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#172824"/>
+      <stop offset="0.5" stop-color="#10161A"/>
+      <stop offset="1" stop-color="#171B24"/>
+    </linearGradient>
+    <linearGradient id="prompt" x1="474" y1="456" x2="542" y2="568" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#83FFA1"/>
+      <stop offset="1" stop-color="#49DBE9"/>
+    </linearGradient>
+  </defs>
 </svg>
