@@ -1,7 +1,7 @@
 import { useId } from 'react'
 
 export function DevWalletIcon({ size }: { size: string }) {
-  const id = useId()
+  const id = useId().replace(/:/g, '')
   const backgroundId = `${id}-devwallet-icon-background`
   const promptId = `${id}-devwallet-icon-prompt`
 
