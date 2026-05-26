@@ -46,6 +46,7 @@ export function useAutoloadAbiQueryOptions({
         return null
       return result.abi.map((abiItem) => ({
         ...abiItem,
+        inputs: 'inputs' in abiItem && abiItem.inputs ? abiItem.inputs : [],
         outputs: 'outputs' in abiItem && abiItem.outputs ? abiItem.outputs : [],
       }))
     },

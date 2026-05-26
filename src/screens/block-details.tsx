@@ -7,7 +7,6 @@ import {
   Box,
   Column,
   Columns,
-  Inline,
   Separator,
   Stack,
   Text,
@@ -156,23 +155,14 @@ export default function BlockDetails() {
                           >
                             <Columns gap="6px" alignVertical="center">
                               <LabelledContent label="Hash">
-                                <Inline
-                                  alignVertical="center"
-                                  gap="4px"
-                                  wrap={false}
+                                <Tooltip
+                                  label={transaction.hash}
+                                  width="full"
                                 >
-                                  <Tooltip
-                                    label={transaction.hash}
-                                    width="full"
-                                  >
-                                    <Text.Truncated
-                                      family="address"
-                                      size="12px"
-                                    >
-                                      {transaction.hash}
-                                    </Text.Truncated>
-                                  </Tooltip>
-                                </Inline>
+                                  <Text.Truncated family="address" size="12px">
+                                    {transaction.hash}
+                                  </Text.Truncated>
+                                </Tooltip>
                               </LabelledContent>
                               <LabelledContent label="From">
                                 <Tooltip label={transaction.from} width="full">

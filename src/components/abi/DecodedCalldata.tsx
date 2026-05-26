@@ -95,6 +95,13 @@ export function DecodedCalldata({
     return { args: undefined, functionName: undefined }
   }, [abiItem, rawArgs])
 
+  if (!data || data === '0x')
+    return (
+      <Text color="text/tertiary" size="12px">
+        No calldata.
+      </Text>
+    )
+
   return (
     <Stack gap="20px">
       {!isFetched && (
