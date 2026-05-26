@@ -30,13 +30,13 @@ export function useContractsQueryOptions({
     staleTime: Number.POSITIVE_INFINITY,
     enabled: Boolean(
       enabled &&
-        block?.number &&
-        network.forkBlockNumber &&
-        block?.number > network.forkBlockNumber,
+        typeof block?.number === 'bigint' &&
+        typeof network.forkBlockNumber === 'bigint' &&
+        block.number > network.forkBlockNumber,
     ),
     queryKey: getContractsQueryKey([client.key]),
     async queryFn() {
-      if (!network.forkBlockNumber) throw new Error()
+      if (typeof network.forkBlockNumber !== 'bigint') throw new Error()
 
       const contracts = await getContracts(client, {
         fromBlock: network.forkBlockNumber + 1n,
