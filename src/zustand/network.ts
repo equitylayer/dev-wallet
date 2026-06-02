@@ -90,6 +90,9 @@ export const networkStore = createStore<NetworkStore>(
         }
       })()
       const name = (() => {
+        // Chain 31337 is shared by Anvil, Hardhat & Foundry — viem can't tell
+        // them apart, so use a neutral label rather than guessing a tool.
+        if (chainId === 31337) return 'Localhost'
         if (network_.name) return network_.name
         const chain = Object.values(chains).find(
           (chain) => chain.id === chainId,

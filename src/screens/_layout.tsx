@@ -9,7 +9,7 @@ import { getMessenger } from '../messengers'
 import PendingRequest from './pending-request'
 
 const headerHeight = '120px'
-const networkOfflineBypassPaths = ['networks', 'session']
+const networkOfflineBypassPaths = ['networks', 'session', 'settings']
 
 const contentMessenger = getMessenger('wallet:contentScript')
 
