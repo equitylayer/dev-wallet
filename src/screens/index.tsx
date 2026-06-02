@@ -21,6 +21,7 @@ import { useSearchParamsState } from '~/hooks/useSearchParamsState'
 import { useSetAccount } from '~/hooks/useSetAccount'
 import { useTransaction } from '~/hooks/useTransaction'
 import { isDomain } from '~/utils'
+import type { DeployedContract } from '~/utils/deployments'
 import { useAccountStore, useNetworkStore, useScrollPositionStore, } from '~/zustand'
 
 import { useRevert } from '../hooks/useRevert'
@@ -887,124 +888,123 @@ function ImportContract() {
   ])
 
   const foundryDirectoryInputRef = useRef<HTMLInputElement | null>(null)
+  const hardhatDirectoryInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
-    const element = foundryDirectoryInputRef.current
-    if (!element) return
-    element.setAttribute('webkitdirectory', 'true')
-    element.setAttribute('directory', 'true')
+    for (const element of [
+      foundryDirectoryInputRef.current,
+      hardhatDirectoryInputRef.current,
+    ]) {
+      if (!element) continue
+      element.setAttribute('webkitdirectory', 'true')
+      element.setAttribute('directory', 'true')
+    }
   }, [])
+
+  // Sync contracts discovered from a framework directory import into the
+  // contracts store and surface a summary toast. Shared by every importer.
+  const applyImportedContracts = (
+    contractsFromDirectory: DeployedContract[],
+    source: string,
+  ) => {
+    if (contractsFromDirectory.length === 0) {
+      toast.error('No deployed contracts found in selected directory')
+      return
+    }
+
+    let imported = 0
+    let updated = 0
+
+    for (const contract of contractsFromDirectory) {
+      const existing = contracts?.find(
+        (c) => c.address.toLowerCase() === contract.address.toLowerCase(),
+      )
+
+      if (existing) {
+        updateContract({
+          address: existing.address,
+          name: contract.name ?? existing.name,
+          abi: contract.abi ?? existing.abi,
+          bytecode: contract.bytecode ?? existing.bytecode,
+          state: 'loaded',
+        })
+        updated++
+      } else {
+        addContract({
+          address: contract.address,
+          name: contract.name,
+          abi: contract.abi,
+          bytecode: contract.bytecode,
+          state: 'loaded',
+        })
+        imported++
+      }
+    }
+
+    const withAbi = contractsFromDirectory.filter((c) => c.abi).length
+
+    console.log(`[${source} Import] Import complete:`, {
+      imported,
+      updated,
+      withAbi,
+    })
+
+    const processedLabel = `Processed ${
+      contractsFromDirectory.length
+    } contract${contractsFromDirectory.length === 1 ? '' : 's'}`
+    const summaryLabel = [
+      `imported ${imported}`,
+      updated > 0 ? `updated ${updated}` : undefined,
+    ]
+      .filter(Boolean)
+      .join(', ')
+    const abiLabel = withAbi > 0 ? ` (${withAbi} with ABIs)` : ''
+
+    toast.success(`${processedLabel} — ${summaryLabel}${abiLabel}`)
+  }
 
   const handleImportFoundry = async (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    console.log('[Foundry Import] Starting import...')
     try {
-      const files = e.target.files
-      const fileArray = files ? Array.from(files) : []
-
-      console.log('[Foundry Import] Files selected:', fileArray.length)
-
-      if (fileArray.length === 0) {
-        console.log('[Foundry Import] No files selected')
-        return
-      }
-
-      const describeFile = (file: File) => {
-        const directoryFile = file as File & { webkitRelativePath?: string }
-        if (
-          directoryFile.webkitRelativePath &&
-          directoryFile.webkitRelativePath !== ''
-        )
-          return directoryFile.webkitRelativePath
-        return file.name
-      }
-
-      console.log(
-        '[Foundry Import] File list:',
-        fileArray.map((file) => describeFile(file)),
-      )
+      const fileArray = e.target.files ? Array.from(e.target.files) : []
+      if (fileArray.length === 0) return
 
       const { loadFoundryContractsFromDirectory } = await import(
         '~/utils/foundry'
       )
-
-      console.log('[Foundry Import] Loading contracts from directory...')
       const contractsFromDirectory =
         await loadFoundryContractsFromDirectory(fileArray)
-      console.log('[Foundry Import] Found contracts:', contractsFromDirectory)
-
-      if (contractsFromDirectory.length === 0) {
-        toast.error('No deployed contracts found in selected directory')
-        return
-      }
-
-      let imported = 0
-      let updated = 0
-
-      for (const contract of contractsFromDirectory) {
-        const existing = contracts?.find(
-          (c) => c.address.toLowerCase() === contract.address.toLowerCase(),
-        )
-
-        if (existing) {
-          console.log(
-            '[Foundry Import] Updating contract:',
-            contract.address,
-            '->',
-            contract.name,
-          )
-          updateContract({
-            address: existing.address,
-            name: contract.name ?? existing.name,
-            abi: contract.abi ?? existing.abi,
-            bytecode: contract.bytecode ?? existing.bytecode,
-            state: 'loaded',
-          })
-          updated++
-        } else {
-          console.log(
-            '[Foundry Import] Adding contract:',
-            contract.name,
-            contract.address,
-          )
-          addContract({
-            address: contract.address,
-            name: contract.name,
-            abi: contract.abi,
-            bytecode: contract.bytecode,
-            state: 'loaded',
-          })
-          imported++
-        }
-      }
-
-      const withAbi = contractsFromDirectory.filter(
-        (contract) => contract.abi,
-      ).length
-
-      console.log('[Foundry Import] Import complete:', {
-        imported,
-        updated,
-        withAbi,
-      })
-
-      const processedLabel = `Processed ${
-        contractsFromDirectory.length
-      } contract${contractsFromDirectory.length === 1 ? '' : 's'}`
-      const summaryLabel = [
-        `imported ${imported}`,
-        updated > 0 ? `updated ${updated}` : undefined,
-      ]
-        .filter(Boolean)
-        .join(', ')
-      const abiLabel = withAbi > 0 ? ` (${withAbi} with ABIs)` : ''
-
-      toast.success(`${processedLabel} — ${summaryLabel}${abiLabel}`)
+      applyImportedContracts(contractsFromDirectory, 'Foundry')
 
       e.target.value = ''
     } catch (error) {
       console.error('[Foundry Import] Error:', error)
+      toast.error(
+        `Import failed: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      )
+    }
+  }
+
+  const handleImportHardhat = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    try {
+      const fileArray = e.target.files ? Array.from(e.target.files) : []
+      if (fileArray.length === 0) return
+
+      const { loadHardhatContractsFromDirectory } = await import(
+        '~/utils/hardhat'
+      )
+      const contractsFromDirectory =
+        await loadHardhatContractsFromDirectory(fileArray)
+      applyImportedContracts(contractsFromDirectory, 'Hardhat')
+
+      e.target.value = ''
+    } catch (error) {
+      console.error('[Hardhat Import] Error:', error)
       toast.error(
         `Import failed: ${
           error instanceof Error ? error.message : 'Unknown error'
@@ -1059,6 +1059,28 @@ function ImportContract() {
         <Box style={{ pointerEvents: 'none' }}>
           <Button height="24px" variant="stroked fill" width="full">
             Import from Foundry
+          </Button>
+        </Box>
+      </Box>
+      <Box position="relative" style={{ display: 'none' }}>
+        <input
+          ref={hardhatDirectoryInputRef}
+          type="file"
+          multiple
+          onChange={handleImportHardhat}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            opacity: 0,
+            cursor: 'pointer',
+          }}
+        />
+        <Box style={{ pointerEvents: 'none' }}>
+          <Button height="24px" variant="stroked fill" width="full">
+            Import from Hardhat
           </Button>
         </Box>
       </Box>

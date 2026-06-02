@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from '@lukeed/uuid'
 import { type EIP1193Provider, announceProvider } from 'mipd'
 
 import { getMessenger } from '~/messengers'
@@ -59,7 +58,7 @@ export function injectProvider() {
       icon: generateBrandIcon(),
       name: 'DevWallet',
       rdns: 'wallet.devwallet',
-      uuid: uuidv4(),
+      uuid: crypto.randomUUID(),
     },
     provider: provider as EIP1193Provider,
   })
