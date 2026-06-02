@@ -10,7 +10,7 @@ const mineAnimation = keyframes({
   },
   '50%': {
     color: 'white',
-    transform: 'rotate(10deg)',
+    transform: 'rotate(45deg)',
   },
   '100%': {
     color: `rgb(${foregroundColorVars['text/tertiary']})`,
@@ -20,6 +20,6 @@ const mineAnimation = keyframes({
 
 export const mineSymbol = style({
   animationName: mineAnimation,
-  animationDuration: '0.2s',
+  animationDuration: '0.3s',
   animationTimingFunction: 'linear',
 })
