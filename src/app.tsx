@@ -3,9 +3,9 @@ import './hmr'
 import { useEffect, useRef } from 'react'
 import ReactDOM from 'react-dom/client'
 import {
-  RouterProvider,
-  createHashRouter,
-  createMemoryRouter,
+    RouterProvider,
+    createHashRouter,
+    createMemoryRouter,
 } from 'react-router-dom'
 import { numberToHex } from 'viem'
 
@@ -14,8 +14,8 @@ import '~/design-system/styles/global.css'
 import { useClient } from '~/hooks/useClient'
 import { useNetworkStatus } from '~/hooks/useNetworkStatus'
 import {
-  getPendingBlockQueryKey,
-  usePendingBlock,
+    getPendingBlockQueryKey,
+    usePendingBlock,
 } from '~/hooks/usePendingBlock'
 import { getPendingTransactionsQueryKey } from '~/hooks/usePendingTransactions'
 import { usePrevious } from '~/hooks/usePrevious'
@@ -25,13 +25,13 @@ import { QueryClientProvider, queryClient } from '~/react-query'
 import { deepEqual } from '~/utils'
 import { getClient } from '~/viem'
 import {
-  type AccountState,
-  type NetworkState,
-  networkStore,
-  syncStores,
-  useAccountStore,
-  useNetworkStore,
-  useSessionsStore,
+    type AccountState,
+    type NetworkState,
+    networkStore,
+    syncStores,
+    useAccountStore,
+    useNetworkStore,
+    useSessionsStore,
 } from '~/zustand'
 
 import { type AppMeta, AppMetaContext } from './contexts'
@@ -54,126 +54,124 @@ import TokenTransfer from './screens/token-transfer'
 import TransactionDetails from './screens/transaction-details'
 
 export function init({ type = 'standalone' }: { type?: AppMeta['type'] } = {}) {
-  syncStores()
+    syncStores()
 
-  const createRouter = (() => {
-    if (type === 'embedded') return createMemoryRouter
-    return createHashRouter
-  })()
+    const createRouter = (() => {
+        if (type === 'embedded') return createMemoryRouter
+        return createHashRouter
+    })()
 
-  const router = createRouter([
-    {
-      path: '/',
-      element: <Layout />,
-      children: [
+    const router = createRouter([
         {
-          path: '',
-          element: <Index />,
+            path: '/',
+            element: <Layout />,
+            children: [
+                {
+                    path: '',
+                    element: <Index />,
+                },
+                {
+                    path: 'account/:address',
+                    element: <AccountDetails />,
+                },
+                {
+                    path: 'transfer/:accountAddress/:tokenAddress?',
+                    element: <TokenTransfer />,
+                },
+                {
+                    path: 'block-config',
+                    element: <BlockConfig />,
+                },
+                {
+                    path: 'block/:blockNumber',
+                    element: <BlockDetails />,
+                },
+                {
+                    path: 'contract/:contractAddress',
+                    element: <ContractDetails />,
+                },
+                {
+                    path: 'transaction/:transactionHash',
+                    element: <TransactionDetails />,
+                },
+                {
+                    path: 'networks',
+                    element: <Networks />,
+                },
+                {
+                    path: 'networks/:rpcUrl',
+                    element: <NetworkConfig />,
+                },
+                {
+                    path: 'session',
+                    element: <Session />,
+                },
+                {
+                    path: 'settings',
+                    element: <Settings />,
+                },
+                {
+                    path: 'onboarding',
+                    children: [
+                        {
+                            path: '',
+                            element: <OnboardingStart />,
+                        },
+                        {
+                            path: 'configure',
+                            element: <OnboardingConfigure />,
+                        },
+                        {
+                            path: 'download',
+                            element: <OnboardingDownload />,
+                        },
+                        {
+                            path: 'run',
+                            element: <OnboardingRun />,
+                        },
+                    ],
+                },
+            ],
         },
-        {
-          path: 'account/:address',
-          element: <AccountDetails />,
-        },
-        {
-          path: 'transfer/:accountAddress/:tokenAddress?',
-          element: <TokenTransfer />,
-        },
-        {
-          path: 'block-config',
-          element: <BlockConfig />,
-        },
-        {
-          path: 'block/:blockNumber',
-          element: <BlockDetails />,
-        },
-        {
-          path: 'contract/:contractAddress',
-          element: <ContractDetails />,
-        },
-        {
-          path: 'transaction/:transactionHash',
-          element: <TransactionDetails />,
-        },
-        {
-          path: 'networks',
-          element: <Networks />,
-        },
-        {
-          path: 'networks/:rpcUrl',
-          element: <NetworkConfig />,
-        },
-        {
-          path: 'session',
-          element: <Session />,
-        },
-        {
-          path: 'settings',
-          element: <Settings />,
-        },
-        {
-          path: 'onboarding',
-          children: [
-            {
-              path: '',
-              element: <OnboardingStart />,
-            },
-            {
-              path: 'configure',
-              element: <OnboardingConfigure />,
-            },
-            {
-              path: 'download',
-              element: <OnboardingDownload />,
-            },
-            {
-              path: 'run',
-              element: <OnboardingRun />,
-            },
-          ],
-        },
-      ],
-    },
-  ])
+    ])
 
-  const backgroundMessenger = getMessenger('background:wallet')
+    const backgroundMessenger = getMessenger('background:wallet')
 
-  // Handle requests from background to toggle the theme.
-  backgroundMessenger.reply('toggleTheme', async () => {
-    const { storageTheme, systemTheme } = getTheme()
-    const theme = storageTheme || systemTheme
-    setTheme(theme === 'dark' ? 'light' : 'dark')
-  })
-
-  // Handle executed transactions to invalidate stale queries.
-  backgroundMessenger.reply('transactionExecuted', async () => {
-    const {
-      network: { rpcUrl },
-    } = networkStore.getState()
-    const client = getClient({ rpcUrl })
-
-    queryClient.invalidateQueries({
-      queryKey: getPendingBlockQueryKey([client.key]),
+    backgroundMessenger.reply('toggleTheme', async () => {
+        const { storageTheme, systemTheme } = getTheme()
+        const theme = storageTheme || systemTheme
+        setTheme(theme === 'dark' ? 'light' : 'dark')
     })
-    queryClient.invalidateQueries({
-      queryKey: getPendingTransactionsQueryKey([client.key]),
-    })
-    queryClient.invalidateQueries({
-      queryKey: getTxpoolQueryKey([client.key]),
-    })
-  })
 
-  ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-    <AppMetaContext.Provider value={{ type }}>
-      <QueryClientProvider>
-        <AccountsChangedEmitter />
-        <NetworkChangedEmitter />
-        <SyncBlockNumber />
-        <SyncJsonRpcAccounts />
-        <SyncNetwork />
-        <RouterProvider router={router} />
-      </QueryClientProvider>
-    </AppMetaContext.Provider>,
-  )
+    backgroundMessenger.reply('transactionExecuted', async () => {
+        const {
+            network: { rpcUrl },
+        } = networkStore.getState()
+        const client = getClient({ rpcUrl })
+
+        queryClient.invalidateQueries({
+            queryKey: getPendingBlockQueryKey([client.key]),
+        })
+        queryClient.invalidateQueries({
+            queryKey: getPendingTransactionsQueryKey([client.key]),
+        })
+        queryClient.invalidateQueries({
+            queryKey: getTxpoolQueryKey([client.key]),
+        })
+    })
+
+    ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+        <AppMetaContext.Provider value={{ type }}>
+            <QueryClientProvider>
+                <AccountsChangedEmitter />
+                <NetworkChangedEmitter />
+                <SyncBlockNumber />
+                <SyncJsonRpcAccounts />
+                <SyncNetwork />
+                <RouterProvider router={router} />
+            </QueryClientProvider>
+        </AppMetaContext.Provider>,
+    )
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -182,97 +180,97 @@ const inpageMessenger = getMessenger('wallet:inpage')
 
 /** Emits EIP-1193 `accountsChanged` Event */
 function AccountsChangedEmitter() {
-  const { account, getAccounts } = useAccountStore()
-  const { sessions } = useSessionsStore()
+    const { account, getAccounts } = useAccountStore()
+    const { sessions } = useSessionsStore()
 
-  const prevAccounts = useRef<AccountState['accounts']>()
-  useEffect(() => {
-    if (!account) {
-      prevAccounts.current = []
-      return
-    }
+    const prevAccounts = useRef<AccountState['accounts']>()
+    useEffect(() => {
+        if (!account) {
+            prevAccounts.current = []
+            return
+        }
 
-    let accounts_ = getAccounts({ rpcUrl: account.rpcUrl })
-    accounts_ = [
-      account,
-      ...accounts_.filter((x) => x.address !== account.address),
-    ]
+        let accounts_ = getAccounts({ rpcUrl: account.rpcUrl })
+        accounts_ = [
+            account,
+            ...accounts_.filter((x) => x.address !== account.address),
+        ]
 
-    if (prevAccounts.current && !deepEqual(prevAccounts.current, accounts_))
-      inpageMessenger.send('accountsChanged', {
-        accounts: accounts_.map((x) => x.address),
-        sessions,
-      })
+        if (prevAccounts.current && !deepEqual(prevAccounts.current, accounts_))
+            inpageMessenger.send('accountsChanged', {
+                accounts: accounts_.map((x) => x.address),
+                sessions,
+            })
 
-    prevAccounts.current = accounts_
-  }, [account])
+        prevAccounts.current = accounts_
+    }, [account])
 
-  return null
+    return null
 }
 
 /** Emits EIP-1193 `chainChanged` Event */
 function NetworkChangedEmitter() {
-  const { network } = useNetworkStore()
-  const { sessions } = useSessionsStore()
+    const { network } = useNetworkStore()
+    const { sessions } = useSessionsStore()
 
-  const prevNetwork = useRef<NetworkState['network']>()
-  useEffect(() => {
-    if (!network.chainId) return
+    const prevNetwork = useRef<NetworkState['network']>()
+    useEffect(() => {
+        if (!network.chainId) return
 
-    if (prevNetwork.current && prevNetwork.current.chainId !== network.chainId)
-      inpageMessenger.send('chainChanged', {
-        chainId: numberToHex(network.chainId),
-        sessions,
-      })
+        if (prevNetwork.current && prevNetwork.current.chainId !== network.chainId)
+            inpageMessenger.send('chainChanged', {
+                chainId: numberToHex(network.chainId),
+                sessions,
+            })
 
-    prevNetwork.current = network
-  }, [network])
+        prevNetwork.current = network
+    }, [network])
 
-  return null
+    return null
 }
 
 /** Keeps block number in sync. */
 function SyncBlockNumber() {
-  const { data: block } = usePendingBlock()
-  useSnapshot({ blockNumber: block?.number })
-  return null
+    const { data: block } = usePendingBlock()
+    useSnapshot({ blockNumber: block?.number })
+    return null
 }
 
 /** Keeps accounts in sync with network. */
 function SyncJsonRpcAccounts() {
-  const { data: chainId } = useNetworkStatus()
-  const client = useClient()
-  const { getAccounts, setJsonRpcAccounts } = useAccountStore()
+    const { data: chainId } = useNetworkStatus()
+    const client = useClient()
+    const { getAccounts, setJsonRpcAccounts } = useAccountStore()
 
-  useEffect(() => {
-    if (!chainId) return
-    ;(async () => {
-      try {
-        const addresses = await client.getAddresses()
-        setJsonRpcAccounts({ addresses, rpcUrl: client.rpcUrl })
-      } catch {}
-    })()
-  }, [getAccounts, chainId, setJsonRpcAccounts, client])
+    useEffect(() => {
+        if (!chainId) return
+            ;(async () => {
+            try {
+                const addresses = await client.getAddresses()
+                setJsonRpcAccounts({ addresses, rpcUrl: client.rpcUrl })
+            } catch {}
+        })()
+    }, [getAccounts, chainId, setJsonRpcAccounts, client])
 
-  return null
+    return null
 }
 
 /** Keeps network in sync (+ ensure chain id is up-to-date). */
 function SyncNetwork() {
-  const client = useClient()
-  const { data: listening } = useNetworkStatus()
+    const client = useClient()
+    const { data: listening } = useNetworkStatus()
 
-  const prevListening = usePrevious(listening)
-  useEffect(() => {
-    // Reset stale queries that are dependent on the client when node comes back online.
-    if (prevListening === false && listening) {
-      queryClient.removeQueries({
-        predicate(query) {
-          return query.queryKey.includes(client.key)
-        },
-      })
-    }
-  }, [prevListening, listening, client.key])
+    const prevListening = usePrevious(listening)
+    useEffect(() => {
+        // Reset stale queries that are dependent on the client when node comes back online.
+        if (prevListening === false && listening) {
+            queryClient.removeQueries({
+                predicate(query) {
+                    return query.queryKey.includes(client.key)
+                },
+            })
+        }
+    }, [prevListening, listening, client.key])
 
-  return null
+    return null
 }

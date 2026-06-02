@@ -11,186 +11,193 @@ import { useNetworkStore } from '~/zustand'
 import { defaultNetwork } from '~/zustand/network'
 
 export default function OnboardingConfigure() {
-  const [params] = useSearchParams()
-  const type = params.get('type')
+    const [params] = useSearchParams()
+    const type = params.get('type')
+    const node = params.get('node') === 'hardhat' ? 'hardhat' : 'anvil'
 
-  const defaultName = useMemo(
-    () => humanId({ separator: '-', capitalize: false }),
-    [],
-  )
+    const defaultName = useMemo(
+        () => humanId({ separator: '-', capitalize: false }),
+        [],
+    )
 
-  type FormValues = {
-    autoMine: boolean
-    blockBaseFeePerGas: string
-    blockTime: string
-    chainId: string
-    networkName: string
-    forkBlockNumber: string
-    forkUrl: string
-    gasLimit: string
-    gasPrice: string
-    name: string
-    port: string
-  }
-  const { register, handleSubmit, setValue, watch } = useForm<FormValues>({
-    defaultValues: {
-      autoMine: true,
-      chainId: '1',
-      forkUrl: 'https://cloudflare-eth.com',
-      name: defaultName,
-      port: '8545',
-    },
-  })
+    const nodeDefaults =
+        node === 'hardhat'
+            ? { chainId: '31337', forkUrl: '', networkName: 'Hardhat' }
+            : { chainId: '1', forkUrl: 'https://cloudflare-eth.com', networkName: 'Ethereum' }
 
-  const watchAutoMine = watch('autoMine')
-  useEffect(() => {
-    if (watchAutoMine) setValue('blockTime', '')
-  }, [watchAutoMine, setValue])
-
-  const watchBlockTime = watch('blockTime')
-  useEffect(() => {
-    if (watchBlockTime) setValue('autoMine', false)
-  }, [watchBlockTime, setValue])
-
-  const navigate = useNavigate()
-
-  const { upsertNetwork, switchNetwork } = useNetworkStore()
-  const submit = handleSubmit(async (values_) => {
-    const values = {
-      ...values_,
-      autoMine: String(values_.autoMine),
-      blockBaseFeePerGas: values_.blockBaseFeePerGas
-        ? String(Number(values_.blockBaseFeePerGas) ** gweiUnits.wei)
-        : '',
-      gasPrice: values_.gasPrice
-        ? String(Number(values_.gasPrice) ** gweiUnits.wei)
-        : '',
+    type FormValues = {
+        autoMine: boolean
+        blockBaseFeePerGas: string
+        blockTime: string
+        chainId: string
+        networkName: string
+        forkBlockNumber: string
+        forkUrl: string
+        gasLimit: string
+        gasPrice: string
+        name: string
+        port: string
     }
-
-    if (type === 'local') {
-      const rpcUrl = `http://127.0.0.1:${values.port}`
-      await upsertNetwork({
-        rpcUrl: defaultNetwork.rpcUrl,
-        network: {
-          blockTime: Number(values.blockTime),
-          chainId: Number(values.chainId),
-          name: values.networkName,
-          rpcUrl,
+    const { register, handleSubmit, setValue, watch } = useForm<FormValues>({
+        defaultValues: {
+            autoMine: true,
+            name: defaultName,
+            port: '8545',
+            ...nodeDefaults,
         },
-      })
-      switchNetwork(rpcUrl)
-    }
+    })
 
-    const search = new URLSearchParams(values)
-    navigate(`/onboarding/run?${search.toString()}`)
-  })
+    const watchAutoMine = watch('autoMine')
+    useEffect(() => {
+        if (watchAutoMine) setValue('blockTime', '')
+    }, [watchAutoMine, setValue])
 
-  return (
-    <Form.Root onSubmit={submit} style={{ height: '100%' }}>
-      <OnboardingContainer
-        title="Configure Options"
-        footer={
-          <>
-            {type === 'hosted' && (
-              <Button height="44px" type="submit">
-                Deploy node
-              </Button>
-            )}
-            {type === 'local' && (
-              <Button height="44px" type="submit">
-                Continue
-              </Button>
-            )}
-          </>
+    const watchBlockTime = watch('blockTime')
+    useEffect(() => {
+        if (watchBlockTime) setValue('autoMine', false)
+    }, [watchBlockTime, setValue])
+
+    const navigate = useNavigate()
+
+    const { upsertNetwork, switchNetwork } = useNetworkStore()
+    const submit = handleSubmit(async (values_) => {
+        const values = {
+            ...values_,
+            autoMine: String(values_.autoMine),
+            blockBaseFeePerGas: values_.blockBaseFeePerGas
+                ? String(Number(values_.blockBaseFeePerGas) ** gweiUnits.wei)
+                : '',
+            gasPrice: values_.gasPrice
+                ? String(Number(values_.gasPrice) ** gweiUnits.wei)
+                : '',
         }
-      >
-        <Stack gap="32px">
-          <Stack gap="16px">
-            {type === 'local' && (
-              <Form.InputField
-                defaultValue={defaultName}
-                innerLeft={
-                  <Text color="text/tertiary">https://127.0.0.1:</Text>
+
+        if (type === 'local') {
+            const rpcUrl = `http://127.0.0.1:${values.port}`
+            await upsertNetwork({
+                rpcUrl: defaultNetwork.rpcUrl,
+                network: {
+                    blockTime: Number(values.blockTime),
+                    chainId: Number(values.chainId),
+                    name: values.networkName,
+                    rpcUrl,
+                },
+            })
+            switchNetwork(rpcUrl)
+        }
+
+        const search = new URLSearchParams(values)
+        search.set('node', node)
+        navigate(`/onboarding/run?${search.toString()}`)
+    })
+
+    return (
+        <Form.Root onSubmit={submit} style={{ height: '100%' }}>
+            <OnboardingContainer
+                title="Configure Options"
+                footer={
+                    <>
+                        {type === 'hosted' && (
+                            <Button height="44px" type="submit">
+                                Deploy node
+                            </Button>
+                        )}
+                        {type === 'local' && (
+                            <Button height="44px" type="submit">
+                                Continue
+                            </Button>
+                        )}
+                    </>
                 }
-                label="Port"
-                min={1}
-                register={register('port')}
-                required
-                type="number"
-              />
-            )}
-            {type === 'hosted' && (
-              <Form.InputField
-                defaultValue={defaultName}
-                innerRight={<Text color="text/tertiary">.riv.et</Text>}
-                label="Name"
-                register={register('name')}
-                required
-              />
-            )}
-            <Form.InputField
-              defaultValue={1}
-              label="Chain ID"
-              min={1}
-              register={register('chainId')}
-              type="number"
-            />
-            <Form.InputField
-              defaultValue="Ethereum"
-              label="Network Name"
-              register={register('networkName')}
-              required
-            />
-          </Stack>
-          <Stack gap="16px">
-            <Text>Configure Fork</Text>
-            <Separator />
-            <Form.InputField
-              defaultValue="https://cloudflare-eth.com"
-              label="RPC URL"
-              register={register('forkUrl')}
-            />
-            <Form.InputField
-              label="Block Number"
-              min={1}
-              type="number"
-              register={register('forkBlockNumber')}
-            />
-          </Stack>
-          <Stack gap="16px">
-            <Text>Configure Blocks</Text>
-            <Separator />
-            <Form.CheckboxField
-              label="Auto-mine transactions"
-              register={register('autoMine')}
-            />
-            <Form.InputField
-              label="Block Time (sec)"
-              min={0}
-              type="number"
-              register={register('blockTime')}
-            />
-            <Form.InputField
-              label="Base Fee (gwei)"
-              min={0}
-              type="number"
-              register={register('blockBaseFeePerGas')}
-            />
-            <Form.InputField
-              label="Gas Price (gwei)"
-              min={0}
-              type="number"
-              register={register('gasPrice')}
-            />
-            <Form.InputField
-              label="Gas Limit"
-              min={0}
-              type="number"
-              register={register('gasLimit')}
-            />
-          </Stack>
-        </Stack>
-      </OnboardingContainer>
-    </Form.Root>
-  )
+            >
+                <Stack gap="32px">
+                    <Stack gap="16px">
+                        {type === 'local' && (
+                            <Form.InputField
+                                defaultValue={defaultName}
+                                innerLeft={
+                                    <Text color="text/tertiary">https://127.0.0.1:</Text>
+                                }
+                                label="Port"
+                                min={1}
+                                register={register('port')}
+                                required
+                                type="number"
+                            />
+                        )}
+                        {type === 'hosted' && (
+                            <Form.InputField
+                                defaultValue={defaultName}
+                                innerRight={<Text color="text/tertiary">.riv.et</Text>}
+                                label="Name"
+                                register={register('name')}
+                                required
+                            />
+                        )}
+                        <Form.InputField
+                            label="Chain ID"
+                            min={1}
+                            register={register('chainId')}
+                            type="number"
+                        />
+                        <Form.InputField
+                            label="Network Name"
+                            register={register('networkName')}
+                            required
+                        />
+                    </Stack>
+                    {node === 'anvil' && (
+                        <>
+                            <Stack gap="16px">
+                                <Text>Configure Fork</Text>
+                                <Separator />
+                                <Form.InputField
+                                    label="RPC URL"
+                                    register={register('forkUrl')}
+                                />
+                                <Form.InputField
+                                    label="Block Number"
+                                    min={1}
+                                    type="number"
+                                    register={register('forkBlockNumber')}
+                                />
+                            </Stack>
+                            <Stack gap="16px">
+                                <Text>Configure Blocks</Text>
+                                <Separator />
+                                <Form.CheckboxField
+                                    label="Auto-mine transactions"
+                                    register={register('autoMine')}
+                                />
+                                <Form.InputField
+                                    label="Block Time (sec)"
+                                    min={0}
+                                    type="number"
+                                    register={register('blockTime')}
+                                />
+                                <Form.InputField
+                                    label="Base Fee (gwei)"
+                                    min={0}
+                                    type="number"
+                                    register={register('blockBaseFeePerGas')}
+                                />
+                                <Form.InputField
+                                    label="Gas Price (gwei)"
+                                    min={0}
+                                    type="number"
+                                    register={register('gasPrice')}
+                                />
+                                <Form.InputField
+                                    label="Gas Limit"
+                                    min={0}
+                                    type="number"
+                                    register={register('gasLimit')}
+                                />
+                            </Stack>
+                        </>
+                    )}
+                </Stack>
+            </OnboardingContainer>
+        </Form.Root>
+    )
 }
