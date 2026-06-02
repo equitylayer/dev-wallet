@@ -12,6 +12,7 @@ import { type Hex, formatGwei } from 'viem'
 import { History, Pickaxe } from 'lucide-react'
 
 import { Tooltip } from '~/components'
+import { mineSymbol } from '~/components/Header.css'
 import { DevWalletIcon } from '~/components/svgs/DevWalletIcon'
 import { useAppMeta } from '~/contexts'
 import {
@@ -465,7 +466,7 @@ function MineButton() {
           variant="ghost primary"
           width="fit"
         >
-          <Pickaxe size={18} />
+          <Pickaxe className={mineSymbol} size={18} />
         </Button.Root>
       </Tooltip>
     </Box>

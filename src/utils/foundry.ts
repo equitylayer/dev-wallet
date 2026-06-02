@@ -1,11 +1,15 @@
 import type { Abi, Address, Hex } from 'viem'
 
-export type FoundryDeployedContract = {
-  address: Address
-  name: string
-  abi?: Abi
-  bytecode?: Hex
-}
+import {
+  type DeployedContract,
+  type DirectoryFile,
+  extractBytecode,
+  getRelativePath,
+  MAX_FILE_SIZE,
+  MAX_FILES,
+} from './deployments'
+
+export type FoundryDeployedContract = DeployedContract
 
 type FoundryTransaction = {
   transactionType: string
@@ -92,16 +96,8 @@ export async function parseFoundryBroadcast(
 /**
  * Load ABIs from selected files and match to contracts
  */
-type DirectoryFile = File & { webkitRelativePath?: string }
-
 const FOUND_BROADCAST_PATTERN = /broadcast\//
 const FOUND_RUN_LATEST_PATTERN = /\/31337\/run-latest\.json$/
-
-function getRelativePath(file: DirectoryFile) {
-  if (file.webkitRelativePath && file.webkitRelativePath.length > 0)
-    return file.webkitRelativePath
-  return file.name
-}
 
 function isBroadcastRunLatest(file: DirectoryFile) {
   const relativePath = getRelativePath(file)
@@ -122,20 +118,6 @@ type FoundryArtifact = {
   deployedBytecode?: Hex | { object?: Hex }
 }
 
-function extractBytecode(artifact: FoundryArtifact) {
-  if (!artifact.bytecode && !artifact.deployedBytecode) return undefined
-
-  const normalize = (value?: Hex | { object?: Hex }) => {
-    if (!value) return undefined
-    if (typeof value === 'string') return value as Hex
-    return value.object
-  }
-
-  return normalize(artifact.deployedBytecode) ?? normalize(artifact.bytecode)
-}
-
-const MAX_FILES = 1000 // Prevent memory issues with huge directories
-const MAX_FILE_SIZE = 2 * 1024 * 1024 // 2MB max per file
 const MAX_CONCURRENT_ABI_LOADS = 1 // Process files one at a time to prevent crashes
 
 export async function loadFoundryContractsFromDirectory(

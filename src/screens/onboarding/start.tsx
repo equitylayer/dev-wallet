@@ -28,8 +28,8 @@ export default function OnboardingStart() {
                 DevWallet
               </Text>
               <Text color="text/tertiary" size="18px" weight="light">
-                Developer Wallet & DevTools for Anvil designed to supercharge
-                your Ethereum development workflow.
+                Developer Wallet & DevTools for Anvil & Hardhat designed to
+                supercharge your Ethereum development workflow.
               </Text>
             </Stack>
             <Stack gap="24px">
@@ -53,7 +53,7 @@ export default function OnboardingStart() {
                     Configure chains
                   </Text>
                   <Text color="text/tertiary">
-                    Customize your Anvil instances
+                    Customize your Anvil & Hardhat chains
                   </Text>
                 </Stack>
               </Inline>
@@ -107,9 +107,21 @@ export default function OnboardingStart() {
           </Stack>
         </Row>
         <Row alignVertical="bottom" height="content">
-          <Link to="/onboarding/download" style={{ width: '100%' }}>
-            <Button height="44px">Create Anvil instance</Button>
-          </Link>
+          <Stack gap="8px" width="full">
+            <Link to="/onboarding/download?node=anvil" style={{ width: '100%' }}>
+              <Button height="44px" width="full">
+                Set up Anvil
+              </Button>
+            </Link>
+            <Link
+              to="/onboarding/download?node=hardhat"
+              style={{ width: '100%' }}
+            >
+              <Button height="44px" variant="stroked fill" width="full">
+                Set up Hardhat
+              </Button>
+            </Link>
+          </Stack>
         </Row>
       </Rows>
     </Inset>
