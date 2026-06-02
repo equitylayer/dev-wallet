@@ -44,6 +44,7 @@
     "@radix-ui/react-popover": "^1.1.15",
     "@radix-ui/react-progress": "^1.1.8",
     "@radix-ui/react-tabs": "^1.1.13",
+    "@radix-ui/react-visually-hidden": "^1.2.3",
     "@react-hook/resize-observer": "^2.0.2",
     "@shazow/whatsabi": "^0.26.0",
     "@tanstack/query-async-storage-persister": "5.101.0",
