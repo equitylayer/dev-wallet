@@ -1,4 +1,4 @@
-<p align="center"><strong>Developer wallet & DevTools for Anvil</strong></p>
+<p align="center"><strong>Developer wallet & DevTools for Anvil & Hardhat</strong></p>
 
 <div align="center">
 
@@ -19,7 +19,9 @@ Forked and modified from [Rivet](https://github.com/paradigmxyz/rivet) (MIT lice
 
 ## What is DevWallet?
 
-DevWallet is a developer Wallet & DevTools for Anvil (akin to [Browser DevTools](https://developer.mozilla.org/en-US/docs/Learn/Common_questions/Tools_and_setup/What_are_browser_developer_tools#how_to_open_the_devtools_in_your_browser) or [React DevTools](https://react.dev/learn/react-developer-tools)). It is a browser extension that enables developers to inspect, debug, modify, and manipulate the state of Ethereum: accounts, blocks, contracts & the node itself. DevWallet is also compatible with any production dApp, meaning you can simulate any type of action from either an Account attached on the Anvil instance, or by "impersonating" another Account on the network.
+DevWallet is a developer Wallet & DevTools for local Ethereum nodes — [Foundry Anvil](https://book.getfoundry.sh/anvil/) and [Hardhat 3](https://hardhat.org/) (akin to [Browser DevTools](https://developer.mozilla.org/en-US/docs/Learn/Common_questions/Tools_and_setup/What_are_browser_developer_tools#how_to_open_the_devtools_in_your_browser) or [React DevTools](https://react.dev/learn/react-developer-tools)). It is a browser extension that enables developers to inspect, debug, modify, and manipulate the state of Ethereum: accounts, blocks, contracts & the node itself. DevWallet is also compatible with any production dApp, meaning you can simulate any type of action from either an Account attached on the local instance, or by "impersonating" another Account on the network.
+
+It connects to any local node on chain id `31337` (the default for both `anvil` and `npx hardhat node`), and can import deployed contracts & their ABIs directly from your Foundry or Hardhat project on disk.
 
 By integrating [EIP-6963: Multi Injected Provider Discovery](https://eips.ethereum.org/EIPS/eip-6963), DevWallet is designed to be used alongside and with other consumer browser wallets like MetaMask or Rainbow to provide more engrained developer tooling and workflows for Ethereum.
 
@@ -29,20 +31,16 @@ DevWallet is aimed to be **contributor first & friendly**. If you would like to 
 
 Development had slowed down and many issues were left open.
 
-Rivet is still the best dev tool that works well in the development flow of use
-
-
 ## Download
 
 - **Chromium (Chrome, Brave, Arc, etc)** [[Download]](https://chromewebstore.google.com/detail/emajibkjkkilgdahffjhapcljjhhdpeb?utm_source=item-share-cb)
 - **Firefox**: coming soon
-- **Safari**: coming soon
 
 ### Nightly Release
 
 DevWallet is currently in active development. If you would like to try out the latest features, you can download the latest nightly build below:
 
-- **Chromium (Chrome, Brave, Arc, etc)**: [Download](https://github.com/D01-DayOne/dev-wallet/releases/latest)
+- **Chromium (Chrome, Brave, Arc, etc)**: [Download](https://github.com/equitylayer/dev-wallet/releases/latest)
 
 <details>
   <summary>Setup Instructions</summary>
@@ -83,6 +81,11 @@ DevWallet is currently in active development. If you would like to try out the l
   - Toggle between "click-to-mine", interval mining, and auto-mining
   - Time-travelling (rewind & replay)*
 - **Contract**
+  - Import deployed contracts & ABIs from a local project directory:
+    - Foundry — `broadcast/` run logs + `out/` artifacts
+    - Hardhat 3 — Ignition deployments (`ignition/deployments/chain-31337/`)
+    - Hardhat — the `hardhat-deploy` plugin (`deployments/<network>/`)
+  - Auto-discovery of contracts & ABIs deployed to the running node
   - Read & write interactions with intuitive UI to represent ABI data structures*
   - Inspect & set storage slots*
   - Inspect & set bytecode*
@@ -146,6 +149,16 @@ bun run dev
 ```
 
 This will run a script that will build the Web Extension, start a dev server for the Test Dapp, and automatically open Chrome with a fresh profile and the extension installed.
+
+### 5. Run the checks
+
+Unit tests run on [Bun's test runner](https://bun.sh/docs/cli/test). Type-checking and linting mirror the pre-commit hook:
+
+```bash
+bun run test       # unit tests
+bun run typecheck  # tsc --noEmit
+bun run lint       # eslint src/
+```
 
 ## Multi-Wallet Support
 
