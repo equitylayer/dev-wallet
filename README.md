@@ -7,11 +7,11 @@
 [//]: # (    <img alt="Chrome Web Store Version" src="https://img.shields.io/chrome-web-store/v/mobmnpcacgadhkjfelhpemphmmnggnod">)
 
 [//]: # (  </a>)
-  <a href="https://github.com/D01-DayOne/dev-wallet/actions/workflows/on-push-to-master.yml">
-    <img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/D01-DayOne/dev-wallet/on-push-to-master.yml">
+  <a href="https://github.com/equitylayer/dev-wallet/actions/workflows/on-push-to-master.yml">
+    <img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/equitylayer/dev-wallet/on-push-to-master.yml">
   </a>
-  <a href="https://github.com/D01-DayOne/dev-wallet/blob/main/LICENSE">
-    <img alt="GitHub" src="https://img.shields.io/github/license/D01-DayOne/dev-wallet">
+  <a href="https://github.com/equitylayer/dev-wallet/blob/master/LICENSE">
+    <img alt="GitHub" src="https://img.shields.io/github/license/equitylayer/dev-wallet">
   </a>
 </div>
 
@@ -115,7 +115,7 @@ DevWallet is currently in active development. If you would like to try out the l
 Clone the repo to your local machine using git:
 
 ```bash
-git clone https://github.com/D01-DayOne/dev-wallet.git
+git clone https://github.com/equitylayer/dev-wallet.git
 ```
 
 ### 2. Install Bun

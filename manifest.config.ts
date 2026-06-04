@@ -37,13 +37,11 @@ export const getManifest = ({ dev }: { dev?: boolean }) =>
     permissions: [
       'activeTab',
       'contextMenus',
-      'declarativeNetRequest',
       'scripting',
       'sidePanel',
       'storage',
       'tabs',
       'unlimitedStorage',
-      'webRequest',
     ],
     host_permissions: ['*://*/*'],
     web_accessible_resources: [
