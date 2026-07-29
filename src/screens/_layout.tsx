@@ -11,6 +11,7 @@ import PendingRequest from './pending-request'
 const headerHeight = '120px'
 const networkOfflineBypassPaths = ['networks', 'session', 'settings']
 
+const backgroundMessenger = getMessenger('background:wallet')
 const contentMessenger = getMessenger('wallet:contentScript')
 
 export default function Layout() {
@@ -31,44 +32,48 @@ export default function Layout() {
     })
   }, [])
 
+  useEffect(() => {
+    if (pendingRequests.length > 0) backgroundMessenger.send('ping', undefined)
+  }, [])
+
   const showNetworkOfflineDialog =
-    isNetworkOffline &&
-    !networkOfflineBypassPaths.some((path) => location.pathname.includes(path))
+      isNetworkOffline &&
+      !networkOfflineBypassPaths.some((path) => location.pathname.includes(path))
 
   return (
-    <Box
-      backgroundColor="surface/primary/elevated"
-      borderLeftWidth="1px"
-      display="flex"
-      flexDirection="column"
-      style={{
-        height: '100vh',
-        width: '100%',
-        overflow: 'hidden',
-      }}
-    >
-      <Toaster />
-      {showHeader && (
-        <Box style={{ height: headerHeight }}>
-          <Header isNetworkOffline={isNetworkOffline} />
-        </Box>
-      )}
       <Box
-        width="full"
-        position="relative"
-        style={{ height: showHeader ? `calc(100% - ${headerHeight})` : '100%' }}
+          backgroundColor="surface/primary/elevated"
+          borderLeftWidth="1px"
+          display="flex"
+          flexDirection="column"
+          style={{
+            height: '100vh',
+            width: '100%',
+            overflow: 'hidden',
+          }}
       >
-        {showNetworkOfflineDialog && <NetworkOfflineDialog />}
-        {pendingRequests.length > 0 ? (
-          <PendingRequest request={pendingRequest} />
-        ) : (
-          <>
-            <Box height="full">
-              <Outlet />
+        <Toaster />
+        {showHeader && (
+            <Box style={{ height: headerHeight }}>
+              <Header isNetworkOffline={isNetworkOffline} />
             </Box>
-          </>
         )}
+        <Box
+            width="full"
+            position="relative"
+            style={{ height: showHeader ? `calc(100% - ${headerHeight})` : '100%' }}
+        >
+          {showNetworkOfflineDialog && <NetworkOfflineDialog />}
+          {pendingRequests.length > 0 ? (
+              <PendingRequest request={pendingRequest} />
+          ) : (
+              <>
+                <Box height="full">
+                  <Outlet />
+                </Box>
+              </>
+          )}
+        </Box>
       </Box>
-    </Box>
   )
 }

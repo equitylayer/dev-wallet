@@ -19,10 +19,11 @@ import {
   accountStore,
   batchCallsStore,
   networkStore,
-  pendingRequestsStore,
   sessionsStore,
   settingsStore,
 } from '~/zustand'
+
+import { type Decision, requestUserDecision } from './pending-requests'
 
 const inpageMessenger = getMessenger('background:inpage')
 const walletMessenger = getMessenger('background:wallet')
@@ -30,9 +31,9 @@ const walletMessenger = getMessenger('background:wallet')
 export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
   messenger.reply('request', async ({ request, rpcUrl: rpcUrl_ }, meta) => {
     const isInpage =
-      meta.sender.tab &&
-      !meta.sender.tab?.url?.includes('extension://') &&
-      (!meta.sender.frameId || meta.sender.frameId === 0)
+        meta.sender.tab &&
+        !meta.sender.tab?.url?.includes('extension://') &&
+        (!meta.sender.frameId || meta.sender.frameId === 0)
 
     const rpcUrl = rpcUrl_ || networkStore.getState().network.rpcUrl
     const rpcClient = getHttpRpcClient(rpcUrl)
@@ -53,18 +54,15 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
       } as RpcResponse
 
     const { bypassSignatureAuth, bypassTransactionAuth } =
-      settingsStore.getState()
+        settingsStore.getState()
     // If the method is a "signable" method, request approval from the user.
     if (
-      (request.method === 'eth_sendTransaction' && !bypassTransactionAuth) ||
-      (request.method === 'eth_sign' && !bypassSignatureAuth) ||
-      (request.method === 'eth_signTypedData_v4' && !bypassSignatureAuth) ||
-      (request.method === 'personal_sign' && !bypassSignatureAuth) ||
-      (request.method === 'wallet_sendCalls' && !bypassTransactionAuth)
+        (request.method === 'eth_sendTransaction' && !bypassTransactionAuth) ||
+        (request.method === 'eth_sign' && !bypassSignatureAuth) ||
+        (request.method === 'eth_signTypedData_v4' && !bypassSignatureAuth) ||
+        (request.method === 'personal_sign' && !bypassSignatureAuth) ||
+        (request.method === 'wallet_sendCalls' && !bypassTransactionAuth)
     ) {
-      const { addPendingRequest, removePendingRequest } =
-        pendingRequestsStore.getState()
-
       if (isInpage && !session)
         return {
           id: request.id,
@@ -74,44 +72,15 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
           },
         } as RpcResponse
 
-      addPendingRequest({ ...request, sender: meta.sender })
-
-      const response = await new Promise((resolve, reject) => {
-        walletMessenger.reply(
-          'pendingRequest',
-          async ({ request: pendingRequest, status }) => {
-            if (pendingRequest.id !== request.id) return
-
-            removePendingRequest(request.id)
-
-            if (status === 'rejected') {
-              resolve({
-                id: request.id,
-                jsonrpc: '2.0',
-                error: {
-                  code: UserRejectedRequestError.code,
-                  message: UserRejectedRequestError.message,
-                  data: { request },
-                },
-              } satisfies RpcResponse)
-              return
-            }
-
-            try {
-              const { id, method, params } = pendingRequest
-              const response = await execute(rpcClient, {
-                method,
-                params,
-                id,
-              } as RpcRequest)
-              resolve(response)
-            } catch (err) {
-              reject(err)
-            }
-          },
-        )
+      const decision = await requestUserDecision({
+        ...request,
+        sender: meta.sender,
       })
-      return response as RpcResponse
+      if (decision.status !== 'approved')
+        return declinedResponse(request, decision.status)
+
+      const { id, method, params } = decision.request
+      return execute(rpcClient, { method, params, id } as RpcRequest)
     }
 
     if (isInpage) {
@@ -144,39 +113,14 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
         const { bypassConnectAuth } = settingsStore.getState()
         if (bypassConnectAuth) return authorize()
 
-        const { addPendingRequest, removePendingRequest } =
-          pendingRequestsStore.getState()
+        const decision = await requestUserDecision({
+          ...request,
+          sender: meta.sender,
+        })
+        if (decision.status !== 'approved')
+          return declinedResponse(request, decision.status)
 
-        addPendingRequest({ ...request, sender: meta.sender })
-
-        try {
-          const response = await new Promise((resolve) => {
-            walletMessenger.reply(
-              'pendingRequest',
-              async ({ request: pendingRequest, status }) => {
-                if (pendingRequest.id !== request.id) return
-
-                if (status === 'rejected') {
-                  resolve({
-                    id: request.id,
-                    jsonrpc: '2.0',
-                    error: {
-                      code: UserRejectedRequestError.code,
-                      message: UserRejectedRequestError.message,
-                      data: { request },
-                    },
-                  } satisfies RpcResponse)
-                  return
-                }
-
-                resolve(authorize())
-              },
-            )
-          })
-          return response as RpcResponse
-        } finally {
-          removePendingRequest(request.id)
-        }
+        return authorize()
       }
 
       if (request.method === 'eth_accounts') {
@@ -188,8 +132,8 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
           rpcUrl: network.rpcUrl,
         })
         const addresses = session
-          ? (accounts.map((x) => x.address) as Address[])
-          : []
+            ? (accounts.map((x) => x.address) as Address[])
+            : []
 
         return {
           id: request.id,
@@ -204,18 +148,18 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
         const { transactionHashes } = batch[batchId]
 
         const responses = await Promise.allSettled(
-          transactionHashes.map((hash) =>
-            rpcClient.request({
-              body: {
-                method: 'eth_getTransactionReceipt',
-                params: [hash],
-              },
-            }),
-          ),
+            transactionHashes.map((hash) =>
+                rpcClient.request({
+                  body: {
+                    method: 'eth_getTransactionReceipt',
+                    params: [hash],
+                  },
+                }),
+            ),
         )
         const pending = responses.some(
-          (response) =>
-            response.status === 'rejected' || !response.value.result,
+            (response) =>
+                response.status === 'rejected' || !response.value.result,
         )
 
         return {
@@ -224,22 +168,22 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
           result: {
             status: pending ? 'PENDING' : 'CONFIRMED',
             receipts: pending
-              ? []
-              : responses
-                  .map((response) => {
-                    if (response.status === 'rejected') return
-                    const receipt = response.value
-                      .result as RpcTransactionReceipt
-                    return {
-                      blockHash: receipt.blockHash,
-                      blockNumber: receipt.blockNumber,
-                      gasUsed: receipt.gasUsed,
-                      logs: receipt.logs,
-                      transactionHash: receipt.transactionHash,
-                      status: receipt.status,
-                    }
-                  })
-                  .filter(Boolean),
+                ? []
+                : responses
+                    .map((response) => {
+                      if (response.status === 'rejected') return
+                      const receipt = response.value
+                          .result as RpcTransactionReceipt
+                      return {
+                        blockHash: receipt.blockHash,
+                        blockNumber: receipt.blockNumber,
+                        gasUsed: receipt.gasUsed,
+                        logs: receipt.logs,
+                        transactionHash: receipt.transactionHash,
+                        status: receipt.status,
+                      }
+                    })
+                    .filter(Boolean),
           },
         } as RpcResponse
       }
@@ -267,8 +211,8 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
         const { batch } = batchCallsStore.getState()
         const { transactionHashes } = batch[batchId]
         walletMessenger.send(
-          'pushRoute',
-          `/transaction/${transactionHashes[0]}`,
+            'pushRoute',
+            `/transaction/${transactionHashes[0]}`,
         )
         return {
           id: request.id,
@@ -282,8 +226,23 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
   })
 }
 
-/////////////////////////////////////////////////////////////////////////////////
-// Utilties
+function declinedResponse(
+    request: RpcRequest,
+    status: Exclude<Decision['status'], 'approved'>,
+) {
+  return {
+    id: request.id,
+    jsonrpc: '2.0',
+    error: {
+      code: UserRejectedRequestError.code,
+      message:
+          status === 'expired'
+              ? 'The request timed out waiting for approval.'
+              : UserRejectedRequestError.message,
+      data: { request },
+    },
+  } satisfies RpcResponse
+}
 
 async function execute(rpcClient: HttpRpcClient, request: RpcRequest) {
   // Anvil doesn't support `personal_sign` – use `eth_sign` instead.
@@ -307,8 +266,8 @@ async function execute(rpcClient: HttpRpcClient, request: RpcRequest) {
   })()) as unknown as RpcResponse
 
   if (
-    request.method === 'eth_sendTransaction' ||
-    request.method === 'wallet_sendCalls'
+      request.method === 'eth_sendTransaction' ||
+      request.method === 'wallet_sendCalls'
   )
     walletMessenger.send('transactionExecuted', undefined)
 
@@ -323,11 +282,11 @@ async function execute(rpcClient: HttpRpcClient, request: RpcRequest) {
 }
 
 async function handleSendCalls({
-  calls,
-  from,
-  id,
-  rpcClient,
-}: {
+                                 calls,
+                                 from,
+                                 id,
+                                 rpcClient,
+                               }: {
   calls: RpcTransactionRequest[]
   from: Address
   id: number
@@ -348,12 +307,12 @@ async function handleSendCalls({
 
   // Disable automining (if enabled) to mine transactions atomically.
   const automine = await rpcClient
-    .request({
-      body: {
-        method: 'anvil_getAutomine',
-      },
-    })
-    .catch(() => {})
+      .request({
+        body: {
+          method: 'anvil_getAutomine',
+        },
+      })
+      .catch(() => {})
   if (automine?.result)
     await rpcClient.request({
       body: {
