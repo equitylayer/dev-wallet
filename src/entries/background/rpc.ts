@@ -1,4 +1,4 @@
-import { type Address, numberToHex } from 'viem'
+import { type Address, hexToNumber, isHex, numberToHex } from 'viem'
 
 import {
   UnauthorizedProviderError,
@@ -299,6 +299,32 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
         } as RpcResponse
       }
 
+      if (request.method === 'wallet_switchEthereumChain') {
+        // A session is guaranteed here: the method is not open to any page.
+        const param = (request.params as [{ chainId?: unknown }] | undefined)?.[0]
+        const chainIdHex = param?.chainId
+        if (typeof chainIdHex !== 'string' || !isHex(chainIdHex))
+          return rpcError(
+            request,
+            -32602,
+            'Invalid chainId: expected a 0x-prefixed hex string',
+          )
+
+        const chainId = hexToNumber(chainIdHex)
+        const { network, networks, switchNetwork } = networkStore.getState()
+
+        // Already on this chain: nothing to do.
+        if (network.chainId === chainId)
+          return { id: request.id, jsonrpc: '2.0', result: null } as RpcResponse
+
+        const target = networks.find((x) => x.chainId === chainId)
+        if (!target)
+          return rpcError(request, 4902, `Unrecognized chain ID "${chainIdHex}".`)
+
+        switchNetwork(target.rpcUrl)
+        return { id: request.id, jsonrpc: '2.0', result: null } as RpcResponse
+      }
+
       if (request.method === 'wallet_requestPermissions') {
         assertEthAccountsRequest(request.params)
 
@@ -358,6 +384,14 @@ function unauthorized(request: RpcRequest) {
       message:
         'The requested account and/or method has not been authorized by the user.',
     },
+  } as RpcResponse
+}
+
+function rpcError(request: RpcRequest, code: number, message: string) {
+  return {
+    id: request.id,
+    jsonrpc: '2.0',
+    error: { code, message },
   } as RpcResponse
 }
 
