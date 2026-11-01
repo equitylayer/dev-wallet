@@ -6,13 +6,12 @@ import type { AccountModeAction } from '~/smart/resolve'
 import type { AaStatus } from '~/smart/setup'
 import type { RpcCall } from '~/smart/types'
 import type { RpcRequest, RpcResponse } from '~/types/rpc'
-import type { SessionsState } from '~/zustand'
+
+import type { PagePayloads } from './page-events'
 
 export type Schema = {
-  accountsChanged: [
-    payload: { accounts: Address[]; sessions: SessionsState['sessions'] },
-    response: void,
-  ]
+  /** What a page's provider gets; `sendPageEvent` sends it (`page-events`). */
+  accountsChanged: [payload: PagePayloads['accountsChanged'], response: void]
   /**
    * The batch review's changes to the open batch; the background is its only
    * writer. `open` is "Start batch", `sign` with `force` is "Sign anyway", and
@@ -32,12 +31,9 @@ export type Schema = {
       | { ok: true }
       | { ok: false; error: { code: number; message: string; data?: unknown } },
   ]
-  chainChanged: [
-    payload: { chainId: string; sessions: SessionsState['sessions'] },
-    response: void,
-  ]
-  connect: [payload: { chainId: string }, response: void]
-  disconnect: [payload: undefined, response: void]
+  chainChanged: [payload: PagePayloads['chainChanged'], response: void]
+  connect: [payload: PagePayloads['connect'], response: void]
+  disconnect: [payload: PagePayloads['disconnect'], response: void]
   injectProvider: [payload: void, response: void]
   notice: [payload: { message: string }, response: void]
   /**

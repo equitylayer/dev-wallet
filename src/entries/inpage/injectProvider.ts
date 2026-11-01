@@ -26,7 +26,6 @@ function generateBrandIcon(): `data:image/${string}` {
 
 export function injectProvider() {
     const provider = getProvider({
-        host: window.location.host,
         eventMessenger: [walletMessenger, backgroundMessenger],
         requestMessenger: backgroundMessenger,
     })

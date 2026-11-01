@@ -5,8 +5,9 @@
 export type MessageSenderLike = {
   id?: string
   url?: string
-  tab?: unknown
+  tab?: { id?: number }
   frameId?: number
+  documentId?: string
   origin?: string
 }
 
@@ -44,6 +45,36 @@ export function isPageSender(
   extensionOrigin: string,
 ): boolean {
   return !isExtensionPageSender(sender, extensionId, extensionOrigin)
+}
+
+/**
+ * Where a reply goes: into the document that asked (a page's frame, through
+ * its content script), or on the runtime channel to an extension page.
+ */
+export type ReplyTarget =
+  | { tabId: number; documentId: string }
+  | { tabId: number; frameId: number }
+  | { runtime: true }
+
+/**
+ * Where to answer a message: a content script's goes back to its tab, and in
+ * it to its own document (or frame, without a document id), never to
+ * whichever tab is active and never to the tab's other frames. An extension
+ * page's goes on the runtime, even one open in a tab.
+ */
+export function replyTarget(
+  sender: MessageSenderLike,
+  extensionId: string,
+  extensionOrigin: string,
+): ReplyTarget {
+  const tabId = sender.tab?.id
+  if (
+    typeof tabId !== 'number' ||
+    isExtensionPageSender(sender, extensionId, extensionOrigin)
+  )
+    return { runtime: true }
+  if (sender.documentId) return { tabId, documentId: sender.documentId }
+  return { tabId, frameId: sender.frameId ?? 0 }
 }
 
 /** The connections a web page may use through the content-script relay. */

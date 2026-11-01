@@ -1,12 +1,11 @@
-import type { Messenger } from '~/messengers'
+import { disconnectEvent } from '~/messengers/page-events'
+import { sendPageEvent } from '~/messengers/sendPageEvent'
 import { sessionsStore } from '~/zustand'
 
-export async function disconnect({
-  host,
-  messenger,
-}: { host: string; messenger: Messenger }) {
+/** Disconnects the site, and tells its pages (and no other site's). */
+export async function disconnect({ host }: { host: string }) {
   const { removeSession } = sessionsStore.getState()
   removeSession({ host })
 
-  await messenger.send('disconnect', undefined)
+  await sendPageEvent(disconnectEvent(host))
 }

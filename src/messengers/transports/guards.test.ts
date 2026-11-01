@@ -5,6 +5,7 @@ import {
   isPageSender,
   isRelayedConnection,
   openWalletMessage,
+  replyTarget,
 } from './guards'
 
 const id = 'abcdefghijklmnopabcdefghijklmnop'
@@ -189,5 +190,86 @@ describe('isPageSender', () => {
   test('anything unidentified counts as a page', () => {
     expect(isPageSender({}, id, origin)).toBe(true)
     expect(isPageSender({ id }, id, origin)).toBe(true)
+  })
+})
+
+describe('replyTarget', () => {
+  test('a page gets its answer in the document that asked', () => {
+    expect(
+      replyTarget(
+        {
+          id,
+          url: 'https://dapp.test/',
+          tab: { id: 7 },
+          frameId: 0,
+          documentId: 'DOC-TOP',
+        },
+        id,
+        origin,
+      ),
+    ).toEqual({ tabId: 7, documentId: 'DOC-TOP' })
+  })
+
+  test('a subframe gets it in its own frame, not the whole tab', () => {
+    expect(
+      replyTarget(
+        {
+          id,
+          url: 'https://evil.test/frame',
+          tab: { id: 7 },
+          frameId: 4,
+          documentId: 'DOC-SUB',
+        },
+        id,
+        origin,
+      ),
+    ).toEqual({ tabId: 7, documentId: 'DOC-SUB' })
+    // Without a document id (before Chrome 106), the frame it asked from.
+    expect(
+      replyTarget(
+        { id, url: 'https://evil.test/frame', tab: { id: 7 }, frameId: 4 },
+        id,
+        origin,
+      ),
+    ).toEqual({ tabId: 7, frameId: 4 })
+  })
+
+  test('two tabs on the same site each get their own', () => {
+    const asking = (tab: number) =>
+      replyTarget(
+        { id, url: 'https://dapp.test/', tab: { id: tab }, frameId: 0 },
+        id,
+        origin,
+      )
+    expect(asking(1)).toEqual({ tabId: 1, frameId: 0 })
+    expect(asking(2)).toEqual({ tabId: 2, frameId: 0 })
+  })
+
+  test('a content script without a frame id is its top frame', () => {
+    expect(
+      replyTarget({ id, url: 'https://dapp.test/', tab: { id: 7 } }, id, origin),
+    ).toEqual({ tabId: 7, frameId: 0 })
+  })
+
+  test('an extension page gets it on the runtime, even in a tab', () => {
+    expect(
+      replyTarget({ id, url: `${origin}src/index.html` }, id, origin),
+    ).toEqual({ runtime: true })
+    expect(
+      replyTarget(
+        { id, url: `${origin}src/index.html`, tab: { id: 7 }, frameId: 0 },
+        id,
+        origin,
+      ),
+    ).toEqual({ runtime: true })
+    expect(
+      replyTarget({ id, url: `${origin}service-worker-loader.js` }, id, origin),
+    ).toEqual({ runtime: true })
+  })
+
+  test('a sender with no tab to answer in gets it on the runtime', () => {
+    expect(
+      replyTarget({ id, url: 'https://dapp.test/', tab: {} }, id, origin),
+    ).toEqual({ runtime: true })
   })
 })

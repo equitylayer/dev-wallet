@@ -7,12 +7,10 @@ import type { RpcRequest } from '~/types/rpc'
 
 const providerCache = new Map<string, EIP1193Provider>()
 export function getProvider({
-  host,
   eventMessenger: eventMessenger_,
   requestMessenger,
   rpcUrl,
 }: {
-  host?: string
   eventMessenger: Messenger | Messenger[]
   requestMessenger: Messenger
   rpcUrl?: string
@@ -32,14 +30,14 @@ export function getProvider({
   // Workaround for id conflicts between inpage & wallet.
   let _id = Math.floor(Math.random() * 10000)
 
+  // A page's content script passes on only the events for its own host
+  // (`pageEventFor`), so whatever arrives here is this page's.
   function listen(messenger: Messenger) {
-    messenger.reply('accountsChanged', async ({ accounts, sessions }) => {
-      if (host && !sessions.find((session) => session.host === host)) return
+    messenger.reply('accountsChanged', async ({ accounts }) => {
       emitter.emit('accountsChanged', accounts)
     })
 
-    messenger.reply('chainChanged', async ({ chainId, sessions }) => {
-      if (host && !sessions.find((session) => session.host === host)) return
+    messenger.reply('chainChanged', async ({ chainId }) => {
       emitter.emit('chainChanged', chainId)
     })
 

@@ -1,15 +1,15 @@
 import { numberToHex } from 'viem'
-import type { Messenger } from '~/messengers'
+
+import { connectEvent } from '~/messengers/page-events'
+import { sendPageEvent } from '~/messengers/sendPageEvent'
 import { networkStore, sessionsStore } from '~/zustand'
 
-export async function connect({
-  host,
-  messenger,
-}: { host: string; messenger: Messenger }) {
+/** Connects the site, and tells its pages (and no other site's). */
+export async function connect({ host }: { host: string }) {
   const { network } = networkStore.getState()
 
   const { addSession } = sessionsStore.getState()
   addSession({ session: { host } })
 
-  await messenger.send('connect', { chainId: numberToHex(network.chainId) })
+  await sendPageEvent(connectEvent(host, numberToHex(network.chainId)))
 }

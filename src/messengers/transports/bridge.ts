@@ -1,3 +1,6 @@
+import { senderHost } from '~/utils/host'
+
+import { PAGE_EVENT, pageEventFor } from '../page-events'
 import { isRelayedConnection } from './guards'
 import { createTabTransport } from './tab'
 import type { Transport } from './types'
@@ -49,6 +52,18 @@ export function setupBridgeTransportRelay() {
     if (!topic) return
 
     const topic_: string = topic.replace('> ', '')
+
+    // An event for the pages reaches every frame: this one passes on only
+    // its own host's, as the provider's topic and payload.
+    if (topic_ === PAGE_EVENT) {
+      const event = pageEventFor(
+        payload,
+        senderHost({ origin: location.origin, url: location.href }),
+      )
+      if (!event) return
+      return windowTransport.send(event.topic, event.payload, { connection })
+    }
+
     const response = await windowTransport.send(topic_, payload, {
       id,
       connection,

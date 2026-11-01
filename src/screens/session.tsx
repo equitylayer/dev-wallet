@@ -3,10 +3,7 @@ import { connect, disconnect } from '~/actions'
 import { Container, LabelledContent } from '~/components'
 import { Box, Button, Inline, Separator, Stack, Text } from '~/design-system'
 import { useHost } from '~/hooks/useHost'
-import { getMessenger } from '~/messengers'
 import { useSessionsStore } from '~/zustand'
-
-const inpageMessenger = getMessenger('wallet:inpage')
 
 export default function Session() {
   const { data: host } = useHost()
@@ -20,7 +17,7 @@ export default function Session() {
           {isConnected ? (
             <Button
               onClick={() =>
-                host && disconnect({ host, messenger: inpageMessenger })
+                host && disconnect({ host })
               }
               variant="solid fill"
             >
@@ -30,7 +27,7 @@ export default function Session() {
             <Button
               variant="solid fill"
               onClick={() =>
-                host && connect({ host, messenger: inpageMessenger })
+                host && connect({ host })
               }
             >
               Connect
@@ -59,10 +56,7 @@ export default function Session() {
                       height="24px"
                       symbol="trash"
                       onClick={() => {
-                        disconnect({
-                          host: session.host,
-                          messenger: inpageMessenger,
-                        })
+                        disconnect({ host: session.host })
                       }}
                       variant="ghost red"
                     />

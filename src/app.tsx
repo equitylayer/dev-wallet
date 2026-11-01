@@ -23,6 +23,11 @@ import { getPendingTransactionsQueryKey } from '~/hooks/usePendingTransactions'
 import { usePrevious } from '~/hooks/usePrevious'
 import { getTxpoolQueryKey } from '~/hooks/useTxpool'
 import { getMessenger } from '~/messengers'
+import {
+    accountsChangedEvent,
+    chainChangedEvent,
+} from '~/messengers/page-events'
+import { sendPageEvent } from '~/messengers/sendPageEvent'
 import { QueryClientProvider, queryClient } from '~/react-query'
 import { sameAddresses } from '~/utils/accounts'
 import { getClient } from '~/viem'
@@ -188,9 +193,7 @@ export function init({ type = 'standalone' }: { type?: AppMeta['type'] } = {}) {
 
 ////////////////////////////////////////////////////////////////////////////
 
-const inpageMessenger = getMessenger('wallet:inpage')
-
-/** Emits EIP-1193 `accountsChanged` Event */
+/** Emits EIP-1193 `accountsChanged` Event, to each connected site's pages. */
 function AccountsChangedEmitter() {
     const { account, getAccounts } = useAccountStore()
     const { sessions } = useSessionsStore()
@@ -212,10 +215,12 @@ function AccountsChangedEmitter() {
             prevAccounts.current &&
             !sameAddresses(prevAccounts.current, accounts_)
         )
-            inpageMessenger.send('accountsChanged', {
-                accounts: accounts_.map((x) => x.address),
-                sessions,
-            })
+            void sendPageEvent(
+                accountsChangedEvent(
+                    accounts_.map((x) => x.address),
+                    sessions,
+                ),
+            )
 
         prevAccounts.current = accounts_
     }, [account])
@@ -223,7 +228,7 @@ function AccountsChangedEmitter() {
     return null
 }
 
-/** Emits EIP-1193 `chainChanged` Event */
+/** Emits EIP-1193 `chainChanged` Event, to each connected site's pages. */
 function NetworkChangedEmitter() {
     const { network } = useNetworkStore()
     const { sessions } = useSessionsStore()
@@ -233,10 +238,9 @@ function NetworkChangedEmitter() {
         if (!network.chainId) return
 
         if (prevNetwork.current && prevNetwork.current.chainId !== network.chainId)
-            inpageMessenger.send('chainChanged', {
-                chainId: numberToHex(network.chainId),
-                sessions,
-            })
+            void sendPageEvent(
+                chainChangedEvent(numberToHex(network.chainId), sessions),
+            )
 
         prevNetwork.current = network
     }, [network])

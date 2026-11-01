@@ -6,6 +6,8 @@ import {
   UnsupportedProviderMethodError,
 } from '~/errors'
 import { type Messenger, getMessenger } from '~/messengers'
+import { connectEvent } from '~/messengers/page-events'
+import { sendPageEvent } from '~/messengers/sendPageEvent'
 import type { Schema } from '~/messengers/schema'
 import { isPageSender } from '~/messengers/transports/guards'
 import type { CallbackOptions } from '~/messengers/transports/types'
@@ -38,7 +40,6 @@ import {
 } from './smart'
 import { handleSend } from './smart-sends'
 
-const inpageMessenger = getMessenger('background:inpage')
 const walletMessenger = getMessenger('background:wallet')
 
 /** How long `eth_accounts` waits for a reconcile before answering anyway. */
@@ -202,9 +203,8 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
           const addresses = accounts.map((x) => x.address) as Address[]
 
           addSession({ session: { host } })
-          inpageMessenger.send('connect', {
-            chainId: numberToHex(network.chainId),
-          })
+          // The site's pages, in any tab or frame, and no other site's.
+          void sendPageEvent(connectEvent(host, numberToHex(network.chainId)))
 
           return { addresses }
         }

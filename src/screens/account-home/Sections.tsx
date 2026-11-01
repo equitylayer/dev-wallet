@@ -20,7 +20,6 @@ import { useContracts } from '~/hooks/useContracts'
 import { useEmptyTokens } from '~/hooks/useEmptyTokens'
 import { useFunctionName } from '~/hooks/useFunctionName'
 import { useHost } from '~/hooks/useHost'
-import { getMessenger } from '~/messengers'
 import { truncate } from '~/utils'
 import {
   type ActivityItem,
@@ -35,7 +34,6 @@ import { TokenRow } from '../account-details/TokenRow'
 import { formatEth } from './AccountPlate'
 import * as styles from './account-home.css'
 
-const inpageMessenger = getMessenger('wallet:inpage')
 const blockIntl = new Intl.NumberFormat('en-US')
 
 function Section({
@@ -190,7 +188,7 @@ export function ConnectedSection() {
             height="24px"
             variant="stroked fill"
             width="fit"
-            onClick={() => connect({ host, messenger: inpageMessenger })}
+            onClick={() => connect({ host })}
           >
             Connect
           </Button>
@@ -219,9 +217,7 @@ export function ConnectedSection() {
             height="24px"
             variant="stroked fill"
             width="fit"
-            onClick={() =>
-              disconnect({ host: session.host, messenger: inpageMessenger })
-            }
+            onClick={() => disconnect({ host: session.host })}
           >
             Disconnect
           </Button>
