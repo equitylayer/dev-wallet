@@ -38,7 +38,6 @@ export function useAccountTokensQueryOptions(args: UseAccountTokensParameters) {
       if (!address) throw new Error('address is required')
       const tokens = await getAccountTokens(client, {
         address,
-        fromBlock: network.forkBlockNumber,
         toBlock: 'latest',
       })
       syncTokens(

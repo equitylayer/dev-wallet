@@ -9,12 +9,14 @@ import { useAccountActivity } from '~/hooks/useAccountActivity'
 import { useAccountTokens } from '~/hooks/useAccountTokens'
 import { useAccounts } from '~/hooks/useAccounts'
 import { useContracts } from '~/hooks/useContracts'
+import { useEmptyTokens } from '~/hooks/useEmptyTokens'
 import { useFunctionName } from '~/hooks/useFunctionName'
 import { useHost } from '~/hooks/useHost'
 import { getMessenger } from '~/messengers'
 import { truncate } from '~/utils'
 import { useSessionsStore } from '~/zustand'
 
+import { EmptyTokensToggle } from '../account-details/EmptyTokensToggle'
 import { ImportToken } from '../account-details/ImportToken'
 import { TokenRow } from '../account-details/TokenRow'
 import { formatEth } from './AccountPlate'
@@ -62,8 +64,12 @@ export function TokensSection({ address }: { address: Address }) {
   const { tokens } = useAccountTokens({ address })
   const [importing, setImporting] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [showEmpty, setShowEmpty] = useState(false)
   const visible = tokens?.filter((token) => token.visible) ?? []
-  const shown = expanded ? visible : visible.slice(0, TOKEN_PREVIEW_COUNT)
+  // Discovered tokens with a zero balance collapse; the preview counts the rest.
+  const { populated, empty } = useEmptyTokens({ address, tokens: visible })
+  const shown = expanded ? populated : populated.slice(0, TOKEN_PREVIEW_COUNT)
+  const canExpand = populated.length > TOKEN_PREVIEW_COUNT
 
   return (
     <Section
@@ -90,6 +96,8 @@ export function TokensSection({ address }: { address: Address }) {
           No ERC-20s yet. They show up here once this account receives a
           transfer.
         </Empty>
+      ) : populated.length === 0 ? (
+        <Empty>No tokens with a balance.</Empty>
       ) : (
         shown.map((token) => (
           <TokenRow
@@ -99,19 +107,36 @@ export function TokensSection({ address }: { address: Address }) {
           />
         ))
       )}
-      {visible.length > TOKEN_PREVIEW_COUNT && (
+      {(canExpand || empty.length > 0) && (
         <Box className={styles.more}>
-          <button
-            type="button"
-            className={styles.textButton}
-            onClick={() => setExpanded((x) => !x)}
-          >
-            <Text size="12px" wrap={false}>
-              {expanded ? 'Show fewer' : `Show all ${visible.length}`}
-            </Text>
-          </button>
+          {canExpand && (
+            <button
+              type="button"
+              className={styles.textButton}
+              onClick={() => setExpanded((x) => !x)}
+            >
+              <Text size="12px" wrap={false}>
+                {expanded ? 'Show fewer' : `Show all ${populated.length}`}
+              </Text>
+            </button>
+          )}
+          {empty.length > 0 && (
+            <EmptyTokensToggle
+              count={empty.length}
+              open={showEmpty}
+              onToggle={() => setShowEmpty((x) => !x)}
+            />
+          )}
         </Box>
       )}
+      {showEmpty &&
+        empty.map((token) => (
+          <TokenRow
+            key={token.address}
+            accountAddress={address}
+            tokenAddress={token.address}
+          />
+        ))}
     </Section>
   )
 }

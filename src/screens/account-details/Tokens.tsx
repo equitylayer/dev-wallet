@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Address } from 'viem'
 
 import {
@@ -10,12 +11,21 @@ import {
     Text,
 } from '~/design-system'
 import { useAccountTokens } from '~/hooks/useAccountTokens'
+import { useEmptyTokens } from '~/hooks/useEmptyTokens'
 
+import * as homeStyles from '../account-home/account-home.css'
+import { EmptyTokensToggle } from './EmptyTokensToggle'
 import { ImportToken } from './ImportToken'
 import { TokenRow } from './TokenRow'
 
 export function Tokens({ accountAddress }: { accountAddress: Address }) {
     const { tokens } = useAccountTokens({ address: accountAddress })
+    const [showEmpty, setShowEmpty] = useState(false)
+    // Discovered tokens with a zero balance collapse behind a toggle.
+    const { populated, empty } = useEmptyTokens({
+        address: accountAddress,
+        tokens: tokens?.filter((token) => token.visible) ?? [],
+    })
 
     if (!accountAddress) return null
     return (
@@ -47,16 +57,32 @@ export function Tokens({ accountAddress }: { accountAddress: Address }) {
             {/* Native ETH */}
             <TokenRow accountAddress={accountAddress} bleed />
             {/* TODO: Handle empty state. */}
-            {tokens?.map((token) =>
-                token.visible ? (
+            {populated.map((token) => (
+                <TokenRow
+                    bleed
+                    accountAddress={accountAddress}
+                    tokenAddress={token.address}
+                    key={token.address}
+                />
+            ))}
+            {empty.length > 0 && (
+                <Box className={homeStyles.moreBleed}>
+                    <EmptyTokensToggle
+                        count={empty.length}
+                        open={showEmpty}
+                        onToggle={() => setShowEmpty((x) => !x)}
+                    />
+                </Box>
+            )}
+            {showEmpty &&
+                empty.map((token) => (
                     <TokenRow
                         bleed
                         accountAddress={accountAddress}
                         tokenAddress={token.address}
                         key={token.address}
                     />
-                ) : null,
-            )}
+                ))}
         </Inset>
     )
 }

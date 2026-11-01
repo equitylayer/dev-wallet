@@ -1,12 +1,14 @@
-import { uniqueBy } from 'remeda'
 import type { Address } from 'viem'
 import { useSyncExternalStoreWithTracked } from '~/hooks/useSyncExternalStoreWithTracked'
+import {
+  type Token,
+  addImportedToken,
+  mergeDiscoveredTokens,
+  migrateTokensState,
+} from './tokens-logic'
 import { createStore, getKey } from './utils'
 
-export type Token = {
-  address: Address
-  visible: boolean
-}
+export type { Token, TokenSource } from './tokens-logic'
 
 export type TokensKey = {
   accountAddress: Address
@@ -40,6 +42,7 @@ export type TokensActions = {
   syncTokens: (
     key: TokensKey,
     parameters: {
+      /** The COMPLETE set of tokens currently discovered for the account. */
       tokenAddresses: Address[]
     },
   ) => void
@@ -51,7 +54,7 @@ export function getTokensKey(key: TokensKey): SerializedTokensKey {
 }
 
 export const tokensStore = createStore<TokensStore>(
-  (set) => ({
+  (set, get) => ({
     tokens: {},
     addToken(key, args) {
       const { tokenAddress } = args
@@ -59,12 +62,9 @@ export const tokensStore = createStore<TokensStore>(
 
       set((state) => {
         const tokens = { ...state.tokens }
-        tokens[serializedKey] = uniqueBy(
-          [
-            { address: tokenAddress, visible: true },
-            ...(state.tokens[serializedKey] || []),
-          ],
-          (x) => x.address,
+        tokens[serializedKey] = addImportedToken(
+          state.tokens[serializedKey] || [],
+          tokenAddress,
         )
 
         return {
@@ -114,70 +114,26 @@ export const tokensStore = createStore<TokensStore>(
       const { tokenAddresses } = args
       const serializedKey = getTokensKey(key)
 
-      set((state) => {
-        const tokens = { ...state.tokens }
+      const current = get().tokens[serializedKey] || []
+      const next = mergeDiscoveredTokens(current, tokenAddresses)
+      // Runs every few seconds; when nothing changed, don't touch the store.
+      if (next === current) return
 
-        for (const tokenAddress of tokenAddresses) {
-          const existingToken = (tokens[serializedKey] || []).find(
-            (x) => x.address.toLowerCase() === tokenAddress.toLowerCase(),
-          )
-          // Only add if token doesn't exist yet
-          // If it exists but is hidden, respect the user's choice and don't modify it
-          if (!existingToken)
-            tokens[serializedKey] = [
-              {
-                address: tokenAddress,
-                visible: true,
-              },
-              ...(tokens[serializedKey] || []),
-            ]
-        }
-
-        return {
-          ...state,
-          tokens,
-        }
-      })
+      set((state) => ({
+        ...state,
+        tokens: { ...state.tokens, [serializedKey]: next },
+      }))
     },
   }),
   {
     persist: {
       name: 'tokens',
-      migrate,
-      version: 1,
+      migrate: (persistedState, version) =>
+        migrateTokensState(persistedState, version) as TokensStore,
+      version: 2,
     },
   },
 )
 
 export const useTokensStore = () =>
   useSyncExternalStoreWithTracked(tokensStore.subscribe, tokensStore.getState)
-
-///////////////////////////////////////////////////////////////////////////////////////
-// Migrations
-
-export type TokensState_v1 = TokensState
-
-export type TokensState_v0 = {
-  tokens: Record<Address, Address[]>
-}
-
-function migrate(persistedState: unknown, version: number): TokensStore {
-  switch (version) {
-    case 0: {
-      const state = persistedState as TokensState_v0
-      return {
-        tokens: Object.fromEntries(
-          Object.entries(state.tokens).map(([address, tokenAddresses]) => [
-            address,
-            tokenAddresses.map((tokenAddress) => ({
-              address: tokenAddress,
-              visible: false,
-            })),
-          ]),
-        ),
-      } as TokensState_v1 as TokensStore
-    }
-    default:
-      return persistedState as TokensStore
-  }
-}

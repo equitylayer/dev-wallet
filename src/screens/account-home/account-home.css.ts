@@ -209,6 +209,18 @@ export const empty = style({
 })
 
 export const more = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: 16,
   padding: `4px ${gutter}px`,
   borderBottom: `1px solid ${rgb(faint)}`,
 })
+
+// Inside an 8px-inset container the row bleeds back to the panel edge.
+export const moreBleed = style([
+  more,
+  {
+    margin: '0 -8px',
+    padding: '4px 8px',
+  },
+])
