@@ -32,6 +32,14 @@ const ONE_GWEI = 1_000_000_000n
 // still goes through and the failure shows up in its outcome.
 const FALLBACK_CALL_GAS_LIMIT = 1_000_000n
 
+/**
+ * The block user operations are built and checked against. With automine off
+ * (or interval mining), an op sent before the last one is mined must take
+ * the next nonce: the pending block has the last one's `handleOps` in it.
+ * Anvil and Hardhat both take it for `eth_call` and `eth_estimateGas`.
+ */
+const PENDING = 'pending'
+
 async function getNonce(node: Node, sender: Address): Promise<bigint> {
   const result = await node.request<Hex>('eth_call', [
     {
@@ -42,7 +50,7 @@ async function getNonce(node: Node, sender: Address): Promise<bigint> {
         args: [sender, 0n],
       }),
     },
-    'latest',
+    PENDING,
   ])
   return decodeFunctionResult({
     abi: entryPoint07Abi,
@@ -60,6 +68,7 @@ async function estimateCallGasLimit(
     const estimate = hexToBigInt(
       await node.request<Hex>('eth_estimateGas', [
         { from: sender, to: sender, data: callData },
+        PENDING,
       ]),
     )
     return (estimate * 12n) / 10n + 50_000n
@@ -174,13 +183,18 @@ export async function submitUserOp(
   }
   // When the estimate reverts, Anvil falls back to the block gas limit and
   // mines the reverting transaction, so simulate first to refuse an op the
-  // EntryPoint would reject.
+  // EntryPoint would reject. On the pending block, as the op was built.
   try {
-    await node.request('eth_call', [tx, 'latest'])
+    await node.request('eth_call', [tx, PENDING])
   } catch (error) {
     throw entryPointRejection(error)
   }
-  return node.request<Hash>('eth_sendTransaction', [tx])
+  // Anvil estimates a send's gas on the latest block, where an op built on
+  // the pending one fails: it would then take the block's whole gas limit,
+  // and wait for a block of its own. So the gas is estimated here, the same
+  // way, on the pending block.
+  const gas = await node.request<Hex>('eth_estimateGas', [tx, PENDING])
+  return node.request<Hash>('eth_sendTransaction', [{ ...tx, gas }])
 }
 
 export type UserOpOutcome = {

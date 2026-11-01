@@ -655,6 +655,35 @@ describe('getCallsStatus while nothing is mined (automine off)', () => {
     expect(mined.receipts).toHaveLength(1)
   })
 
+  test('two user ops from one account before a block are both 200 once mined', async () => {
+    await prepareSponsor(node, DEVWALLET)
+    await node.request('evm_setAutomine', [false])
+    const calls: Call[] = [{ to: X, value: 1n }]
+    const send = () =>
+      executeCalls({
+        node,
+        chainId,
+        account: kernelAccount,
+        calls,
+        atomicRequired: false,
+        sponsor: DEVWALLET,
+      })
+
+    // The second must take the account's next nonce, from the pending block.
+    const first = await send()
+    const second = await send()
+    expect([first.path, second.path]).toEqual(['userop', 'userop'])
+    expect(second.userOpHash).not.toBe(first.userOpHash)
+    const records = [first, second].map((r) => recordFrom(r, calls, account))
+    for (const record of records)
+      expect((await getCallsStatus(node, record)).status).toBe(100)
+
+    await node.request('evm_mine')
+    for (const record of records)
+      expect((await getCallsStatus(node, record)).status).toBe(200)
+    expect(await node.getBalance(X)).toBe(2n)
+  })
+
   test('a self-call is 100, then 200', async () => {
     await node.request('evm_setAutomine', [false])
     const calls: Call[] = [{ to: X, value: 1n }]
