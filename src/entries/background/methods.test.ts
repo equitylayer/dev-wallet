@@ -7,6 +7,7 @@ import {
   TRANSACTION_METHODS,
   assertEthAccountsRequest,
   declinedError,
+  isSignatureMethod,
   isTransactionMethod,
   needsSession,
   openToAnyPage,
@@ -33,6 +34,19 @@ test('isTransactionMethod is true only for the send methods', () => {
   expect(isTransactionMethod('wallet_sendCalls')).toBe(true)
   expect(isTransactionMethod('eth_sendRawTransaction')).toBe(false)
   expect(isTransactionMethod('wallet_getCallsStatus')).toBe(false)
+})
+
+test('isSignatureMethod is true only for the signatures the approval shows', () => {
+  for (const method of SIGNATURE_METHODS)
+    expect(isSignatureMethod(method)).toBe(true)
+  for (const method of [
+    'eth_signTypedData',
+    'eth_signTypedData_v3',
+    'eth_signTransaction',
+    'eth_sendTransaction',
+    'toString',
+  ])
+    expect(isSignatureMethod(method)).toBe(false)
 })
 
 test('transaction methods need approval unless bypassed', () => {

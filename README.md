@@ -224,7 +224,7 @@ DevWallet never touches contract code, and leaves an account delegated somewhere
 
 ### What DevWallet writes to your chain
 
-DevWallet keeps the node in step with the modes. It checks a network when the Account home opens on one it hasn't checked yet, when you change a mode, when a dApp connects, before it answers a connected dApp's account requests and EIP-5792 reads, and before it previews or sends anything. A site that isn't connected can't ask for any of these, so it never makes DevWallet write to the chain. Each time, it:
+DevWallet keeps the node in step with the modes. It checks a network when the Account home opens on one it hasn't checked yet, when you change a mode, when a dApp connects, before it answers a connected dApp's account requests, signature requests and EIP-5792 reads, and before it previews or sends anything. A site that isn't connected can't ask for any of these, so it never makes DevWallet write to the chain. Each time, it:
 
 - installs the account-abstraction contracts at any of these addresses that has no code, with `anvil_setCode` (`hardhat_setCode` on Hardhat):
 

@@ -145,12 +145,19 @@ export function isTransactionMethod(
   return isOneOf(TRANSACTION_METHODS, method)
 }
 
+/** Whether the method asks for a signature the approval shows (`SIGNATURE_METHODS`). */
+export function isSignatureMethod(
+  method: string,
+): method is (typeof SIGNATURE_METHODS)[number] {
+  return isOneOf(SIGNATURE_METHODS, method)
+}
+
 /** Whether the user has to approve this method before it is executed. */
 export function requiresApproval(
   method: string,
   s: ApprovalSettings,
 ): boolean {
-  if (isOneOf(SIGNATURE_METHODS, method)) return !s.bypassSignatureAuth
+  if (isSignatureMethod(method)) return !s.bypassSignatureAuth
   if (isOneOf(TRANSACTION_METHODS, method)) return !s.bypassTransactionAuth
   return false
 }

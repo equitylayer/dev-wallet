@@ -177,6 +177,7 @@ mock.module('~/messengers', () => ({
 }))
 
 const {
+  invalidate,
   reconcileBeforeAnswering,
   reconcileForRpc,
   setupSmartHandlers,
@@ -1495,6 +1496,48 @@ describe('page requests', () => {
       const raw = await ask('eth_sendRawTransaction', ['0x02'], top('dapp.test'))
       expect(raw.error).toBeDefined()
       expect(raw.error?.code).not.toBe(4100)
+    })
+  })
+
+  describe("a signature waits for the accounts' code to match their modes", () => {
+    /** The node lost the smart account's delegation since the last check. */
+    async function delegationLost() {
+      await reconcileForRpc(rpcUrl)
+      await node.setCode(smart, '0x')
+      invalidate(rpcUrl)
+    }
+    afterEach(() => {
+      delete settings.bypassSignatureAuth
+    })
+
+    test('unasked (bypass on), a personal_sign puts the delegation back first', async () => {
+      settings.bypassSignatureAuth = true
+      await delegationLost()
+      const signed = await ask(
+        'personal_sign',
+        ['0x68656c6c6f', smart],
+        top('dapp.test'),
+      )
+      expect(signed.result).toMatch(/^0x[0-9a-f]{130}$/)
+      expect(await node.getCode(smart)).toBe(delegationCode(KERNEL_V3_3))
+    })
+
+    test('asked, the delegation is back before the approval opens', async () => {
+      await delegationLost()
+      const answer = ask(
+        'personal_sign',
+        ['0x68656c6c6f', smart],
+        top('dapp.test'),
+      )
+      for (let i = 0; i < 300 && pendingRequests.length < 1; i++)
+        await Bun.sleep(10)
+      expect(pendingRequests).toHaveLength(1)
+      expect(await node.getCode(smart)).toBe(delegationCode(KERNEL_V3_3))
+      await handlers.get('pendingRequest')?.({
+        request: pendingRequests[0],
+        status: 'rejected',
+      })
+      expect(await answer).toMatchObject({ error: { code: 4001 } })
     })
   })
 

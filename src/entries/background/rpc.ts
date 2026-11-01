@@ -26,6 +26,7 @@ import {
 import {
   assertEthAccountsRequest,
   declinedError,
+  isSignatureMethod,
   isTransactionMethod,
   needsSession,
   openToAnyPage,
@@ -46,7 +47,10 @@ import { handleSend } from './smart-sends'
 
 const walletMessenger = getMessenger('background:wallet')
 
-/** How long `eth_accounts` waits for a reconcile before answering anyway. */
+/**
+ * How long `eth_accounts` and a page's signature request wait for a reconcile
+ * before going on anyway.
+ */
 const ETH_ACCOUNTS_RECONCILE_MS = 1500
 
 // A page picks its own JSON-RPC ids, so two tabs (or a page on purpose) can
@@ -156,6 +160,14 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
         ...params.slice(1),
       ]
     }
+
+    // What a page signs may be checked against its account's code (ERC-1271,
+    // or d1 picking a raw or wrapped signature), so the code must match the
+    // account's mode first, as for `eth_accounts`: asked or not (bypass).
+    if (isInpage && isSignatureMethod(request.method))
+      await reconcileBeforeAnswering(rpcUrl, {
+        timeoutMs: ETH_ACCOUNTS_RECONCILE_MS,
+      })
 
     // Sends go through the smart-account execution core, which asks for the
     // approval itself; plain `eth_sendTransaction`s come back to pass through.
