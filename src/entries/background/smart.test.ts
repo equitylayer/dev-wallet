@@ -189,6 +189,7 @@ const { requestUserDecision, setupPendingRequests } = await import(
   './pending-requests'
 )
 const { setupRpcHandler } = await import('./rpc')
+const { setupWalletSidebarHandler } = await import('./wallet-sidebar')
 setupSmartHandlers()
 setupBatchQueue()
 setupPendingRequests()
@@ -1397,6 +1398,135 @@ describe('page requests', () => {
     ).toHaveLength(1)
   })
 
+  describe('a site that is not connected may only read (R53)', () => {
+    const tx = { from: smart, ...transfer }
+    const writes: [string, unknown[]][] = [
+      ['anvil_setBalance', [X, '0x1']],
+      ['anvil_setCode', [X, '0x6000']],
+      ['anvil_reset', []],
+      ['anvil_dumpState', []],
+      ['hardhat_setBalance', [X, '0x1']],
+      ['evm_mine', []],
+      ['eth_sendUnsignedTransaction', [tx]],
+      ['eth_sendRawTransaction', ['0x02']],
+      // These reconcile, which writes the delegations.
+      ['wallet_getCapabilities', [smart]],
+      ['wallet_getCallsStatus', ['0x1234']],
+      ['wallet_showCallsStatus', ['0x1234']],
+    ]
+    const bypasses = [
+      {},
+      { bypassSignatureAuth: true, bypassTransactionAuth: true },
+    ]
+    afterEach(() => {
+      delete settings.bypassSignatureAuth
+      delete settings.bypassTransactionAuth
+    })
+
+    test('anything but reading or connecting is 4100, whatever the settings, and the node never hears of it', async () => {
+      await node.setCode(smart, '0x')
+      const before = await node.blockNumber()
+      const fetches = spyOn(globalThis, 'fetch')
+      try {
+        for (const bypass of bypasses) {
+          Object.assign(settings, bypass)
+          for (const [method, params] of writes)
+            expect(await ask(method, params, top('evil.test'))).toMatchObject({
+              id: 1,
+              error: { code: 4100 },
+            })
+        }
+        expect(fetches).not.toHaveBeenCalled()
+      } finally {
+        fetches.mockRestore()
+      }
+      expect(await node.blockNumber()).toBe(before)
+      expect(await node.getBalance(X)).toBe(0n)
+      expect(await node.getCode(X)).toBe('0x')
+      // Nothing reconciled: the delegation is still gone.
+      expect(await node.getCode(smart)).toBe('0x')
+      expect(pendingRequests).toHaveLength(0)
+    })
+
+    test('it still reads, and is told it is not connected', async () => {
+      const read = async (method: string, params: unknown[]) =>
+        (await ask(method, params, top('evil.test'))).result
+      expect(await read('eth_chainId', [])).toBe('0x7a69')
+      expect(await read('eth_call', [{ to: X, data: '0x' }, 'latest'])).toBe(
+        '0x',
+      )
+      expect(await read('eth_getBalance', [X, 'latest'])).toBe('0x0')
+      expect(await read('eth_accounts', [])).toEqual([])
+      expect(await read('wallet_getPermissions', [])).toEqual([])
+    })
+
+    test('a connected site still reaches the cheats and raw sends', async () => {
+      const before = await node.blockNumber()
+      expect(await ask('evm_mine', [], top('dapp.test'))).toMatchObject({
+        result: '0x0',
+      })
+      expect(await node.blockNumber()).toBe(before + 1n)
+      expect(
+        await ask('anvil_setBalance', [X, '0x5'], top('dapp.test')),
+      ).not.toHaveProperty('error')
+      expect(await node.getBalance(X)).toBe(5n)
+      // The node's own error: the page's raw send reached it.
+      const raw = await ask('eth_sendRawTransaction', ['0x02'], top('dapp.test'))
+      expect(raw.error).toBeDefined()
+      expect(raw.error?.code).not.toBe(4100)
+    })
+  })
+
+  describe('the side panel (R53)', () => {
+    let opened: number[] = []
+    let deliver: (message: unknown, sender: Sender) => void = () => {}
+    beforeEach(() => {
+      opened = []
+      const chrome = (globalThis as { chrome: Record<string, any> }).chrome
+      chrome.runtime.onMessage = {
+        addListener: (listener: typeof deliver) => {
+          deliver = listener
+        },
+      }
+      chrome.sidePanel = { open: ({ tabId }: { tabId: number }) => opened.push(tabId) }
+      setupWalletSidebarHandler()
+    })
+    afterEach(() => {
+      delete settings.bypassSignatureAuth
+      delete settings.bypassTransactionAuth
+    })
+    const openWallet = (method: string, sender: Sender) =>
+      deliver({ type: 'openWallet', payload: { method } }, sender)
+
+    test('opens for a connected site as its approvals need', () => {
+      openWallet('personal_sign', top('dapp.test'))
+      openWallet('wallet_showCallsStatus', top('dapp.test'))
+      expect(opened).toEqual([1, 1])
+      settings.bypassSignatureAuth = true
+      openWallet('personal_sign', top('dapp.test'))
+      expect(opened).toEqual([1, 1])
+    })
+
+    test('a site that is not connected opens it only to connect: it learns nothing of the settings', () => {
+      for (const bypass of [false, true]) {
+        settings.bypassSignatureAuth = bypass
+        settings.bypassTransactionAuth = bypass
+        for (const method of [
+          'personal_sign',
+          'eth_sendTransaction',
+          'wallet_sendCalls',
+          'wallet_showCallsStatus',
+        ]) {
+          openWallet(method, top('evil.test'))
+          openWallet(method, subframe('evil.test', 'dapp.test'))
+        }
+      }
+      expect(opened).toEqual([])
+      openWallet('eth_requestAccounts', top('evil.test'))
+      expect(opened).toEqual([1])
+    })
+  })
+
   describe('with both bypasses on', () => {
     beforeEach(() => {
       settings.bypassSignatureAuth = true
@@ -1431,6 +1561,7 @@ describe('page requests', () => {
       ['eth_signTypedData_v4', [smart, typedData]],
       ['eth_signTransaction', [tx]],
       ['eth_sendTransactionSync', [tx]],
+      ['eth_sendUnsignedTransaction', [tx]],
     ]
 
     test('a site that is not connected gets 4100, and the node never hears of it', async () => {
@@ -1570,6 +1701,18 @@ describe('page requests', () => {
         expect(await node.getBalance(X)).toBe(1n)
       })
 
+      test('an unsigned transaction goes from the active account (R53)', async () => {
+        active(never)
+        const sent = await ask(
+          'eth_sendUnsignedTransaction',
+          [transfer],
+          top('dapp.test'),
+        )
+        const receipt = await waitForReceipt(node, sent.result as Hex)
+        expect(lower(receipt.from)).toBe(lower(never))
+        expect(await node.getBalance(X)).toBe(1n)
+      })
+
       test('a signed transaction is signed by the active account', async () => {
         active(never)
         const signed = await ask(
@@ -1628,7 +1771,11 @@ describe('page requests', () => {
     test('a connected site may not have the node sign or send unasked: 4200, and the node never hears of it (R49)', async () => {
       const fetches = spyOn(globalThis, 'fetch')
       try {
-        for (const method of ['eth_signTransaction', 'eth_sendTransactionSync'])
+        for (const method of [
+          'eth_signTransaction',
+          'eth_sendTransactionSync',
+          'eth_sendUnsignedTransaction',
+        ])
           expect(await ask(method, [tx], top('dapp.test'))).toMatchObject({
             id: 1,
             error: { code: 4200 },
@@ -1667,6 +1814,7 @@ describe('page requests', () => {
       for (const method of [
         'eth_signTransaction',
         'eth_sendTransactionSync',
+        'eth_sendUnsignedTransaction',
         'eth_signTypedData',
         'eth_signTypedData_v3',
       ])

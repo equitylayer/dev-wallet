@@ -9,6 +9,7 @@ import {
   declinedError,
   isTransactionMethod,
   needsSession,
+  openToAnyPage,
   opensSidebar,
   refusedFromPage,
   takesFrom,
@@ -67,27 +68,60 @@ test('read-only methods never need approval', () => {
   expect(requiresApproval('wallet_getCallsStatus', {})).toBe(false)
 })
 
-test('opensSidebar covers every approval method plus connect and status', () => {
-  expect(opensSidebar('wallet_requestPermissions', {})).toBe(true)
-  expect(opensSidebar('eth_requestAccounts', {})).toBe(true)
-  expect(opensSidebar('wallet_showCallsStatus', {})).toBe(true)
-  expect(opensSidebar('eth_sendTransaction', {})).toBe(true)
-  expect(opensSidebar('personal_sign', {})).toBe(true)
-})
+describe('opensSidebar', () => {
+  const connected = { connected: true }
 
-test('opensSidebar honours the bypass settings for approval methods only', () => {
-  expect(
-    opensSidebar('eth_sendTransaction', { bypassTransactionAuth: true }),
-  ).toBe(false)
-  expect(opensSidebar('eth_sign', { bypassSignatureAuth: true })).toBe(false)
-  expect(
-    opensSidebar('eth_requestAccounts', {
-      bypassSignatureAuth: true,
-      bypassTransactionAuth: true,
-    }),
-  ).toBe(true)
-  expect(opensSidebar('eth_call', {})).toBe(false)
-  expect(opensSidebar('wallet_getPermissions', {})).toBe(false)
+  test('covers every approval method plus connect and status', () => {
+    expect(opensSidebar('wallet_requestPermissions', {}, connected)).toBe(true)
+    expect(opensSidebar('eth_requestAccounts', {}, connected)).toBe(true)
+    expect(opensSidebar('wallet_showCallsStatus', {}, connected)).toBe(true)
+    expect(opensSidebar('eth_sendTransaction', {}, connected)).toBe(true)
+    expect(opensSidebar('personal_sign', {}, connected)).toBe(true)
+  })
+
+  test('honours the bypass settings for approval methods only', () => {
+    expect(
+      opensSidebar(
+        'eth_sendTransaction',
+        { bypassTransactionAuth: true },
+        connected,
+      ),
+    ).toBe(false)
+    expect(
+      opensSidebar('eth_sign', { bypassSignatureAuth: true }, connected),
+    ).toBe(false)
+    expect(
+      opensSidebar(
+        'eth_requestAccounts',
+        { bypassSignatureAuth: true, bypassTransactionAuth: true },
+        connected,
+      ),
+    ).toBe(true)
+    expect(opensSidebar('eth_call', {}, connected)).toBe(false)
+    expect(opensSidebar('wallet_getPermissions', {}, connected)).toBe(false)
+  })
+
+  // Whether the panel opens would tell the page the bypass settings (R53).
+  test('a site that is not connected opens it only to connect, whatever the settings', () => {
+    const settings = [
+      {},
+      { bypassSignatureAuth: true },
+      { bypassTransactionAuth: true },
+      { bypassSignatureAuth: true, bypassTransactionAuth: true },
+    ]
+    const unconnected = { connected: false }
+    for (const s of settings) {
+      for (const method of [
+        ...SIGNATURE_METHODS,
+        ...TRANSACTION_METHODS,
+        'wallet_showCallsStatus',
+        'eth_call',
+      ])
+        expect(opensSidebar(method, s, unconnected)).toBe(false)
+      for (const method of ['eth_requestAccounts', 'wallet_requestPermissions'])
+        expect(opensSidebar(method, s, unconnected)).toBe(true)
+    }
+  })
 })
 
 test('permissionsFor reports eth_accounts for a connected origin', () => {
@@ -255,6 +289,7 @@ describe('needsSession', () => {
     'eth_signTransaction',
     'eth_sendTransaction',
     'eth_sendTransactionSync',
+    'eth_sendUnsignedTransaction',
     'wallet_sendCalls',
   ])('%s signs or sends with an account key: a site must be connected', (method) => {
     expect(needsSession(method)).toBe(true)
@@ -276,9 +311,8 @@ describe('needsSession', () => {
     'wallet_showCallsStatus',
     'eth_call',
     'eth_sendRawTransaction',
-    // Parked (R46): the node's, with no key of ours.
+    // Signed by the page itself: a connected page may send it (R53).
     'eth_sendRawTransactionSync',
-    'eth_sendUnsignedTransaction',
     'toString',
     '',
   ])('%p does not', (method) => {
@@ -294,7 +328,11 @@ describe('refusedFromPage', () => {
     { bypassSignatureAuth: true, bypassTransactionAuth: true },
   ]
 
-  test.each(['eth_signTransaction', 'eth_sendTransactionSync'])(
+  test.each([
+    'eth_signTransaction',
+    'eth_sendTransactionSync',
+    'eth_sendUnsignedTransaction',
+  ])(
     '%s skips the approval and the smart core: refused unless transactions are bypassed',
     (method) => {
       expect(settings.map((s) => refusedFromPage(method, s))).toEqual([
@@ -340,6 +378,7 @@ describe('takesFrom', () => {
     'eth_sendTransaction',
     'eth_signTransaction',
     'eth_sendTransactionSync',
+    'eth_sendUnsignedTransaction',
   ])('%s is a transaction from an account', (method) => {
     expect(takesFrom(method)).toBe(true)
   })
@@ -353,5 +392,103 @@ describe('takesFrom', () => {
     '',
   ])('%p is not', (method) => {
     expect(takesFrom(method)).toBe(false)
+  })
+})
+
+describe('openToAnyPage', () => {
+  // What a page may ask before it is connected: reads, and connecting (R53).
+  test.each([
+    'eth_chainId',
+    'net_version',
+    'eth_blockNumber',
+    'eth_call',
+    'eth_estimateGas',
+    'eth_createAccessList',
+    'eth_simulateV1',
+    'eth_feeHistory',
+    'eth_gasPrice',
+    'eth_maxPriorityFeePerGas',
+    'eth_blobBaseFee',
+    'eth_syncing',
+    'web3_clientVersion',
+    'eth_getProof',
+    'eth_getBalance',
+    'eth_getCode',
+    'eth_getStorageAt',
+    'eth_getTransactionCount',
+    'eth_getBlockByNumber',
+    'eth_getBlockByHash',
+    'eth_getBlockReceipts',
+    'eth_getTransactionByHash',
+    'eth_getTransactionReceipt',
+    'eth_getLogs',
+    'eth_newFilter',
+    'eth_newBlockFilter',
+    'eth_getFilterChanges',
+    'eth_getFilterLogs',
+    'eth_uninstallFilter',
+    'eth_requestAccounts',
+    'eth_accounts',
+    'wallet_requestPermissions',
+    'wallet_getPermissions',
+  ])('%s is open', (method) => {
+    expect(openToAnyPage(method)).toBe(true)
+  })
+
+  test.each([
+    // The EIP-5792 reads reconcile, which writes code (R53).
+    'wallet_getCapabilities',
+    'wallet_getCallsStatus',
+    'wallet_showCallsStatus',
+    // Sends and signatures.
+    'eth_sendTransaction',
+    'eth_sendTransactionSync',
+    'eth_sendRawTransaction',
+    'eth_sendRawTransactionSync',
+    'eth_sendUnsignedTransaction',
+    'wallet_sendCalls',
+    'eth_sign',
+    'personal_sign',
+    'eth_signTypedData',
+    'eth_signTypedData_v3',
+    'eth_signTypedData_v4',
+    'eth_signTransaction',
+    // The node's cheats.
+    'anvil_setBalance',
+    'anvil_setCode',
+    'anvil_setStorageAt',
+    'anvil_reset',
+    'anvil_dumpState',
+    'anvil_setRpcUrl',
+    'anvil_impersonateAccount',
+    'hardhat_setBalance',
+    'hardhat_reset',
+    'evm_mine',
+    'evm_setAutomine',
+    'evm_snapshot',
+    'evm_revert',
+    'eth_getWork',
+    'eth_subscribe',
+    'wallet_switchEthereumChain',
+    'toString',
+    '__proto__',
+    '',
+  ])('%p is not', (method) => {
+    expect(openToAnyPage(method)).toBe(false)
+  })
+
+  test('nothing that needs a session is open', () => {
+    for (const method of [
+      ...SIGNATURE_METHODS,
+      ...TRANSACTION_METHODS,
+      'eth_signTypedData',
+      'eth_signTypedData_v3',
+      'eth_signTransaction',
+      'eth_sendTransactionSync',
+      'eth_sendUnsignedTransaction',
+    ]) {
+      expect(needsSession(method)).toBe(true)
+      expect(openToAnyPage(method)).toBe(false)
+    }
   })
 })

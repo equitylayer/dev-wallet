@@ -194,6 +194,16 @@ DevWallet supports both legacy `window.ethereum` injection and modern [EIP-6963]
 
 Helpful note: A fresh Chrome profile gets instantiated when running the dev script: `bun run dev`.
 
+## What a site can do
+
+DevWallet treats every web page as a site, and each frame as its own site: a connected dApp's iframe from another host is not connected, and a sandboxed frame never is.
+
+- **A site that isn't connected** can only read the chain and connect. It gets answers to the node's reads (`eth_chainId`, `eth_blockNumber`, `eth_call`, `eth_estimateGas`, the `eth_get*` methods, fees, logs and log filters), to `eth_requestAccounts` and `wallet_requestPermissions`, and to `eth_accounts` and `wallet_getPermissions`, which are empty until it connects. Anything else gets `4100`: signing and sending, the node's cheat methods (`anvil_*`, `hardhat_*`, `evm_*`), raw sends, and the EIP-5792 methods. The side panel doesn't open for its requests, so it can't tell what your settings are.
+- **A connected site** asks you to approve its sends and signatures, and can use the node's cheat methods and `eth_sendRawTransaction` as before.
+- **Bypass Signature Authorization** and **Bypass Transaction Authorization** skip asking you, not connecting: a site that isn't connected still gets `4100`.
+- **Methods the node would sign or send without an approval screen** get `4200` from a connected site unless their bypass is on: `eth_signTransaction`, `eth_sendTransactionSync` and `eth_sendUnsignedTransaction` need **Bypass Transaction Authorization**, and `eth_signTypedData` and `eth_signTypedData_v3` need **Bypass Signature Authorization**. Your own screens in DevWallet can still use them.
+- **A send that names no `from`** goes from the active account, the first one `eth_accounts` returns, never from the node's default account.
+
 ## Smart accounts
 
 Since 3.0.0, the node's dev accounts are smart accounts: each is an EOA delegated to [Kernel v3.3](https://github.com/zerodevapp/kernel) with EIP-7702. A dApp sees the same address, and messages are still signed with the account's own key.
@@ -214,7 +224,7 @@ DevWallet never touches contract code, and leaves an account delegated somewhere
 
 ### What DevWallet writes to your chain
 
-DevWallet keeps the node in step with the modes. It checks a network when the Account home opens on one it hasn't checked yet, when you change a mode, before it answers a connected dApp's account requests and EIP-5792 reads, and before it previews or sends anything. Each time, it:
+DevWallet keeps the node in step with the modes. It checks a network when the Account home opens on one it hasn't checked yet, when you change a mode, when a dApp connects, before it answers a connected dApp's account requests and EIP-5792 reads, and before it previews or sends anything. A site that isn't connected can't ask for any of these, so it never makes DevWallet write to the chain. Each time, it:
 
 - installs the account-abstraction contracts at any of these addresses that has no code, with `anvil_setCode` (`hardhat_setCode` on Hardhat):
 
@@ -256,12 +266,12 @@ DevWallet answers `wallet_*` batch requests itself, per [EIP-5792](https://eips.
 
 When the wallet expects a batch to revert, its approval says so, and **Sign anyway** sends it to revert on chain. With **Bypass Transaction Authorization** on, nobody is asked, so it is refused with code `3` and the revert data. The test dApp that `bun run dev` serves has buttons for all four methods.
 
-These are the EIP-5792 errors a dApp can get. Other methods can also return `4200` (unsupported method), `-32603` (internal), or an error the node passed through.
+These are the EIP-5792 errors a dApp can get. Other methods can also return `4200` (unsupported method), `-32603` (internal), or an error the node passed through. A site that isn't connected gets `4100` for all four methods (see [What a site can do](#what-a-site-can-do)).
 
 | Code | When |
 |---|---|
 | `4001` | You rejected the request, or it waited 5 minutes for approval. A request waiting in the batch queue also gets it when the batch is discarded, the request is removed, or the network changes. |
-| `4100` | `from`, or the account `wallet_getCapabilities` is asked about, isn't one of the wallet's accounts. |
+| `4100` | The site isn't connected. Or `from`, or the account `wallet_getCapabilities` is asked about, isn't one of the wallet's accounts. |
 | `5700` | A required capability, which the wallet doesn't support. |
 | `5710` | `wallet_sendCalls` with a `chainId` that is not the wallet's chain. (`wallet_getCapabilities` returns `{}` for it.) |
 | `5720` | `id` is already used by a batch on this network, or by one waiting in the batch queue. |

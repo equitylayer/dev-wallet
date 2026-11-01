@@ -15,6 +15,18 @@ export const TRANSACTION_METHODS = [
 ] as const
 
 /**
+ * Methods the node signs or sends with an account's key, past both the
+ * approval and the smart-account core: a page may call them only while
+ * transactions are bypassed (R49). `eth_sendUnsignedTransaction` needs no key
+ * at all: Anvil sends it from any address (R53).
+ */
+const NODE_SIGNED_METHODS = [
+  'eth_signTransaction',
+  'eth_sendTransactionSync',
+  'eth_sendUnsignedTransaction',
+] as const
+
+/**
  * Every method that signs or sends with an account's key on the node (Anvil
  * 1.7.1 and Hardhat), the wallet's own sends included. A page must be
  * connected to call any of them, whatever the bypass settings: bypassing
@@ -23,20 +35,73 @@ export const TRANSACTION_METHODS = [
 const SESSION_METHODS = [
   ...SIGNATURE_METHODS,
   ...TRANSACTION_METHODS,
+  ...NODE_SIGNED_METHODS,
   'eth_signTypedData',
   'eth_signTypedData_v3',
-  'eth_signTransaction',
-  'eth_sendTransactionSync',
 ] as const
 
 /**
- * Methods the node signs or sends with an account's key, past both the
- * approval and the smart-account core: a page may call them only while
- * transactions are bypassed (R49).
+ * All a page may ask before it is connected (R53): the node's reads, and
+ * connecting. Anything else, the node's cheats and raw sends included, waits
+ * for a session, as do the EIP-5792 reads, which reconcile (and so write
+ * code). A deny-by-default list: a method missing here costs an unconnected
+ * dApp a 4100, never the node a write.
  */
-const NODE_SIGNED_METHODS = [
-  'eth_signTransaction',
-  'eth_sendTransactionSync',
+const OPEN_TO_ANY_PAGE = [
+  // The chain.
+  'eth_chainId',
+  'net_version',
+  'web3_clientVersion',
+  'eth_syncing',
+  'eth_blockNumber',
+  // Calls and estimates, which change nothing.
+  'eth_call',
+  'eth_estimateGas',
+  'eth_createAccessList',
+  'eth_simulateV1',
+  // Fees.
+  'eth_feeHistory',
+  'eth_gasPrice',
+  'eth_maxPriorityFeePerGas',
+  'eth_blobBaseFee',
+  // State, blocks, transactions and logs.
+  'eth_getBalance',
+  'eth_getCode',
+  'eth_getStorageAt',
+  'eth_getTransactionCount',
+  'eth_getProof',
+  'eth_getAccount',
+  'eth_getAccountInfo',
+  'eth_getBlockByNumber',
+  'eth_getBlockByHash',
+  'eth_getBlockReceipts',
+  'eth_getBlockTransactionCountByHash',
+  'eth_getBlockTransactionCountByNumber',
+  'eth_getUncleCountByBlockHash',
+  'eth_getUncleCountByBlockNumber',
+  'eth_getUncleByBlockHashAndIndex',
+  'eth_getUncleByBlockNumberAndIndex',
+  'eth_getTransactionByHash',
+  'eth_getTransactionByBlockHashAndIndex',
+  'eth_getTransactionByBlockNumberAndIndex',
+  'eth_getTransactionBySenderAndNonce',
+  'eth_getRawTransactionByHash',
+  'eth_getRawTransactionByBlockHashAndIndex',
+  'eth_getRawTransactionByBlockNumberAndIndex',
+  'eth_getTransactionReceipt',
+  'eth_getLogs',
+  // Log and block filters: ethers' and viem's event watchers poll them.
+  'eth_newFilter',
+  'eth_newBlockFilter',
+  'eth_newPendingTransactionFilter',
+  'eth_getFilterChanges',
+  'eth_getFilterLogs',
+  'eth_uninstallFilter',
+  // Connecting, and asking whether it is.
+  'eth_requestAccounts',
+  'eth_accounts',
+  'wallet_requestPermissions',
+  'wallet_getPermissions',
 ] as const
 
 /**
@@ -113,8 +178,26 @@ export function takesFrom(method: string): boolean {
   return isOneOf(FROM_METHODS, method)
 }
 
-/** Whether a request for this method should open the side panel. */
-export function opensSidebar(method: string, s: ApprovalSettings): boolean {
+/**
+ * Whether a page that isn't connected may call this method
+ * (`OPEN_TO_ANY_PAGE`). Asked after `needsSession`, of a page with no session.
+ */
+export function openToAnyPage(method: string): boolean {
+  return isOneOf(OPEN_TO_ANY_PAGE, method)
+}
+
+/**
+ * Whether a page's request for this method should open the side panel. A
+ * page that isn't connected gets it only for what it may call
+ * (`openToAnyPage`), which never depends on the settings: otherwise it could
+ * watch the panel open, or not, and learn whether approvals are bypassed.
+ */
+export function opensSidebar(
+  method: string,
+  s: ApprovalSettings,
+  { connected }: { connected: boolean },
+): boolean {
+  if (!connected && !openToAnyPage(method)) return false
   return requiresApproval(method, s) || isOneOf(SIDEBAR_METHODS, method)
 }
 

@@ -29,6 +29,7 @@ import {
   declinedError,
   isTransactionMethod,
   needsSession,
+  openToAnyPage,
   permissionsFor,
   refusedFromPage,
   requestRpcUrl,
@@ -121,6 +122,11 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
     // Signing or sending with an account's key needs a connected site, bypass
     // or not: the bypass skips asking the user, not authorizing the site.
     if (isInpage && !session && needsSession(request.method))
+      return unauthorized(request)
+    // Nor may it reach the node, beyond reading it (R53): its cheats, raw
+    // sends and the EIP-5792 reads (which reconcile, and so write code) wait
+    // for a session. Asked before anything that reads the settings.
+    if (isInpage && !session && !openToAnyPage(request.method))
       return unauthorized(request)
 
     // The node would sign these unasked, so a page gets them only with their
