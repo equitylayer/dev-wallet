@@ -1,4 +1,5 @@
 import { createStyleObject as capsize } from '@capsizecss/core'
+import interMetrics from '@capsizecss/metrics/inter'
 
 export type Theme = 'light' | 'dark'
 export type ColorScheme = 'light' | 'dark'
@@ -131,17 +132,35 @@ export const backgroundColor = {
   },
   'surface/fill/devwallet/active': {
     light: {
-      value: '#55b350',
+      value: '#e3eff0',
       scheme: 'light',
       hover: {
         brightness: '0.98',
       },
     },
     dark: {
-      value: '#046504',
+      value: '#2c2416',
       scheme: 'dark',
       hover: {
         contrast: '0.95',
+      },
+    },
+  },
+  'surface/accent': {
+    light: {
+      value: '#00717f',
+      scheme: 'dark',
+      text: '#ffffff',
+      hover: {
+        brightness: '0.95',
+      },
+    },
+    dark: {
+      value: '#f9b64f',
+      scheme: 'light',
+      text: '#1d1407',
+      hover: {
+        brightness: '0.95',
       },
     },
   },
@@ -390,9 +409,11 @@ export const foregroundColor = {
     light: '#9a9590',
     dark: '#78797E',
   },
+  // Prompt Teal (light) / Phosphor Amber (dark). Active, selected and focused
+  // only; never a status. See "Amber Is Not a Warning" in DESIGN.md.
   'text/accent/active': {
-    light: '#4a90e2',
-    dark: '#39ff14',
+    light: '#00717f',
+    dark: '#f9b64f',
   },
 } as const satisfies Record<string, ForegroundColorValue>
 export type ForegroundColor = keyof typeof foregroundColor
@@ -421,10 +442,11 @@ export type Breakpoint = keyof typeof breakpoints
 
 export const fontFamily = {
   default:
-    "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif",
-  mono: "'JetBrains Mono', monospace",
-  address: "'Orbitron', monospace",
-  numeric: "'Orbitron', monospace",
+    "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif",
+  // Data wears mono: addresses, hashes, numbers, selectors and calldata.
+  mono: "'IBM Plex Mono', ui-monospace, Menlo, monospace",
+  address: "'IBM Plex Mono', ui-monospace, Menlo, monospace",
+  numeric: "'IBM Plex Mono', ui-monospace, Menlo, monospace",
 }
 export type FontFamily = keyof typeof fontFamily
 
@@ -434,82 +456,34 @@ export type FontAttributes = {
   lineHeight: number | `${number}%`
   letterSpacing: number
 }
-export const fontAttributes = {
-  '9px': {
-    fontSize: 9,
-    letterSpacing: 0.56,
-    letterWidth: 5.75,
-    lineHeight: 11,
-  },
-  '11px': {
-    fontSize: 11,
-    letterSpacing: 0.56,
-    letterWidth: 6.9,
-    lineHeight: 15,
-  },
-  '12px': {
-    fontSize: 12,
-    letterSpacing: 0.52,
-    letterWidth: 7.825,
-    lineHeight: 15,
-  },
-  '14px': {
-    fontSize: 14,
-    letterSpacing: 0.48,
-    letterWidth: 8.75,
-    lineHeight: 19,
-  },
-  '15px': {
-    fontSize: 15,
-    letterSpacing: 0.35,
-    letterWidth: 9.25,
-    lineHeight: 21,
-  },
-  '16px': {
-    fontSize: 16,
-    letterSpacing: 0.35,
-    letterWidth: 9.75,
-    lineHeight: 21,
-  },
-  '18px': {
-    fontSize: 18,
-    letterSpacing: 0.36,
-    letterWidth: 10.75,
-    lineHeight: 23,
-  },
-  '20px': {
-    fontSize: 20,
-    letterSpacing: 0.36,
-    letterWidth: 12,
-    lineHeight: 25,
-  },
-  '22px': {
-    fontSize: 22,
-    letterSpacing: 0.35,
-    letterWidth: 13.5,
-    lineHeight: 29,
-  },
-  '26px': {
-    fontSize: 26,
-    letterSpacing: 0.36,
-    letterWidth: 16,
-    lineHeight: 32,
-  },
-  '32px': {
-    fontSize: 32,
-    letterSpacing: 0.41,
-    letterWidth: 20,
-    lineHeight: 40,
-  },
-} satisfies { [key: string]: FontAttributes }
 
-const fontMetrics = {
-  capHeight: 1543,
-  ascent: 1950,
-  descent: -494,
-  lineGap: 0,
-  unitsPerEm: 2048,
-} as const
+// letterWidth is the IBM Plex Mono advance (0.6em). Text.Truncated uses it to
+// fit addresses and hashes, which are always set in mono.
+const attrs = (fontSize: number, lineHeight: number, letterSpacing: number) =>
+  ({
+    fontSize,
+    lineHeight,
+    letterSpacing,
+    letterWidth: fontSize * 0.6,
+  }) satisfies FontAttributes
+
+// Scale from DESIGN.md. Nothing goes below 11px, units included. 9px and
+// 10px remain only until the screens that still use them are migrated.
+export const fontAttributes = {
+  '9px': attrs(9, 11, 0.2),
+  '10px': attrs(10, 13, 0.2),
+  '11px': attrs(11, 15, 0.1),
+  '12px': attrs(12, 16, 0.1),
+  '13px': attrs(13, 17, 0),
+  '14px': attrs(14, 20, 0),
+  '15px': attrs(15, 20, -0.1),
+  '16px': attrs(16, 21, -0.1),
+  '18px': attrs(18, 23, -0.2),
+  '20px': attrs(20, 25, -0.3),
+  '22px': attrs(22, 28, -0.4),
+  '26px': attrs(26, 32, -0.5),
+  '32px': attrs(32, 40, -0.6),
+} satisfies { [key: string]: FontAttributes }
 
 function defineType(fontAttributes: FontAttributes, inline: boolean) {
   const { fontSize, lineHeight, letterSpacing } = fontAttributes
@@ -520,7 +494,7 @@ function defineType(fontAttributes: FontAttributes, inline: boolean) {
 
   if (inline) return { fontSize, letterSpacing }
   return {
-    ...capsize({ fontMetrics, fontSize, leading }),
+    ...capsize({ fontMetrics: interMetrics, fontSize, leading }),
     letterSpacing,
   }
 }
@@ -528,8 +502,10 @@ function defineType(fontAttributes: FontAttributes, inline: boolean) {
 export const fontSize = (inline: boolean) =>
   ({
     '9px': defineType(fontAttributes['9px'], inline),
+    '10px': defineType(fontAttributes['10px'], inline),
     '11px': defineType(fontAttributes['11px'], inline),
     '12px': defineType(fontAttributes['12px'], inline),
+    '13px': defineType(fontAttributes['13px'], inline),
     '14px': defineType(fontAttributes['14px'], inline),
     '15px': defineType(fontAttributes['15px'], inline),
     '16px': defineType(fontAttributes['16px'], inline),

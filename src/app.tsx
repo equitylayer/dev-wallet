@@ -10,6 +10,7 @@ import {
 import { numberToHex } from 'viem'
 
 import { getTheme, setTheme } from '~/design-system'
+import '~/design-system/styles/fonts'
 import '~/design-system/styles/global.css'
 import { useClient } from '~/hooks/useClient'
 import { useNetworkStatus } from '~/hooks/useNetworkStatus'

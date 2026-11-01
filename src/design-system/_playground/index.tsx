@@ -4,6 +4,7 @@ import { useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'
 
+import '~/design-system/styles/fonts'
 import '~/design-system/styles/global.css'
 
 import {

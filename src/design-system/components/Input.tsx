@@ -35,8 +35,8 @@ export const stylesForVariant = {
     borderColor: {
       default: 'surface/invert@0.2',
       hover: 'surface/invert@0.3',
-      focus: 'surface/invert@0.7',
-      hoverfocus: 'surface/invert@0.7',
+      focus: 'surface/accent',
+      hoverfocus: 'surface/accent',
     },
   },
 } satisfies Record<InputVariant, BoxStyles>
@@ -54,6 +54,9 @@ export const stylesForHeight = {
   '24px': {
     paddingHorizontal: '6px',
   },
+  '28px': {
+    paddingHorizontal: '8px',
+  },
   '36px': {
     paddingHorizontal: '12px',
   },
@@ -62,6 +65,9 @@ export const stylesForHeight = {
 export const textStylesForHeight = {
   '24px': {
     fontSize: '11px',
+  },
+  '28px': {
+    fontSize: '13px',
   },
   '36px': {
     fontSize: '15px',

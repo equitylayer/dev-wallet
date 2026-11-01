@@ -69,7 +69,7 @@ function DrawerPull({
 
 function UnitLabel({ children }: { children: ReactNode }) {
   return (
-    <Text color="text/tertiary" size="9px" wrap={false}>
+    <Text color="text/tertiary" size="11px" wrap={false}>
       {children}
     </Text>
   )
@@ -124,18 +124,11 @@ export function AccountCard({ account }: { account: Account }) {
       position="relative"
       backgroundColor={
         active
-          ? 'surface/fill/tertiary'
+          ? 'surface/fill/devwallet/active'
           : { hover: 'surface/fill/quarternary' }
       }
       marginHorizontal="-8px"
     >
-      {active && (
-        <Box
-          position="absolute"
-          backgroundColor="surface/invert"
-          style={{ left: 0, top: 0, bottom: 0, width: '2px', zIndex: 1 }}
-        />
-      )}
 
       <Inline gap="0px" wrap={false}>
         {/* CONTENT: identity, values, address */}
@@ -186,7 +179,7 @@ export function AccountCard({ account }: { account: Account }) {
                 pointerEvents: 'none',
               }}
             >
-              <Text color="text/tertiary" size="9px" wrap={false} tabular>
+              <Text color="text/tertiary" size="11px" wrap={false} tabular>
                 {aliasValue.length}/{ALIAS_MAX_LENGTH}
               </Text>
             </Box>

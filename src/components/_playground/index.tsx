@@ -4,6 +4,7 @@ import { parseAbiItem } from 'viem'
 import { useState } from 'react'
 import ReactDOM from 'react-dom/client'
 
+import '~/design-system/styles/fonts'
 import '~/design-system/styles/global.css'
 
 import { DecodedAbiParameters } from '../abi/DecodedAbiParameters'

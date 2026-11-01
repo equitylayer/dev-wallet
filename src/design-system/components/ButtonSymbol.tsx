@@ -17,7 +17,7 @@ type ButtonSymbolProps = UnionOmit<ButtonRootProps, 'children'> & {
 
 export const symbolStylesForHeight = {
   '16px': {
-    size: '9px',
+    size: '11px',
   },
   '18px': {
     size: '11px',
@@ -27,6 +27,9 @@ export const symbolStylesForHeight = {
   },
   '24px': {
     size: '12px',
+  },
+  '28px': {
+    size: '14px',
   },
   '36px': {
     size: '15px',

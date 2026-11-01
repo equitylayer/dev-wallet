@@ -3,10 +3,12 @@ import { Fragment, useEffect, useMemo, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { type Address, type Block, formatEther, type Hex, isAddress, type Transaction, } from 'viem'
-import { Container, LoadMore, TabsContent, TabsList, useVirtualList, } from '~/components'
+import { type Block, formatEther, type Hex, isAddress, type Transaction, } from 'viem'
+import { Container, LoadMore, TabsContent, useVirtualList } from '~/components'
+import { defaultSection } from '~/components/shell'
 
 import { AccountCard } from '~/components/AccountCard'
+import { ImportAccount } from '~/components/ImportAccount'
 import * as Form from '~/components/form'
 import { Box, Button, Column, Columns, Inline, Input, Inset, Separator, SFSymbol, Stack, Text, } from '~/design-system'
 import { useAccounts } from '~/hooks/useAccounts'
@@ -18,39 +20,27 @@ import { useInfiniteBlockTransactions } from '~/hooks/useInfiniteBlockTransactio
 import { usePendingBlock } from '~/hooks/usePendingBlock'
 import { usePendingTransactions } from '~/hooks/usePendingTransactions'
 import { useSearchParamsState } from '~/hooks/useSearchParamsState'
-import { useSetAccount } from '~/hooks/useSetAccount'
 import { useTransaction } from '~/hooks/useTransaction'
-import { isDomain } from '~/utils'
 import type { DeployedContract } from '~/utils/deployments'
-import { useAccountStore, useNetworkStore, useScrollPositionStore, } from '~/zustand'
+import { useAccountStore, useNetworkStore } from '~/zustand'
 
 import { useRevert } from '../hooks/useRevert'
 import { useSnapshot } from '../hooks/useSnapshot'
+import { AccountHome } from './account-home'
 import OnboardingStart from './onboarding/start'
 
 export default function Index() {
-  const defaultTab = 'accounts'
-
-  const { setPosition } = useScrollPositionStore()
-  const [params, setParams] = useSearchParams({ tab: defaultTab })
+  const [params] = useSearchParams({ tab: defaultSection })
   const { onboarded } = useNetworkStore()
   if (!onboarded) return <OnboardingStart />
+
+  // Sections are switched from the bottom nav; this screen renders one.
+  const tab = params.get('tab') || defaultSection
+  if (tab === 'account') return <AccountHome />
   return (
     <Container scrollable={false} verticalInset={false}>
-      <Tabs.Root asChild value={params.get('tab') || defaultTab}>
+      <Tabs.Root asChild value={tab}>
         <Box display="flex" flexDirection="column" height="full">
-          <TabsList
-            items={[
-              { label: 'Accounts', value: 'accounts' },
-              { label: 'Contracts', value: 'contracts' },
-              { label: 'TXs', value: 'txs' },
-              { label: 'Blocks', value: 'blocks' },
-            ]}
-            onSelect={(item) => {
-              setParams({ tab: item.value })
-              setPosition(0)
-            }}
-          />
           <TabsContent inset={false} value="accounts">
             <Accounts />
           </TabsContent>
@@ -89,94 +79,6 @@ function Accounts() {
         </Fragment>
       ))}
     </>
-  )
-}
-
-
-function ImportAccount() {
-  const {
-    network: { rpcUrl },
-  } = useNetworkStore()
-  const client = useClient()
-  const { mutateAsync: setAccount } = useSetAccount()
-  const { accounts, upsertAccount, removeAccount } = useAccountStore()
-
-  const { handleSubmit, register, reset } = useForm<{ addressOrEns: string }>({
-    defaultValues: {
-      addressOrEns: '',
-    },
-  })
-
-  const submit = handleSubmit(async ({ addressOrEns }) => {
-    reset()
-
-    const isAlreadyImported = accounts.some(
-      (account) =>
-        account.displayName === addressOrEns ||
-        account.address.toLowerCase() === addressOrEns.toLowerCase(),
-    )
-    if (isAlreadyImported) {
-      toast(`"${addressOrEns}" is already imported.`)
-      return
-    }
-
-    const isDomain_ = isDomain(addressOrEns)
-    const isAddress_ = isAddress(addressOrEns)
-
-    const loadingAccount = {
-      address: '' as Address,
-      key: addressOrEns,
-      rpcUrl,
-      state: 'loading',
-      type: 'json-rpc',
-    } as const
-
-    try {
-      if (!isDomain_ && !isAddress_) throw new Error()
-
-      if (isDomain_)
-        upsertAccount({
-          account: loadingAccount,
-        })
-
-      const address = isAddress_
-        ? addressOrEns
-        : await client.getEnsAddress({ name: addressOrEns })
-      const displayName = isDomain_ ? addressOrEns : undefined
-
-      if (!address) throw new Error()
-
-      setAccount({
-        account: {
-          address,
-          displayName,
-          impersonate: true,
-          rpcUrl,
-          type: 'json-rpc',
-        },
-        key: addressOrEns,
-      })
-    } catch {
-      if (isDomain_) removeAccount({ account: loadingAccount })
-      toast.error(`"${addressOrEns}" is not a valid address or ENS.`)
-    }
-  })
-
-  return (
-    <Form.Root onSubmit={submit} style={{ width: '100%' }}>
-      <Inline gap="4px" wrap={false}>
-        <Form.InputField
-          height="24px"
-          hideLabel
-          label="Import address"
-          placeholder="Import address or ENS name..."
-          register={register('addressOrEns', { required: true })}
-        />
-        <Button height="24px" variant="stroked fill" width="fit" type="submit">
-          Import
-        </Button>
-      </Inline>
-    </Form.Root>
   )
 }
 
