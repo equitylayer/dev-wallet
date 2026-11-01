@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { type Address, hexToString, isHex, size, zeroAddress } from 'viem'
+import { type Address, size, zeroAddress } from 'viem'
 
 import {
   AddressLine,
@@ -14,7 +14,12 @@ import * as styles from '~/components/approval/approval.css'
 import { Box, Text } from '~/design-system'
 import { sendTransactionCall } from '~/smart/transaction-call'
 import { type RpcCall, toRpcCall } from '~/smart/types'
-import { signNotice } from '~/utils/signRequest'
+import {
+  canonicalParams,
+  payloadBytes,
+  readableText,
+  signNotice,
+} from '~/utils/signRequest'
 import type { RpcTransaction } from '~/utils/transactionForm'
 import { useAccountStore } from '~/zustand'
 import type { PendingRequest } from '~/zustand/pending-requests'
@@ -171,6 +176,19 @@ function SendTransactionRequest({
 // Signatures: plain signatures by the account's key, in every mode
 
 /**
+ * The request as the decision forwards it: its payload as the 0x-prefixed
+ * bytes the screen shows, so what is shown is what gets signed.
+ */
+function useCanonical<R extends ExtractRequest<'eth_sign' | 'personal_sign'>>(
+  request: R,
+): R {
+  return useMemo(() => {
+    const params = canonicalParams(request.method, request.params)
+    return params === request.params ? request : { ...request, params }
+  }, [request])
+}
+
+/**
  * `eth_sign`: the node signs the bytes as a personal message (EIP-191
  * prefixed), as for `personal_sign`. A 32-byte payload looks like a hash, and
  * a contract that checks a hash signed that way (Kernel's validator, for a
@@ -179,14 +197,16 @@ function SendTransactionRequest({
  */
 function SignRequest({ request }: { request: ExtractRequest<'eth_sign'> }) {
   const [address, data] = request.params
+  const bytes = payloadBytes(data)
   const notice = signNotice('eth_sign', data)
+  const decided = useCanonical(request)
   return (
     <ApprovalFrame
       title="Sign data"
       subtitle={originOf(request)}
       footer={
         <DecisionActions
-          request={request}
+          request={decided}
           {...(notice === 'hash' && { approve: 'Sign hash', risky: true })}
         />
       }
@@ -196,38 +216,43 @@ function SignRequest({ request }: { request: ExtractRequest<'eth_sign'> }) {
         {notice === 'hash' && <SignNotice kind="hash" />}
         <Box paddingTop="16px">
           <Text color="text/tertiary" size="11px">
-            {isHex(data) ? `Data · ${size(data)} bytes` : 'Data'}
+            {bytes === null ? 'Data' : `Data · ${size(bytes)} bytes`}
           </Text>
           <Box className={styles.hexBox}>
             <Text family="mono" size="12px" wrap="anywhere">
-              {data}
+              {bytes ?? String(data)}
             </Text>
           </Box>
         </Box>
-        {notice === 'prefixed' && <SignNotice kind="prefixed" />}
+        {notice !== 'hash' && <SignNotice kind={notice} />}
       </Box>
     </ApprovalFrame>
   )
 }
 
 /**
- * `personal_sign`: the message as text. One that looks like a hash shows as
- * hex under the same warning as `eth_sign`'s: it is the same signature.
+ * `personal_sign`: the message as text, when its bytes are plain UTF-8, else
+ * as hex. One that looks like a hash shows as hex under the same warning as
+ * `eth_sign`'s: it is the same signature.
  */
 function SignMessageRequest({
   request,
 }: { request: ExtractRequest<'personal_sign'> }) {
   const [data, address] = request.params
+  const bytes = payloadBytes(data)
   const notice = signNotice('personal_sign', data)
   const hash = notice === 'hash'
-  const message = useMemo(() => {
-    if (hash) return data
-    try {
-      return isHex(data) ? hexToString(data) : data
-    } catch {
-      return data
-    }
-  }, [data, hash])
+  const text = useMemo(
+    () => (bytes !== null && !hash ? readableText(bytes) : null),
+    [bytes, hash],
+  )
+  const decided = useCanonical(request)
+  const label = hash
+    ? 'Hash · 32 bytes'
+    : bytes === null
+      ? 'Message'
+      : `${text === null ? 'Data' : 'Message'} · ${size(bytes)} bytes`
+  const hex = bytes !== null && text === null
 
   return (
     <ApprovalFrame
@@ -235,28 +260,29 @@ function SignMessageRequest({
       subtitle={originOf(request)}
       footer={
         <DecisionActions
-          request={request}
+          request={decided}
           {...(hash && { approve: 'Sign hash', risky: true })}
         />
       }
     >
       <Box className={styles.block}>
         <AddressLine label="Account" address={address} />
-        <SignNotice kind={notice} />
+        {hash && <SignNotice kind="hash" />}
         <Box paddingTop="16px">
           <Text color="text/tertiary" size="11px">
-            {hash ? 'Hash · 32 bytes' : 'Message'}
+            {label}
           </Text>
           <Box className={styles.hexBox}>
             <Text
-              family={hash ? 'mono' : undefined}
-              size={hash ? '12px' : '13px'}
+              family={hex ? 'mono' : undefined}
+              size={hex ? '12px' : '13px'}
               wrap="anywhere"
             >
-              {message}
+              {text ?? bytes ?? String(data)}
             </Text>
           </Box>
         </Box>
+        {!hash && <SignNotice kind={notice} />}
       </Box>
     </ApprovalFrame>
   )
