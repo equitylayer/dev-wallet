@@ -51,9 +51,19 @@ type FakeAccount = {
   impersonate?: boolean
 }
 
+// Every store has loaded, unless a test says otherwise (`loading`).
+const hydration = { done: true, listeners: new Set<() => void>() }
 const persist = {
-  hasHydrated: () => true,
-  onFinishHydration: () => () => {},
+  hasHydrated: () => hydration.done,
+  onFinishHydration: (listener: () => void) => {
+    hydration.listeners.add(listener)
+    return () => void hydration.listeners.delete(listener)
+  },
+}
+/** The stores load what they persisted. */
+function finishHydration() {
+  hydration.done = true
+  for (const listener of [...hydration.listeners]) listener()
 }
 const accountState: { account?: FakeAccount; accounts: FakeAccount[] } = {
   accounts: [],
@@ -1547,6 +1557,27 @@ describe('page requests', () => {
       { sender },
     )
   }
+
+  test('a woken worker answers a page only once its stores have loaded', async () => {
+    // Before they load, the stores hold their defaults: no sessions.
+    hydration.done = false
+    connectedHosts = new Set()
+    try {
+      let answered = false
+      const answer = ask('eth_accounts', [], top('dapp.test')).then((r) => {
+        answered = true
+        return r
+      })
+      await Bun.sleep(50)
+      expect(answered).toBe(false)
+
+      connectedHosts = new Set(['dapp.test'])
+      finishHydration()
+      expect((await answer).result).toEqual([smart, upgradable, never])
+    } finally {
+      finishHydration()
+    }
+  })
 
   test("the page's rpcUrl is ignored: the wallet's network answers", async () => {
     expect(

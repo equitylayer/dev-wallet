@@ -37,7 +37,11 @@ import {
   takesFrom,
   withSerializedErrors,
 } from './methods'
-import { type PlainDecision, requestUserDecision } from './pending-requests'
+import {
+  type PlainDecision,
+  hydrated,
+  requestUserDecision,
+} from './pending-requests'
 import {
   reconcileBeforeAnswering,
   showCallsStatus,
@@ -84,6 +88,11 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
     meta: CallbackOptions,
   ): Promise<RpcResponse> {
     const { request, rpcUrl: rpcUrl_ } = payload
+    // A woken worker must not take "not loaded yet" for "not connected", the
+    // default network or no bypass: every store read below has loaded first.
+    await Promise.all(
+      [sessionsStore, networkStore, settingsStore, accountStore].map(hydrated),
+    )
     // Anything that isn't one of our extension pages is a page: a content
     // script in any frame, top or not. Each frame is its own site.
     const isInpage = isPageSender(
