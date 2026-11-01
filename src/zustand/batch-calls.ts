@@ -8,6 +8,7 @@ import {
   putRecord,
 } from '~/smart/batch-records'
 
+import { migrateBatchCallsState } from './batch-calls-logic'
 import { createStore } from './utils'
 
 export type BatchCallsState = BatchRecordsState
@@ -37,7 +38,8 @@ export const batchCallsStore = createStore<BatchCallsStore>(
     persist: {
       name: 'batch-calls',
       version: 1,
-      migrate,
+      migrate: (persisted) =>
+        migrateBatchCallsState(persisted) as BatchCallsStore,
     },
   },
 )
@@ -47,12 +49,3 @@ export const useBatchCallsStore = () =>
     batchCallsStore.subscribe,
     batchCallsStore.getState,
   )
-
-///////////////////////////////////////////////////////////////////////////////////////
-// Migrations
-
-// v0 kept batches by id with no network and no call details to rely on, so
-// there is nothing worth carrying over.
-function migrate(): BatchCallsStore {
-  return { records: {} } as BatchCallsStore
-}
