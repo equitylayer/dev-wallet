@@ -203,6 +203,14 @@ export const pillGreen = style([
   },
 ])
 
+export const pillRed = style([
+  pill,
+  {
+    borderColor: rgb(backgroundColorVars['surface/red'], 0.55),
+    color: rgb(backgroundColorVars['surface/red']),
+  },
+])
+
 export const empty = style({
   padding: `12px ${gutter}px`,
   borderBottom: `1px solid ${rgb(faint)}`,

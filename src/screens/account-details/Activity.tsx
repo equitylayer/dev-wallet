@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { type Address, formatEther } from 'viem'
 
-import { LoadMore, Tooltip, useVirtualList } from '~/components'
+import { LoadMore, useVirtualList } from '~/components'
 import {
     Box,
     Column,
@@ -10,10 +10,11 @@ import {
     Inset,
     Separator,
     SFSymbol,
-    Stack,
     Text,
 } from '~/design-system'
-import { useAccountActivity } from '~/hooks/useAccountActivity'
+import { activitySubject, useAccountActivity } from '~/hooks/useAccountActivity'
+
+import { ActivityTags } from '../account-home/Sections'
 
 const numberIntl4SigFigs = new Intl.NumberFormat('en-US', {
     maximumSignificantDigits: 4,
@@ -123,13 +124,16 @@ export function Activity({ accountAddress }: { accountAddress: Address }) {
                                 </VirtualList.Item>
                             )
 
-                        const { transaction, status } =
-                        transactions[layoutItem.index ?? 0] || {}
-                        if (!transaction) return
+                        const activityItem = transactions[layoutItem.index ?? 0]
+                        if (!activityItem) return
+                        const { transaction, status, userOps } = activityItem
+                        // A user operation reads as the account's calls, not as the
+                        // bundler's handleOps.
+                        const subject = activitySubject(activityItem)
                         const isSponsored = sponsoredHashes.has(transaction.hash)
                         const isOutgoing =
                             isSponsored || transaction.from.toLowerCase() === accountLower
-                        const counterparty = isOutgoing ? transaction.to : transaction.from
+                        const counterparty = isOutgoing ? subject.to : transaction.from
                         return (
                             <VirtualList.Item {...item}>
                                 <VirtualList.Link to={`/transaction/${transaction.hash}`}>
@@ -165,36 +169,44 @@ export function Activity({ accountAddress }: { accountAddress: Address }) {
                                                 )}
                                             </Inline>
                                             <Column alignVertical="center">
-                                                <Stack gap="2px">
-                                                    {counterparty ? (
-                                                        <Box title={counterparty}>
-                                                            <Text.Truncated family="address" size="12px">
-                                                                {counterparty}
-                                                            </Text.Truncated>
-                                                        </Box>
-                                                    ) : (
-                                                        <Text
-                                                            color="text/tertiary"
-                                                            size="11px"
-                                                            wrap={false}
-                                                        >
-                                                            Deploy Contract
-                                                        </Text>
-                                                    )}
-                                                    {isSponsored && (
-                                                        <Tooltip
-                                                            label={`Sponsored by ${transaction.from}`}
-                                                        >
+                                                <Box
+                                                    style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 6,
+                                                        minWidth: 0,
+                                                    }}
+                                                >
+                                                    <Box style={{ flex: '0 1 auto', minWidth: 0 }}>
+                                                        {subject.count > 1 ? (
                                                             <Text
-                                                                color="surface/green"
-                                                                size="9px"
+                                                                color="text/tertiary"
+                                                                size="11px"
                                                                 wrap={false}
                                                             >
-                                                                SPONSORED
+                                                                {`Batch of ${subject.count} calls`}
                                                             </Text>
-                                                        </Tooltip>
-                                                    )}
-                                                </Stack>
+                                                        ) : counterparty ? (
+                                                            <Box title={counterparty}>
+                                                                <Text.Truncated family="address" size="12px">
+                                                                    {counterparty}
+                                                                </Text.Truncated>
+                                                            </Box>
+                                                        ) : (
+                                                            <Text
+                                                                color="text/tertiary"
+                                                                size="11px"
+                                                                wrap={false}
+                                                            >
+                                                                Deploy Contract
+                                                            </Text>
+                                                        )}
+                                                    </Box>
+                                                    <ActivityTags
+                                                        payer={isSponsored ? transaction.from : undefined}
+                                                        reverted={userOps?.success === false}
+                                                    />
+                                                </Box>
                                             </Column>
                                             <Column alignVertical="center">
                                                 <Text
@@ -205,7 +217,7 @@ export function Activity({ accountAddress }: { accountAddress: Address }) {
                                                     width="full"
                                                 >
                                                     {numberIntl4SigFigs.format(
-                                                        Number(formatEther(transaction.value ?? 0n)),
+                                                        Number(formatEther(subject.value)),
                                                     )}{' '}
                                                     <Text color="text/tertiary">ETH</Text>
                                                 </Text>

@@ -21,6 +21,7 @@ import { usePendingBlock } from '~/hooks/usePendingBlock'
 import { usePendingTransactions } from '~/hooks/usePendingTransactions'
 import { useSearchParamsState } from '~/hooks/useSearchParamsState'
 import { useTransaction } from '~/hooks/useTransaction'
+import { classifyCode } from '~/smart/kernel'
 import type { DeployedContract } from '~/utils/deployments'
 import { useAccountStore, useNetworkStore } from '~/zustand'
 
@@ -700,6 +701,9 @@ function Contracts() {
   )
 }
 
+/** Why an import was refused, in words meant for the toast. */
+class ImportRefused extends Error {}
+
 function ImportContract() {
   const { account } = useAccountStore()
   const client = useClient()
@@ -746,6 +750,12 @@ function ImportContract() {
       if (address) {
         const bytecode_ = await client.getBytecode({ address })
         if (!bytecode_) throw new Error()
+        // An EIP-7702 delegation is code too, but the address is an account.
+        const { kind } = classifyCode(bytecode_)
+        if (kind === 'kernel' || kind === 'delegated')
+          throw new ImportRefused(
+            'This address is an account (EIP-7702 delegated), not a contract.',
+          )
 
         updateContract({
           address,
@@ -769,10 +779,12 @@ function ImportContract() {
 
         return
       }
-    } catch {
+    } catch (error) {
       removeContract({ key })
       toast.error(
-        `"${addressOrBytecode}" is not a valid contract address or bytecode.`,
+        error instanceof ImportRefused
+          ? error.message
+          : `"${addressOrBytecode}" is not a valid contract address or bytecode.`,
       )
     }
   })

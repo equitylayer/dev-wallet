@@ -23,6 +23,7 @@ import { useNetworkStatus } from './useNetworkStatus'
 import { getNonceQueryKey } from './useNonce'
 import { getPendingTransactionsQueryKey } from './usePendingTransactions'
 import { getTxpoolQueryKey } from './useTxpool'
+import { getUserOpLogsQueryKey } from './useUserOpLogs'
 
 type UsePendingBlockParameters = { refetchInterval?: number }
 
@@ -90,6 +91,9 @@ export function usePendingBlockQueryOptions({
         })
         queryClient.invalidateQueries({
           queryKey: getTxpoolQueryKey([client.key]),
+        })
+        queryClient.invalidateQueries({
+          queryKey: getUserOpLogsQueryKey([client.key]),
         })
 
         const latestBlock = await client.getBlock({

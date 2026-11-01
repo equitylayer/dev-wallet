@@ -31,8 +31,10 @@ import { useTransactionReceipt } from '~/hooks/useTransactionReceipt'
 import { capitalize } from '~/utils'
 import { FormattedAbiFunctionName } from '../components/abi/FormattedAbiFunctionName'
 import { recordsForTransaction } from '~/smart/batch-records'
+import { decodeHandleOps } from '~/smart/decode'
 import { useNetworkStore } from '~/zustand'
 import { useBatchCallsStore } from '../zustand/batch-calls'
+import { Authorizations, UserOperations } from './transaction-details-smart'
 
 const numberIntl = new Intl.NumberFormat()
 const numberIntl4SigFigs = new Intl.NumberFormat('en-US', {
@@ -77,7 +79,17 @@ export default function TransactionDetails() {
     }))
   }, [batchCalls, network.rpcUrl, receipt?.transactionHash])
 
+  // The user operations a mined handleOps ran, from its receipt's events.
+  const userOps = useMemo(
+    () =>
+      transaction && receipt ? decodeHandleOps(transaction, receipt) : null,
+    [transaction, receipt],
+  )
+
   if (!transaction) return null
+  // EIP-7702 transactions are priced like EIP-1559 ones.
+  const hasFeeCaps =
+    transaction.type === 'eip1559' || transaction.type === 'eip7702'
   return (
     <>
       <Container dismissable header={'Transaction Details'}>
@@ -202,7 +214,7 @@ export default function TransactionDetails() {
               </LabelledContent>
             </Column>
             <Column width="1/3">
-              {transaction.type === 'eip1559' ? (
+              {hasFeeCaps ? (
                 <LabelledContent label="Tip/Max Fee Per Gas">
                   <Text size="12px">
                     {transaction.maxPriorityFeePerGas
@@ -234,7 +246,7 @@ export default function TransactionDetails() {
                 </LabelledContent>
               )}
             </Column>
-            {receipt && transaction.type === 'eip1559' && (
+            {receipt && hasFeeCaps && (
               <Column width="1/3">
                 <LabelledContent label="Actual Fee Per Gas">
                   <Text size="12px">
@@ -288,6 +300,10 @@ export default function TransactionDetails() {
               </Column>
             ) : null}
           </Columns>
+          {transaction.type === 'eip7702' && (
+            <Authorizations transaction={transaction} />
+          )}
+          {userOps && <UserOperations ops={userOps} />}
           <Tabs.Root asChild defaultValue={params.get('tab') ?? 'data'}>
             <Box display="flex" flexDirection="column" height="full">
               <TabsList

@@ -21,6 +21,7 @@ import {
 } from 'viem/account-abstraction'
 
 import { DEVWALLET_PAYMASTER, ENTRY_POINT_07 } from './constants'
+import { USER_OPERATION_EVENT } from './decode'
 import { WalletRpcError } from './errors'
 import { encodeKernelBatch } from './kernel'
 import type { Node } from './node'
@@ -191,9 +192,7 @@ export type UserOpOutcome = {
 const BEFORE_EXECUTION_TOPIC = toEventSelector(
   getAbiItem({ abi: entryPoint07Abi, name: 'BeforeExecution' }),
 )
-const USER_OP_EVENT_TOPIC = toEventSelector(
-  getAbiItem({ abi: entryPoint07Abi, name: 'UserOperationEvent' }),
-)
+const USER_OP_EVENT_TOPIC = toEventSelector(USER_OPERATION_EVENT)
 
 /**
  * The outcome of one operation in an already-fetched `handleOps` receipt, with
