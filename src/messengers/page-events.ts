@@ -9,7 +9,7 @@ import type { Address } from 'viem'
 
 import { normalizeHost } from '~/utils/host'
 
-/** The topic the extension sends page events on, to content scripts. */
+/** The type of the message that carries a page event to content scripts. */
 export const PAGE_EVENT = 'pageEvent'
 
 /** What a page's provider receives, by topic. */
@@ -95,4 +95,39 @@ export function pageEventFor(
   if (own === '' || !Array.isArray(hosts) || !hosts.includes(own))
     return undefined
   return { topic, payload } as PageMessage
+}
+
+/**
+ * What `sendPageEvent` sends every frame's content script. It has no
+ * `topic`, so no transport takes it for a request: nothing answers it.
+ */
+export type PageEventMessage = { type: typeof PAGE_EVENT; event: PageEvent }
+
+export function pageEventMessage(event: PageEvent): PageEventMessage {
+  return { type: PAGE_EVENT, event }
+}
+
+/** The event a `PageEventMessage` carries; `undefined` for any other. */
+export function eventIn(message: unknown): unknown {
+  if (typeof message !== 'object' || message === null) return undefined
+  const { type, event } = message as Partial<PageEventMessage>
+  return type === PAGE_EVENT ? event : undefined
+}
+
+/**
+ * The window post that hands a page its event: a request on the provider's
+ * `wallet:inpage` messenger, for the event's topic. Nobody waits for the
+ * answer.
+ */
+export function providerPost(message: PageMessage) {
+  return {
+    connection: 'wallet:inpage',
+    topic: `> ${message.topic}`,
+    payload: message.payload,
+  }
+}
+
+/** Whether `topic` is a page event's: the extension's to say, never a page's to ask. */
+export function isPageEventTopic(topic: string): boolean {
+  return TOPICS.includes(topic)
 }

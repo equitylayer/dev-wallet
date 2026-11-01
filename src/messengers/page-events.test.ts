@@ -6,8 +6,13 @@ import {
   chainChangedEvent,
   connectEvent,
   disconnectEvent,
+  eventIn,
+  isPageEventTopic,
   pageEventFor,
+  pageEventMessage,
+  providerPost,
 } from './page-events'
+import { isValidSend } from './transports/utils'
 
 const accounts = [
   '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
@@ -101,4 +106,63 @@ describe('pageEventFor', () => {
     expect(pageEventFor(connectEvent('', '0x1'), '')).toBeUndefined()
     expect(pageEventFor(disconnectEvent(''), '')).toBeUndefined()
   })
+})
+
+describe('pageEventMessage', () => {
+  const event = disconnectEvent('dapp.test')
+
+  test('carries the event, and no topic: it is no request, so nothing answers it', () => {
+    const message = pageEventMessage(event)
+    expect(eventIn(message)).toBe(event)
+    expect('topic' in message).toBe(false)
+    expect(isValidSend({ message: message as never, topic: '*' })).toBe(false)
+  })
+
+  test.each([
+    undefined,
+    null,
+    'pageEvent',
+    { type: 'openWallet', event },
+    { topic: '> pageEvent', payload: event },
+  ])('%p carries no event', (message) => {
+    expect(eventIn(message)).toBeUndefined()
+  })
+})
+
+describe('providerPost', () => {
+  test("is a request on the provider's messenger, for the event's topic", () => {
+    const message = pageEventFor(
+      accountsChangedEvent(accounts, sessions),
+      'dapp.test',
+    )!
+    const post = providerPost(message)
+    expect(post).toEqual({
+      connection: 'wallet:inpage',
+      topic: '> accountsChanged',
+      payload: { accounts },
+    })
+    expect(
+      isValidSend({
+        message: post,
+        options: { connection: 'wallet:inpage' },
+        topic: 'accountsChanged',
+      }),
+    ).toBe(true)
+  })
+})
+
+describe('isPageEventTopic', () => {
+  test.each(['accountsChanged', 'chainChanged', 'connect', 'disconnect'])(
+    '%p is the extension\'s to say, never a page\'s to ask',
+    (topic) => {
+      expect(isPageEventTopic(topic)).toBe(true)
+    },
+  )
+
+  test.each(['request', 'injectProvider', 'pageEvent', 'toString', ''])(
+    '%p is not',
+    (topic) => {
+      expect(isPageEventTopic(topic)).toBe(false)
+    },
+  )
 })

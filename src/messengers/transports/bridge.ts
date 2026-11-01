@@ -1,6 +1,11 @@
 import { senderHost } from '~/utils/host'
 
-import { PAGE_EVENT, pageEventFor } from '../page-events'
+import {
+  eventIn,
+  isPageEventTopic,
+  pageEventFor,
+  providerPost,
+} from '../page-events'
 import { isRelayedConnection } from './guards'
 import { createTabTransport } from './tab'
 import type { Transport } from './types'
@@ -38,6 +43,9 @@ export function setupBridgeTransportRelay() {
     if (!isRelayedConnection(connection)) return
 
     const topic_ = topic.replace('> ', '')
+    // An event is the extension's to tell the page (below), never the page's
+    // to ask: this frame's own post of one stays here.
+    if (isPageEventTopic(topic_)) return
     const response = await tabTransport.send(topic_, payload, {
       id,
       connection,
@@ -52,24 +60,24 @@ export function setupBridgeTransportRelay() {
     if (!topic) return
 
     const topic_: string = topic.replace('> ', '')
-
-    // An event for the pages reaches every frame: this one passes on only
-    // its own host's, as the provider's topic and payload. A sandboxed
-    // frame's origin is opaque (`self.origin`), whatever its url's.
-    if (topic_ === PAGE_EVENT) {
-      const origin = self.origin === 'null' ? 'null' : location.origin
-      const event = pageEventFor(
-        payload,
-        senderHost({ origin, url: location.href }),
-      )
-      if (!event) return
-      return windowTransport.send(event.topic, event.payload, { connection })
-    }
-
     const response = await windowTransport.send(topic_, payload, {
       id,
       connection,
     })
     return response
+  })
+
+  // background -> content script -> inpage, for events: every frame gets each
+  // one (`sendPageEvent`) and passes on only its own host's. Posted, not
+  // sent: nothing waits for the provider's answer (a frame with no provider
+  // never gives one), and nothing answers the extension.
+  chrome.runtime.onMessage.addListener((message: unknown) => {
+    // A sandboxed frame's origin is opaque (`self.origin`), whatever its url.
+    const origin = self.origin === 'null' ? 'null' : location.origin
+    const event = pageEventFor(
+      eventIn(message),
+      senderHost({ origin, url: location.href }),
+    )
+    if (event) window.postMessage(providerPost(event), '*')
   })
 }
