@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import {
   type Address,
   type Hex,
+  type RpcTransactionReceipt,
   decodeFunctionResult,
+  encodeAbiParameters,
+  encodeEventTopics,
   encodeFunctionData,
   getAddress,
   hexToBigInt,
@@ -39,6 +42,7 @@ import {
   getUserOpOutcome,
   signUserOp,
   submitUserOp,
+  userOpOutcomeFromReceipt,
 } from './userop'
 
 const account = DEV_ACCOUNTS[1]
@@ -482,5 +486,143 @@ describe('user operations', () => {
     await expect(getUserOpOutcome(node, hash, userOpHash)).rejects.toThrow(
       /UserOperationEvent/,
     )
+  })
+})
+
+describe('userOpOutcomeFromReceipt', () => {
+  const OURS: Hex = `0x${'aa'.repeat(32)}`
+  const OTHER: Hex = `0x${'bb'.repeat(32)}`
+  const TOKEN = getAddress('0x00000000000000000000000000000000000c0c0c')
+
+  type ReceiptLog = RpcTransactionReceipt['logs'][number]
+  function log(address: Address, topics: Hex[], data: Hex = '0x'): ReceiptLog {
+    return {
+      address,
+      topics: topics as ReceiptLog['topics'],
+      data,
+      blockHash: `0x${'01'.repeat(32)}`,
+      blockNumber: '0x1',
+      logIndex: '0x0',
+      transactionHash: `0x${'02'.repeat(32)}`,
+      transactionIndex: '0x0',
+      removed: false,
+    }
+  }
+  const beforeExecution = (address: Address = ENTRY_POINT_07) =>
+    log(
+      address,
+      encodeEventTopics({
+        abi: entryPoint07Abi,
+        eventName: 'BeforeExecution',
+      }) as Hex[],
+    )
+  const userOpEvent = (
+    userOpHash: Hex,
+    { success = true, address = ENTRY_POINT_07 } = {},
+  ) =>
+    log(
+      address,
+      encodeEventTopics({
+        abi: entryPoint07Abi,
+        eventName: 'UserOperationEvent',
+        args: { userOpHash, sender: account, paymaster: DEVWALLET_PAYMASTER },
+      }) as Hex[],
+      encodeAbiParameters(
+        [
+          { type: 'uint256' },
+          { type: 'bool' },
+          { type: 'uint256' },
+          { type: 'uint256' },
+        ],
+        [0n, success, 7n, 8n],
+      ),
+    )
+  const own = (n: number) =>
+    log(TOKEN, [`0x${n.toString(16).padStart(64, '0')}`])
+  const receiptOf = (...logs: ReceiptLog[]) => ({ logs }) as RpcTransactionReceipt
+
+  test('returns the outcome and only the logs between BeforeExecution and the op event', () => {
+    const outcome = userOpOutcomeFromReceipt(
+      receiptOf(
+        own(1),
+        beforeExecution(),
+        own(2),
+        own(3),
+        userOpEvent(OURS),
+        own(4),
+      ),
+      OURS,
+    )
+    expect(outcome).toMatchObject({
+      success: true,
+      actualGasCost: 7n,
+      paymaster: DEVWALLET_PAYMASTER,
+    })
+    expect(outcome?.logs).toEqual([own(2), own(3)])
+  })
+
+  test('reports a failed op, keeping its revert reason log', () => {
+    const reason = log(
+      ENTRY_POINT_07,
+      encodeEventTopics({
+        abi: entryPoint07Abi,
+        eventName: 'UserOperationRevertReason',
+        args: { userOpHash: OURS, sender: account },
+      }) as Hex[],
+    )
+    const outcome = userOpOutcomeFromReceipt(
+      receiptOf(
+        beforeExecution(),
+        reason,
+        userOpEvent(OURS, { success: false }),
+      ),
+      OURS,
+    )
+    expect(outcome?.success).toBe(false)
+    expect(outcome?.logs).toEqual([reason])
+  })
+
+  test('with several ops, an op starts after the previous op event', () => {
+    const receipt = receiptOf(
+      beforeExecution(),
+      own(1),
+      userOpEvent(OTHER),
+      own(2),
+      userOpEvent(OURS),
+      own(3),
+    )
+    expect(userOpOutcomeFromReceipt(receipt, OURS)?.logs).toEqual([own(2)])
+    expect(userOpOutcomeFromReceipt(receipt, OTHER)?.logs).toEqual([own(1)])
+  })
+
+  test('matches the op hash case-insensitively, and without BeforeExecution takes the logs from the start', () => {
+    const outcome = userOpOutcomeFromReceipt(
+      receiptOf(own(1), userOpEvent(OURS)),
+      OURS.toUpperCase().replace('0X', '0x') as Hex,
+    )
+    expect(outcome?.logs).toEqual([own(1)])
+  })
+
+  test('is null when the receipt has no event for the op', () => {
+    expect(userOpOutcomeFromReceipt(receiptOf(), OURS)).toBeNull()
+    expect(
+      userOpOutcomeFromReceipt(
+        receiptOf(beforeExecution(), own(1), userOpEvent(OTHER)),
+        OURS,
+      ),
+    ).toBeNull()
+  })
+
+  test('ignores look-alike events from other contracts', () => {
+    expect(
+      userOpOutcomeFromReceipt(
+        receiptOf(
+          beforeExecution(TOKEN),
+          own(1),
+          userOpEvent(OURS, { address: TOKEN }),
+        ),
+        OURS,
+      ),
+    ).toBeNull()
   })
 })

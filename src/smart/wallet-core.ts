@@ -1,13 +1,13 @@
 import { type Address, type Hex, isAddress } from 'viem'
 
 import type { BatchRecord, BatchRecords } from './batch-records'
+import { getCallsStatus } from './calls-status'
+import { getCapabilities, isQuantity, parseSendCalls } from './eip5792'
 import {
-  getCallsStatus,
-  getCapabilities,
-  isQuantity,
-  parseSendCalls,
-} from './eip5792'
-import { WalletRpcError } from './errors'
+  INVALID_PARAMS,
+  WalletRpcError,
+  unauthorizedAccount,
+} from './errors'
 import { executeCalls } from './execute'
 import { atomicStatus } from './modes'
 import type { Node } from './node'
@@ -18,8 +18,6 @@ import {
   toRpcCall,
 } from './types'
 
-const INVALID_PARAMS = -32602
-const UNAUTHORIZED = 4100
 const UNSUPPORTED_METHOD = 4200
 const UNKNOWN_BUNDLE_ID = 5730
 
@@ -66,12 +64,7 @@ function capabilitiesFor(
     throw new WalletRpcError(INVALID_PARAMS, 'Expected hex chain ids')
   }
   const account = findAccount(deps.accounts, address)
-  if (!account) {
-    throw new WalletRpcError(
-      UNAUTHORIZED,
-      `The account ${address} is not one of the wallet's accounts`,
-    )
-  }
+  if (!account) throw unauthorizedAccount(address)
   return getCapabilities({
     chainId: deps.chainId,
     status: atomicStatus(account.mode, account.onchain),
@@ -93,13 +86,10 @@ async function sendCalls(
     knownAccounts: deps.accounts.map((a) => a.address),
     records: deps.records,
   })
+  // `parseSendCalls` checked `from` against the wallet's accounts, except for
+  // the default (the active account), which may not be one of them.
   const account = findAccount(deps.accounts, from)
-  if (!account) {
-    throw new WalletRpcError(
-      UNAUTHORIZED,
-      `The account ${from} is not one of the wallet's accounts`,
-    )
-  }
+  if (!account) throw unauthorizedAccount(from)
 
   const result = await executeCalls({
     node: deps.node,

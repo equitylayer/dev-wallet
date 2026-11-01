@@ -12,6 +12,16 @@ export class WalletRpcError extends Error {
 }
 
 const INTERNAL_ERROR = -32603
+export const INVALID_PARAMS = -32602
+/** EIP-1193: the requested account isn't one the wallet holds. */
+export const UNAUTHORIZED = 4100
+
+export function unauthorizedAccount(address: string): WalletRpcError {
+  return new WalletRpcError(
+    UNAUTHORIZED,
+    `The account ${address} is not one of the wallet's accounts`,
+  )
+}
 
 export function serializeError(e: unknown): {
   code: number

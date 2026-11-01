@@ -1,8 +1,6 @@
 import {
   type Address,
-  type Hash,
   type Hex,
-  type RpcTransactionReceipt,
   bytesToHex,
   hexToNumber,
   isAddress,
@@ -10,21 +8,18 @@ import {
   numberToHex,
 } from 'viem'
 
-import type { BatchRecord, BatchRecords } from './batch-records'
-import { WalletRpcError } from './errors'
-import type { Node } from './node'
+import type { BatchRecords } from './batch-records'
+import { EIP5792_VERSION } from './calls-status'
+import {
+  INVALID_PARAMS,
+  WalletRpcError,
+  unauthorizedAccount,
+} from './errors'
 import { type AtomicStatus, type Call, type RpcCall, toCall } from './types'
-import { getUserOpOutcome } from './userop'
 
-export type { BatchRecord } from './batch-records'
-
-const INVALID_PARAMS = -32602
-const UNAUTHORIZED = 4100
 const UNSUPPORTED_CAPABILITY = 5700
 const UNSUPPORTED_CHAIN_ID = 5710
 const DUPLICATE_ID = 5720
-
-const VERSION = '2.0.0'
 
 function invalidParams(message: string): WalletRpcError {
   return new WalletRpcError(INVALID_PARAMS, message)
@@ -135,8 +130,8 @@ export function parseSendCalls(
   const { version, chainId, from, id, atomicRequired, calls, capabilities } =
     request
 
-  if (version !== VERSION) {
-    throw invalidParams(`\`version\` must be "${VERSION}"`)
+  if (version !== EIP5792_VERSION) {
+    throw invalidParams(`\`version\` must be "${EIP5792_VERSION}"`)
   }
   if (!isQuantity(chainId)) {
     throw invalidParams('`chainId` must be a hex quantity')
@@ -158,12 +153,7 @@ export function parseSendCalls(
     const known = ctx.knownAccounts.find(
       (a) => a.toLowerCase() === from.toLowerCase(),
     )
-    if (!known) {
-      throw new WalletRpcError(
-        UNAUTHORIZED,
-        `The account ${from} is not one of the wallet's accounts`,
-      )
-    }
+    if (!known) throw unauthorizedAccount(from)
     sender = known
   }
 
@@ -189,123 +179,4 @@ export function parseSendCalls(
     calls: calls.map(parseCall),
     atomicRequired: atomicRequired ?? false,
   }
-}
-
-// -- wallet_getCallsStatus ----------------------------------------------------
-
-type CallsReceipt = {
-  logs: { address: Address; data: Hex; topics: Hex[] }[]
-  status: '0x1' | '0x0'
-  blockHash: Hex
-  blockNumber: Hex
-  gasUsed: Hex
-  transactionHash: Hash
-}
-
-export type CallsStatus = {
-  version: '2.0.0'
-  id: string
-  chainId: Hex
-  /** 100 pending, 200 confirmed, 500 reverted, 600 partially reverted. */
-  status: 100 | 200 | 400 | 500 | 600
-  atomic: boolean
-  receipts?: CallsReceipt[]
-}
-
-const PENDING = 100
-const CONFIRMED = 200
-const REVERTED = 500
-const PARTIALLY_REVERTED = 600
-
-function toCallsReceipt(
-  receipt: RpcTransactionReceipt,
-  status: CallsReceipt['status'] = receipt.status === '0x1' ? '0x1' : '0x0',
-): CallsReceipt {
-  return {
-    logs: receipt.logs.map(({ address, data, topics }) => ({
-      address,
-      data,
-      topics: [...topics],
-    })),
-    status,
-    blockHash: receipt.blockHash,
-    blockNumber: receipt.blockNumber,
-    gasUsed: receipt.gasUsed,
-    transactionHash: receipt.transactionHash,
-  }
-}
-
-/**
- * What a mined `handleOps` receipt means for the batch. Its own status says
- * nothing about the user operation, so the operation's event decides. A
- * transaction mined without that event did not execute the operation: that is
- * a failure, and the receipt keeps its own status. `null` if the transaction
- * has vanished since (a reorg), which makes the batch pending again.
- */
-async function userOpResult(
-  node: Node,
-  record: BatchRecord,
-  receipt: RpcTransactionReceipt,
-): Promise<{ status: 200 | 500; receipt: CallsReceipt } | null> {
-  try {
-    const outcome = await getUserOpOutcome(
-      node,
-      receipt.transactionHash,
-      record.userOpHash as Hex,
-    )
-    if (!outcome) return null
-    return {
-      status: outcome.success ? CONFIRMED : REVERTED,
-      receipt: toCallsReceipt(receipt, outcome.success ? '0x1' : '0x0'),
-    }
-  } catch {
-    return { status: REVERTED, receipt: toCallsReceipt(receipt) }
-  }
-}
-
-/**
- * Reads the batch's transactions and maps them to an EIP-5792 status. While
- * any is unmined the status is `100`, with no receipts.
- */
-export async function getCallsStatus(
-  node: Node,
-  record: BatchRecord,
-): Promise<CallsStatus> {
-  const base = {
-    version: VERSION,
-    id: record.id,
-    chainId: numberToHex(record.chainId),
-    atomic: record.path !== 'sequential',
-  } as const
-  const pending = { ...base, status: PENDING } as const
-
-  const raw = await Promise.all(
-    record.transactionHashes.map((hash) =>
-      node.request<RpcTransactionReceipt | null>('eth_getTransactionReceipt', [
-        hash,
-      ]),
-    ),
-  )
-  const mined = raw.filter((r): r is RpcTransactionReceipt => r !== null)
-  if (mined.length < raw.length) return pending
-
-  if (record.path === 'userop') {
-    const result = await userOpResult(
-      node,
-      record,
-      mined[0] as RpcTransactionReceipt,
-    )
-    if (!result) return pending
-    return { ...base, status: result.status, receipts: [result.receipt] }
-  }
-
-  const receipts = mined.map((r) => toCallsReceipt(r))
-  const succeeded = receipts.filter((r) => r.status === '0x1').length
-  const status =
-    succeeded === receipts.length
-      ? CONFIRMED
-      : succeeded === 0
-        ? REVERTED
-        : PARTIALLY_REVERTED
-  return { ...base, status, receipts }
 }

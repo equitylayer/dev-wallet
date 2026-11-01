@@ -3,19 +3,20 @@ import {
   type Address,
   type Hex,
   type RpcTransactionReceipt,
+  encodeDeployData,
+  encodeEventTopics,
+  encodeFunctionData,
   getAddress,
   numberToHex,
   parseEther,
 } from 'viem'
+import { entryPoint07Abi } from 'viem/account-abstraction'
 
+import { MockERC20 } from '../../test/contracts/generated'
 import type { BatchRecord } from './batch-records'
+import { type CallsStatus, getCallsStatus } from './calls-status'
 import { DEVWALLET_SPONSOR, KERNEL_V3_3 } from './constants'
-import {
-  type CallsStatus,
-  getCallsStatus,
-  getCapabilities,
-  parseSendCalls,
-} from './eip5792'
+import { getCapabilities, parseSendCalls } from './eip5792'
 import { WalletRpcError } from './errors'
 import { type ExecutionResult, executeCalls } from './execute'
 import { setDelegation } from './kernel'
@@ -357,6 +358,27 @@ function expectHexReceipt(
   }
 }
 
+function entryPointTopic(
+  name: 'BeforeExecution' | 'UserOperationEvent' | 'UserOperationRevertReason',
+): Hex {
+  return encodeEventTopics({ abi: entryPoint07Abi, eventName: name })[0] as Hex
+}
+
+/** Deploys a MockERC20 from a dev account and returns its address. */
+async function deployToken(): Promise<Address> {
+  const hash = await node.request<Hex>('eth_sendTransaction', [
+    {
+      from: DEV_ACCOUNTS[0],
+      data: encodeDeployData({
+        abi: MockERC20.abi,
+        bytecode: MockERC20.bytecode.object as Hex,
+        args: ['Mock', 'MCK', 18],
+      }),
+    },
+  ])
+  return (await waitForReceipt(node, hash)).contractAddress as Address
+}
+
 describe('getCallsStatus', () => {
   useAnvil()
 
@@ -413,6 +435,78 @@ describe('getCallsStatus', () => {
     expect(status.status).toBe(500)
     expect(status.atomic).toBe(true)
     expect(status.receipts?.map((r) => r.status)).toEqual(['0x0'])
+    // The op's own logs include why it failed, but not the event that closes it.
+    const topics = status.receipts?.[0]?.logs.map((l) => l.topics[0])
+    expect(topics).toContain(entryPointTopic('UserOperationRevertReason'))
+    expect(topics).not.toContain(entryPointTopic('UserOperationEvent'))
+    expect(topics).not.toContain(entryPointTopic('BeforeExecution'))
+  })
+
+  test('a user op receipt has only the logs of that op', async () => {
+    const token = await deployToken()
+    const call = (functionName: 'mint' | 'transfer', to: Address): Call => ({
+      to: token,
+      data: encodeFunctionData({
+        abi: MockERC20.abi,
+        functionName,
+        args: [to, 10n],
+      }),
+    })
+    const record = await sendFromKernel([
+      call('mint', account),
+      call('transfer', Y),
+    ])
+    expect(record.path).toBe('userop')
+
+    const status = await getCallsStatus(node, record)
+
+    expect(status.status).toBe(200)
+    const logs = status.receipts?.[0]?.logs ?? []
+    const transfer = encodeEventTopics({
+      abi: MockERC20.abi,
+      eventName: 'Transfer',
+    })[0]
+    // The mint and the transfer, nothing from the EntryPoint around them.
+    const lowercased = token.toLowerCase() as Address
+    expect(logs.map((l) => [l.address, l.topics[0]])).toEqual([
+      [lowercased, transfer],
+      [lowercased, transfer],
+    ])
+    const topics = logs.map((l) => l.topics[0])
+    expect(topics).not.toContain(entryPointTopic('BeforeExecution'))
+    expect(topics).not.toContain(entryPointTopic('UserOperationEvent'))
+    // The transaction itself does carry them.
+    const outer = await waitForReceipt(
+      node,
+      record.transactionHashes[0] as Hex,
+    )
+    const outerTopics = outer.logs.map((l) => l.topics[0])
+    expect(outerTopics).toContain(entryPointTopic('BeforeExecution'))
+    expect(outerTopics).toContain(entryPointTopic('UserOperationEvent'))
+  })
+
+  test('a user op with no event in its transaction keeps all of its logs', async () => {
+    const token = await deployToken()
+    const record = await sendFromPlain([
+      {
+        to: token,
+        data: encodeFunctionData({
+          abi: MockERC20.abi,
+          functionName: 'mint',
+          args: [plain, 10n],
+        }),
+      },
+    ])
+
+    const status = await getCallsStatus(node, {
+      ...record,
+      path: 'userop',
+      userOpHash: `0x${'11'.repeat(32)}`,
+    })
+
+    expect(status.status).toBe(500)
+    expect(status.receipts?.[0]?.status).toBe('0x1')
+    expect(status.receipts?.[0]?.logs).toHaveLength(1)
   })
 
   test('a user op with no event in its transaction is 500, with the outer status', async () => {
@@ -657,7 +751,7 @@ describe('handleWalletRequest', () => {
   })
 
   test('any other method is 4200', async () => {
-    for (const method of ['eth_blockNumber', 'wallet_showCallsStatus']) {
+    for (const method of ['eth_blockNumber', 'wallet_foo']) {
       expect(await codeOf(() => handleWalletRequest(deps(), { method }))).toBe(
         4200,
       )

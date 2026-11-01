@@ -6,10 +6,12 @@ import {
   decodeErrorResult,
   decodeFunctionResult,
   encodeFunctionData,
+  getAbiItem,
   hexToBigInt,
   isAddressEqual,
   isHex,
   parseEventLogs,
+  toEventSelector,
 } from 'viem'
 import {
   type UserOperation,
@@ -185,6 +187,58 @@ export type UserOpOutcome = {
   paymaster: Address
 }
 
+const BEFORE_EXECUTION_TOPIC = toEventSelector(
+  getAbiItem({ abi: entryPoint07Abi, name: 'BeforeExecution' }),
+)
+const USER_OP_EVENT_TOPIC = toEventSelector(
+  getAbiItem({ abi: entryPoint07Abi, name: 'UserOperationEvent' }),
+)
+
+/**
+ * The outcome of one operation in an already-fetched `handleOps` receipt, with
+ * the logs that belong to it, or `null` if the receipt has no
+ * `UserOperationEvent` for it (for example, `handleOps` reverted).
+ *
+ * The logs are the ones strictly between the EntryPoint's `BeforeExecution`
+ * (or the previous operation's `UserOperationEvent`) and this operation's own
+ * `UserOperationEvent`, as bundlers report them in
+ * `eth_getUserOperationReceipt`. That is the operation's call logs, any
+ * paymaster post-op logs, and `UserOperationRevertReason` when it failed.
+ */
+export function userOpOutcomeFromReceipt(
+  receipt: RpcTransactionReceipt,
+  userOpHash: Hex,
+): (UserOpOutcome & { logs: RpcTransactionReceipt['logs'] }) | null {
+  const wanted = userOpHash.toLowerCase()
+  let start = -1
+  let end = -1
+  for (const [index, log] of receipt.logs.entries()) {
+    if (!isAddressEqual(log.address, ENTRY_POINT_07)) continue
+    const [topic, hash] = log.topics.map((t) => t.toLowerCase())
+    if (topic === BEFORE_EXECUTION_TOPIC) start = index
+    else if (topic === USER_OP_EVENT_TOPIC) {
+      if (hash === wanted) end = index
+      // Another operation's event closes its logs; ours come after it.
+      else if (end === -1) start = index
+    }
+  }
+  if (end === -1) return null
+
+  const [event] = parseEventLogs({
+    abi: entryPoint07Abi,
+    eventName: 'UserOperationEvent',
+    logs: [receipt.logs[end] as RpcTransactionReceipt['logs'][number]],
+  })
+  if (!event) return null
+  const { success, actualGasCost, paymaster } = event.args
+  return {
+    success,
+    actualGasCost,
+    paymaster,
+    logs: receipt.logs.slice(start + 1, end),
+  }
+}
+
 /**
  * What happened to the operation in a mined `handleOps` transaction, or
  * `null` while the transaction is unmined. Throws if it was mined but carries
@@ -201,21 +255,13 @@ export async function getUserOpOutcome(
   )
   if (!receipt) return null
 
-  const event = parseEventLogs({
-    abi: entryPoint07Abi,
-    eventName: 'UserOperationEvent',
-    logs: receipt.logs,
-  }).find(
-    (log) =>
-      isAddressEqual(log.address, ENTRY_POINT_07) &&
-      log.args.userOpHash.toLowerCase() === userOpHash.toLowerCase(),
-  )
-  if (!event) {
+  const result = userOpOutcomeFromReceipt(receipt, userOpHash)
+  if (!result) {
     const status = receipt.status === '0x1' ? 'succeeded' : 'reverted'
     throw new Error(
       `Transaction ${transactionHash} ${status} without a UserOperationEvent for ${userOpHash}`,
     )
   }
-  const { success, actualGasCost, paymaster } = event.args
+  const { success, actualGasCost, paymaster } = result
   return { success, actualGasCost, paymaster }
 }
