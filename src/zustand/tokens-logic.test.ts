@@ -6,11 +6,13 @@ import {
   addImportedToken,
   mergeDiscoveredTokens,
   migrateTokensState,
+  partitionEmptyTokens,
 } from './tokens-logic'
 
 const A = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as Address
 const B = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' as Address
 const C = '0xcccccccccccccccccccccccccccccccccccccccc' as Address
+const D = '0xdddddddddddddddddddddddddddddddddddddddd' as Address
 
 const discovered = (address: Address, visible = true): Token => ({
   address,
@@ -130,6 +132,36 @@ describe('addImportedToken', () => {
   test('an imported token survives a sync that does not find it', () => {
     const list = addImportedToken([discovered(A)], B)
     expect(mergeDiscoveredTokens(list, [A])).toEqual(list)
+  })
+})
+
+describe('partitionEmptyTokens', () => {
+  test('collapses discovered tokens whose balance is known to be zero', () => {
+    const tokens = [discovered(A), discovered(B), discovered(C)]
+    const { populated, empty } = partitionEmptyTokens(tokens, [5n, 0n, 1n])
+    expect(populated).toEqual([tokens[0], tokens[2]])
+    expect(empty).toEqual([tokens[1]])
+  })
+
+  test('keeps imported tokens listed at zero', () => {
+    const tokens = [imported(A), discovered(B)]
+    const { populated, empty } = partitionEmptyTokens(tokens, [0n, 0n])
+    expect(populated).toEqual([tokens[0]])
+    expect(empty).toEqual([tokens[1]])
+  })
+
+  test('keeps a token listed while its balance is loading', () => {
+    const tokens = [discovered(A), discovered(B)]
+    const { populated, empty } = partitionEmptyTokens(tokens, [undefined, 0n])
+    expect(populated).toEqual([tokens[0]])
+    expect(empty).toEqual([tokens[1]])
+  })
+
+  test('preserves order and handles an empty list', () => {
+    expect(partitionEmptyTokens([], [])).toEqual({ populated: [], empty: [] })
+    const tokens = [discovered(A), discovered(B), discovered(C), discovered(D)]
+    const { populated } = partitionEmptyTokens(tokens, [1n, 2n, 3n, 4n])
+    expect(populated).toEqual(tokens)
   })
 })
 

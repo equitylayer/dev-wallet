@@ -74,6 +74,24 @@ export function addImportedToken(existing: Token[], address: Address): Token[] {
   ]
 }
 
+/**
+ * Split tokens into those to list and those to collapse. A token collapses
+ * only when it was discovered (never an imported one) and its balance is
+ * known to be zero: a balance that is still loading keeps it listed.
+ */
+export function partitionEmptyTokens<T extends Token>(
+  tokens: T[],
+  balances: (bigint | undefined)[],
+): { populated: T[]; empty: T[] } {
+  const populated: T[] = []
+  const empty: T[] = []
+  tokens.forEach((token, i) => {
+    if (token.source === 'discovered' && balances[i] === 0n) empty.push(token)
+    else populated.push(token)
+  })
+  return { populated, empty }
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////
 // Migrations
 
