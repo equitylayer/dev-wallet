@@ -1,6 +1,6 @@
 // Sends: `eth_sendTransaction` and `wallet_sendCalls`, after the approval gate,
 // through the smart-account execution core, or into the open batch queue
-// (`batch-queue.ts`). `smart.ts` keeps the node in step with the accounts'
+// (`batch-queue-join.ts`). `smart.ts` keeps the node in step with the accounts'
 // modes; `rpc.ts` routes the requests here.
 import { getMessenger } from '~/messengers'
 import { KERNEL_V3_3 } from '~/smart/constants'
@@ -13,7 +13,7 @@ import { findAccount, handleWalletRequest } from '~/smart/wallet-core'
 import type { RpcRequest, RpcResponse } from '~/types/rpc'
 import { accountModesStore } from '~/zustand'
 
-import { addToBatch, joinUnasked, openBatch } from './batch-queue'
+import { addToBatch, joinUnasked, openBatch } from './batch-queue-join'
 import { declinedError } from './methods'
 import type { Batcher, Decision, Joined } from './pending-requests'
 import {
@@ -208,6 +208,9 @@ async function sendCalls(
         const joined = await joinUnasked(send, approved.request)
         if (joined) return joined
       }
+      // A batch with this id may have joined the queue while this one waited
+      // for approval: 5720, before anything is written.
+      parseBatch((await reconcileSnapshot(rpcUrl)).deps, approved.request)
       if (upgrade) await upgradeBeforeBatch(rpcUrl, approved, { notifyUser: !ask })
       const { deps: fresh } = await reconcileSnapshot(rpcUrl, { fresh: true })
       return {

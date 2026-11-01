@@ -1,6 +1,11 @@
 import { type Address, type Hash, type Hex, numberToHex } from 'viem'
 
-import { INVALID_PARAMS, WalletRpcError, atomicityUnsupported } from './errors'
+import {
+  EXECUTION_REVERTED,
+  INVALID_PARAMS,
+  WalletRpcError,
+  atomicityUnsupported,
+} from './errors'
 import { encodeKernelBatch } from './kernel'
 import { atomicStatus } from './modes'
 import type { Node } from './node'
@@ -55,8 +60,6 @@ export type ExecutionResult = ExecutionPlan & {
   /** Only for `userop`. */
   userOpHash?: Hex
 }
-
-const EXECUTION_REVERTED = 3
 
 const IMPERSONATED_REASON =
   "Impersonated accounts can't sign, so they pay their own gas."

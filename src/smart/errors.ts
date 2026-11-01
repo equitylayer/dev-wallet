@@ -13,6 +13,8 @@ export class WalletRpcError extends Error {
 
 const INTERNAL_ERROR = -32603
 export const INVALID_PARAMS = -32602
+/** A send that reverted, or is predicted to (EIP-1474); `data` holds the revert. */
+export const EXECUTION_REVERTED = 3
 /** EIP-1193: the requested account isn't one the wallet holds. */
 export const UNAUTHORIZED = 4100
 

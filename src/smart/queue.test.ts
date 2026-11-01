@@ -6,7 +6,6 @@ import {
   DEVWALLET_ORIGIN,
   type QueuedItem,
   cannotJoin,
-  droppedItems,
   enqueue,
   flattenQueue,
   moveItem,
@@ -118,18 +117,6 @@ describe('orphaned', () => {
   })
 })
 
-describe('droppedItems', () => {
-  test('returns the ids removed, not the ones moved or added', () => {
-    const prev = [item(1), item(2), item(3)]
-    const next = [item(3), item(1), item(4)]
-    expect(droppedItems(prev, next)).toEqual([2])
-  })
-
-  test('clearing the queue drops everything', () => {
-    expect(droppedItems([item(1), item(2)], [])).toEqual([1, 2])
-  })
-})
-
 // Review Focus #5: the background's network-change rule.
 describe('queueAfterNetworkChange', () => {
   test('another network closes the queue and rejects every request', () => {
@@ -164,19 +151,25 @@ describe('cannotJoin', () => {
   }
 
   test('a smart account joins the open queue of its own, or opens one', () => {
-    expect(cannotJoin(queue([item(1)]), candidate)).toBeNull()
+    expect(cannotJoin(queue([item(1)]), candidate, A)).toBeNull()
     expect(
-      cannotJoin(queue([]), {
-        ...candidate,
-        account: ACCOUNT.toLowerCase() as Address,
-      }),
+      cannotJoin(
+        queue([]),
+        { ...candidate, account: ACCOUNT.toLowerCase() as Address },
+        A,
+      ),
     ).toBeNull()
-    expect(cannotJoin(null, candidate)).toBeNull()
+    expect(cannotJoin(null, candidate, A)).toBeNull()
+  })
+
+  test('only on the active network', () => {
+    expect(cannotJoin(null, candidate, B)).toMatch(/active network/)
+    expect(cannotJoin(queue([item(1)]), candidate, B)).toMatch(/active network/)
   })
 
   test('a plain account never batches', () => {
     for (const mode of ['plain-upgradable', 'plain-never'] as const) {
-      expect(cannotJoin(null, { ...candidate, mode })).toMatch(
+      expect(cannotJoin(null, { ...candidate, mode }, A)).toMatch(
         /Only smart accounts/,
       )
     }
@@ -184,15 +177,19 @@ describe('cannotJoin', () => {
 
   test('a deployment never batches', () => {
     expect(
-      cannotJoin(null, { ...candidate, calls: [{ to: X }, { data: '0x00' }] }),
+      cannotJoin(
+        null,
+        { ...candidate, calls: [{ to: X }, { data: '0x00' }] },
+        A,
+      ),
     ).toMatch(/deployment/)
   })
 
   test("a queue open for another account or network isn't joined", () => {
-    expect(cannotJoin(queue([], { account: OTHER }), candidate)).toMatch(
+    expect(cannotJoin(queue([], { account: OTHER }), candidate, A)).toMatch(
       OTHER,
     )
-    expect(cannotJoin(queue([], { rpcUrl: B }), candidate)).toMatch(B)
+    expect(cannotJoin(queue([], { rpcUrl: B }), candidate, A)).toMatch(B)
   })
 })
 

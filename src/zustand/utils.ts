@@ -80,8 +80,17 @@ async function syncStore({ store }: { store: StoreWithPersist<unknown> }) {
   webextStorage.local.subscribe(storageName, listener)
 }
 
-export function syncStores() {
+/**
+ * Reloads each persisted store whenever another context writes it. `except`
+ * lists the stores this context alone writes: its memory is the truth, and a
+ * reload that one of its own writes set off could land after a later write
+ * and undo it.
+ */
+export function syncStores({
+  except = [],
+}: { except?: readonly object[] } = {}) {
   Object.values(stores).forEach((store) => {
+    if (except.includes(store)) return
     if ('persist' in store && (store as StoreWithPersist<unknown>).persist)
       syncStore({ store: store as StoreWithPersist<unknown> })
   })

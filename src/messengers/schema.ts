@@ -13,9 +13,18 @@ export type Schema = {
     payload: { accounts: Address[]; sessions: SessionsState['sessions'] },
     response: void,
   ]
-  /** The batch review's Sign ("Sign anyway" with `force`) and Discard. */
+  /**
+   * The batch review's changes to the open batch; the background is its only
+   * writer. `open` is "Start batch", `sign` with `force` is "Sign anyway", and
+   * `remove` takes a request (a `wallet_sendCalls` whole) out, with 4001.
+   */
   batchQueue: [
-    payload: { action: 'sign'; force?: boolean } | { action: 'discard' },
+    payload:
+      | { action: 'sign'; force?: boolean }
+      | { action: 'discard' }
+      | { action: 'open'; rpcUrl: string; account: Address }
+      | { action: 'remove'; requestId: number }
+      | { action: 'move'; from: number; to: number },
     response:
       | { ok: true }
       | { ok: false; error: { code: number; message: string; data?: unknown } },

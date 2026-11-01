@@ -5,6 +5,8 @@ import type { RpcResponse } from '~/types/rpc'
 import { batchQueueStore, pendingRequestsStore } from '~/zustand'
 import type { PendingRequest } from '~/zustand/pending-requests'
 
+import { editQueue } from './send-shared'
+
 const walletMessenger = getMessenger('background:wallet')
 
 const liveRequests = new Set<number>()
@@ -12,8 +14,9 @@ const requestTimeout = 5 * 60 * 1000
 const keepAliveInterval = 20 * 1000
 
 /**
- * The requests waiting in the batch queue, by id. Each is answered when the
- * batch is signed, or when it leaves the batch any other way; none expires.
+ * The requests waiting in the batch queue, by the background's own request
+ * id. Each is answered when the batch is signed, or when it leaves the batch
+ * any other way; none expires.
  */
 const queuedWaiters = new Map<number, (r: RpcResponse) => void>()
 
@@ -79,9 +82,14 @@ async function dropOrphans() {
   for (const request of pendingRequests)
     if (!liveRequests.has(request.id)) removePendingRequest(request.id)
 
-  const { queue, clearQueue } = batchQueueStore.getState()
+  // A known limitation: the requests of a batch left from before the restart
+  // are never answered. Their waiters were in the old worker's memory, and
+  // after the usual restart (an extension reload) the pages' content scripts
+  // are gone too, so no answer could reach them. The batch just closes, and
+  // those pages' requests stay pending, like an approval's would.
+  const { queue } = batchQueueStore.getState()
   if (queue && orphaned(queue.items, queuedRequestIds()).length > 0)
-    clearQueue()
+    editQueue(() => null)
 }
 
 /** Parks a request in the batch queue until `answerQueued` answers it. */
@@ -108,14 +116,14 @@ type Decide = (payload: Schema['pendingRequest'][0]) => Promise<void>
 
 /** How each pending request takes its decision, by request id. */
 const deciders = new Map<number, Decide>()
-let listening = false
 
-// One reply for all pending requests. With one per request, every one of them
-// would answer each decision, the first answer would win, and a refused
-// "Add to batch" could be lost behind another request's empty reply.
-function listenForDecisions() {
-  if (listening) return
-  listening = true
+/**
+ * Takes the user's decisions, with one reply for all pending requests: with
+ * one per request, every one of them would answer each decision, the first
+ * answer would win, and a refused "Add to batch" could be lost behind another
+ * request's empty reply. A decision on no pending request gets an empty one.
+ */
+export function setupPendingRequests() {
   walletMessenger.reply('pendingRequest', async (payload) => {
     await deciders.get(payload.request.id)?.(payload)
   })
@@ -125,7 +133,6 @@ function waitForDecision(request: PendingRequest, batch?: Batcher) {
   return new Promise<Decision>((resolve) => {
     liveRequests.add(request.id)
     startKeepAlive()
-    listenForDecisions()
 
     const expire = () => settle({ status: 'expired' })
     let timeout = setTimeout(expire, requestTimeout)

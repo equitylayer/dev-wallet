@@ -12,6 +12,7 @@ export const DEVWALLET_ORIGIN = 'DevWallet'
 
 /** A request waiting in the queue. A `wallet_sendCalls` is one item. */
 export type QueuedItem = {
+  /** The background's own id for the request, never the page's. */
   requestId: number
   /** The site's host, or `DEVWALLET_ORIGIN`. */
   origin: string
@@ -73,15 +74,6 @@ export function orphaned(
     .filter((id) => !liveRequestIds.has(id))
 }
 
-/** The requests in `prev` that `next` no longer holds. */
-export function droppedItems(
-  prev: readonly QueuedItem[],
-  next: readonly QueuedItem[],
-): number[] {
-  const kept = new Set(next.map((i) => i.requestId))
-  return prev.map((i) => i.requestId).filter((id) => !kept.has(id))
-}
-
 /**
  * The queue once the wallet is on `newRpcUrl`: a queue on another network
  * closes, and every request in it is rejected.
@@ -96,9 +88,10 @@ export function queueAfterNetworkChange(
 
 /**
  * Why a send can't join `queue` (or open one, when there is none), or `null`
- * when it can. Only a smart account batches (a plain account gets the upgrade
- * offer instead), a deployment never does (spec §4), and an open queue takes
- * only its own account and network.
+ * when it can. Batches are for the active network only; only a smart account
+ * batches (a plain account gets the upgrade offer instead); a deployment
+ * never does (spec §4); and an open queue takes only its own account and
+ * network.
  */
 export function cannotJoin(
   queue: BatchQueue | null,
@@ -108,7 +101,11 @@ export function cannotJoin(
     mode: AccountMode
     calls: readonly RpcCall[]
   },
+  activeRpcUrl: string,
 ): string | null {
+  if (send.rpcUrl !== activeRpcUrl) {
+    return `Batches are only for the active network, not ${send.rpcUrl}.`
+  }
   if (send.mode !== 'smart') {
     return `Only smart accounts can batch: ${send.account} is ${send.mode}.`
   }
