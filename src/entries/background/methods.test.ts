@@ -6,10 +6,13 @@ import {
   SIGNATURE_METHODS,
   TRANSACTION_METHODS,
   assertEthAccountsRequest,
+  closesOnNetworkChange,
   declinedError,
   isSignatureMethod,
   isTransactionMethod,
   needsSession,
+  networkSwitched,
+  onNetworkChange,
   openToAnyPage,
   opensSidebar,
   refusedFromPage,
@@ -249,6 +252,17 @@ describe('declinedError', () => {
     const error = declinedError(request, 'expired')
     expect(error.code).toBe(4001)
     expect(error.message).toBe('The request timed out waiting for approval.')
+  })
+
+  test('a network change is 4001 and says so, even for an upgrade', () => {
+    for (const upgrade of [false, true]) {
+      const error = declinedError(request, 'network-changed', { upgrade })
+      expect(error.code).toBe(4001)
+      expect(error.message).toBe(
+        'The network changed while the request waited for approval.',
+      )
+      expect(error.data).toEqual({ request })
+    }
   })
 
   test('a rejected account upgrade is 5750; a timed out one stays 4001', () => {
@@ -504,5 +518,46 @@ describe('openToAnyPage', () => {
       expect(needsSession(method)).toBe(true)
       expect(openToAnyPage(method)).toBe(false)
     }
+  })
+})
+
+describe('a network change', () => {
+  test('closes the approvals of sends and signatures, which ran on the old one', () => {
+    for (const method of [...SIGNATURE_METHODS, ...TRANSACTION_METHODS])
+      expect(closesOnNetworkChange(method)).toBe(true)
+    for (const method of [
+      'eth_requestAccounts',
+      'wallet_requestPermissions',
+      'eth_call',
+      'toString',
+      '',
+    ])
+      expect(closesOnNetworkChange(method)).toBe(false)
+  })
+
+  test('closes a send or signature now, or once a join under way fails; never a connection', () => {
+    for (const method of ['personal_sign', 'eth_sendTransaction']) {
+      expect(onNetworkChange(method, { joining: false })).toBe('close')
+      // A join that succeeds is the batch's to close; one that fails must
+      // not put the old network's approval back.
+      expect(onNetworkChange(method, { joining: true })).toBe(
+        'close-if-join-fails',
+      )
+    }
+    for (const joining of [false, true])
+      expect(onNetworkChange('eth_requestAccounts', { joining })).toBe('keep')
+  })
+
+  test("is a change of the network's rpcUrl", () => {
+    const on = (rpcUrl?: string) => ({
+      network: rpcUrl === undefined ? undefined : { rpcUrl },
+    })
+    expect(networkSwitched(on('http://a'), on('http://b'))).toBe(true)
+    expect(networkSwitched(on('http://a'), on(undefined))).toBe(true)
+    expect(networkSwitched(on('http://a'), on('http://a'))).toBe(false)
+    // Another field of the network changing is no switch.
+    const before = { network: { rpcUrl: 'http://a', chainId: 1 } }
+    const after = { network: { rpcUrl: 'http://a', chainId: 2 } }
+    expect(networkSwitched(after, before)).toBe(false)
   })
 })

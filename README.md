@@ -270,7 +270,7 @@ These are the EIP-5792 errors a dApp can get. Other methods can also return `420
 
 | Code | When |
 |---|---|
-| `4001` | You rejected the request, or it waited 5 minutes for approval. A request waiting in the batch queue also gets it when the batch is discarded, the request is removed, or the network changes. |
+| `4001` | You rejected the request, or it waited 5 minutes for approval. A send or signature waiting for approval also gets it when you switch networks, and a request waiting in the batch queue when the batch is discarded, the request is removed, or the network changes. |
 | `4100` | The site isn't connected. Or `from`, or the account `wallet_getCapabilities` is asked about, isn't one of the wallet's accounts. |
 | `5700` | A required capability, which the wallet doesn't support. |
 | `5710` | `wallet_sendCalls` with a `chainId` that is not the wallet's chain. (`wallet_getCapabilities` returns `{}` for it.) |

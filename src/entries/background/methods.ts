@@ -226,19 +226,53 @@ export function requestRpcUrl({
   return requested || current
 }
 
+/**
+ * Whether a pending approval of this method closes when the network changes:
+ * a send or a signature, which the old network's node would make, while the
+ * screen previews the new one. A connection doesn't depend on it.
+ */
+export function closesOnNetworkChange(method: string): boolean {
+  return isSignatureMethod(method) || isTransactionMethod(method)
+}
+
+/**
+ * What a pending approval does when the network changes: a send or signature
+ * closes (`closesOnNetworkChange`), unless "Add to batch" is under way. A
+ * join that succeeds is the batch's to answer (it closes on the change too);
+ * one that fails then closes, rather than putting the old network's approval
+ * back.
+ */
+export function onNetworkChange(
+  method: string,
+  { joining }: { joining: boolean },
+): 'close' | 'close-if-join-fails' | 'keep' {
+  if (!closesOnNetworkChange(method)) return 'keep'
+  return joining ? 'close-if-join-fails' : 'close'
+}
+
+type NetworkState = { network?: { rpcUrl?: string } }
+
+/** Whether the wallet's active network changed (its rpcUrl). */
+export function networkSwitched(next: NetworkState, prev: NetworkState): boolean {
+  return next.network?.rpcUrl !== prev.network?.rpcUrl
+}
+
 /** EIP-1193: the user rejected the request. */
 export const USER_REJECTED = 4001
 /** EIP-5792: the user declined the account upgrade a batch needed. */
 const UPGRADE_REJECTED = 5750
 
+/** Why a request was never approved: the user said no, time ran out, or the network changed under it. */
+export type DeclineStatus = 'rejected' | 'expired' | 'network-changed'
+
 /**
  * The error for a request the user didn't approve: `4001`, or `5750` when what
  * they rejected was the account upgrade a `wallet_sendCalls` needed. A timeout
- * is always `4001`.
+ * or a network change is always `4001`.
  */
 export function declinedError(
   request: unknown,
-  status: 'rejected' | 'expired',
+  status: DeclineStatus,
   { upgrade = false }: { upgrade?: boolean } = {},
 ): WalletRpcError {
   const data = { request }
@@ -247,6 +281,12 @@ export function declinedError(
       return new WalletRpcError(
         USER_REJECTED,
         'The request timed out waiting for approval.',
+        data,
+      )
+    case 'network-changed':
+      return new WalletRpcError(
+        USER_REJECTED,
+        'The network changed while the request waited for approval.',
         data,
       )
     case 'rejected':

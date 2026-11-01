@@ -36,7 +36,7 @@ import {
 import { batchQueueStore, networkStore } from '~/zustand'
 
 import { openBatch, startBatch } from './batch-queue-join'
-import { USER_REJECTED } from './methods'
+import { USER_REJECTED, networkSwitched } from './methods'
 import { answerQueued, hydrated } from './pending-requests'
 import { activeRpcUrl, editQueue, oneSendAtATime } from './send-shared'
 import { invalidate, reconcileSnapshot } from './smart'
@@ -290,7 +290,7 @@ export function setupBatchQueue() {
   walletMessenger.reply('batchQueue', (payload) => handle(payload).catch(failed))
 
   networkStore.subscribe((state, prev) => {
-    if (state.network?.rpcUrl !== prev.network?.rpcUrl) void leaveNetwork()
+    if (networkSwitched(state, prev)) void leaveNetwork()
   })
   void closeStaleBatch()
 }

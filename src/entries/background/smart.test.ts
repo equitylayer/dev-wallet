@@ -1224,6 +1224,27 @@ describe('batch queue', () => {
     expect(queueNow()).toBeNull()
   })
 
+  test('a network change during "Add to batch" closes the approval once the join fails', async () => {
+    const request = sendTransactionRequest({ from: smart, ...transfer })
+    const outcome = startSend(request, viaApproval)
+    await until(() => pendingWith(request.id) !== undefined, 'the approval')
+
+    // The join is under way (it reconciles first) when the network changes,
+    // so it is refused: batches are for the active network.
+    const joining = call('pendingRequest', { request, status: 'batched' })
+    network.set({ network: { rpcUrl: OFF }, onboarded: true })
+    await expect(joining).rejects.toThrow(/active network/)
+
+    // Not back to pending for the old network: closed, 4001.
+    expect(pendingWith(request.id)).toBeUndefined()
+    expect(await codeOf(outcome)).toMatchObject({
+      code: 4001,
+      message: 'The network changed while the request waited for approval.',
+    })
+    expect(queueNow()).toBeNull()
+    expect(await node.getBalance(X)).toBe(0n)
+  })
+
   test('a network change declines every request in the batch with 4001', async () => {
     await startBatch()
     const outcome = await joined(sendTransactionRequest({ from: smart, ...transfer }))
@@ -1680,6 +1701,42 @@ describe('page requests', () => {
       })
       expect(await answer).toMatchObject({ error: { code: 4001 } })
     })
+  })
+
+  test('a network change closes the approvals of sends and signatures with 4001, not a connection', async () => {
+    const answers = [
+      ask('personal_sign', ['0x68656c6c6f', smart], top('dapp.test')),
+      ask('eth_sendTransaction', [{ from: smart, ...transfer }], top('dapp.test')),
+      // An upgrade's approval, which a rejection would answer 5750.
+      ask(
+        'wallet_sendCalls',
+        [{ version: '2.0.0', chainId: '0x7a69', from: upgradable, calls: [transfer] }],
+        top('dapp.test'),
+      ),
+    ]
+    const connect = ask('eth_requestAccounts', [], top('new.test'))
+    for (let i = 0; i < 300 && pendingRequests.length < 4; i++)
+      await Bun.sleep(10)
+    expect(pendingRequests).toHaveLength(4)
+
+    network.set({ network: { rpcUrl: 'http://127.0.0.1:1' }, onboarded: true })
+    for (const answer of answers)
+      expect(await answer).toMatchObject({
+        id: 1,
+        error: {
+          code: 4001,
+          message: 'The network changed while the request waited for approval.',
+        },
+      })
+    expect(pendingRequests.map((r) => r.method)).toEqual(['eth_requestAccounts'])
+
+    await handlers.get('pendingRequest')?.({
+      request: pendingRequests[0],
+      status: 'rejected',
+    })
+    expect(await connect).toMatchObject({ error: { code: 4001 } })
+    expect(await node.getBalance(X)).toBe(0n)
+    expect(await node.getCode(upgradable)).toBe('0x')
   })
 
   describe('the side panel (R53)', () => {

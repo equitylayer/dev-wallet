@@ -2,9 +2,15 @@ import { getMessenger } from '~/messengers'
 import type { Schema } from '~/messengers/schema'
 import { orphaned } from '~/smart/queue'
 import type { RpcResponse } from '~/types/rpc'
-import { batchQueueStore, pendingRequestsStore } from '~/zustand'
+import { batchQueueStore, networkStore, pendingRequestsStore } from '~/zustand'
 import type { PendingRequest } from '~/zustand/pending-requests'
 
+import {
+  type DeclineStatus,
+  closesOnNetworkChange,
+  networkSwitched,
+  onNetworkChange,
+} from './methods'
 import { editQueue } from './send-shared'
 
 const walletMessenger = getMessenger('background:wallet')
@@ -29,7 +35,7 @@ export type Joined = {
 export type Decision =
     | { status: 'approved'; request: PendingRequest; force?: boolean }
     | ({ status: 'batched' } & Joined)
-    | { status: 'rejected' | 'expired' }
+    | { status: DeclineStatus }
 
 /** The decision on a request that can't be batched. */
 export type PlainDecision = Exclude<Decision, { status: 'batched' }>
@@ -118,14 +124,28 @@ type Decide = (payload: Schema['pendingRequest'][0]) => Promise<void>
 const deciders = new Map<number, Decide>()
 
 /**
+ * The pending approvals a network change closes (`closesOnNetworkChange`),
+ * by request id: a send or signature would go to the old network's node,
+ * while the screen shows the new one.
+ */
+const closeOnNetworkChange = new Map<number, () => void>()
+
+/**
  * Takes the user's decisions, with one reply for all pending requests: with
  * one per request, every one of them would answer each decision, the first
  * answer would win, and a refused "Add to batch" could be lost behind another
  * request's empty reply. A decision on no pending request gets an empty one.
+ *
+ * A network change answers the pending sends and signatures with 4001, as
+ * it does the batch queue's (`batch-queue.ts`).
  */
 export function setupPendingRequests() {
   walletMessenger.reply('pendingRequest', async (payload) => {
     await deciders.get(payload.request.id)?.(payload)
+  })
+  networkStore.subscribe((state, prev) => {
+    if (!networkSwitched(state, prev)) return
+    for (const close of [...closeOnNetworkChange.values()]) close()
   })
 }
 
@@ -137,6 +157,14 @@ function waitForDecision(request: PendingRequest, batch?: Batcher) {
     const expire = () => settle({ status: 'expired' })
     let timeout = setTimeout(expire, requestTimeout)
     let joining = false
+    // The network changed while "Add to batch" was under way.
+    let switchedWhileJoining = false
+    if (closesOnNetworkChange(request.method))
+      closeOnNetworkChange.set(request.id, () => {
+        const action = onNetworkChange(request.method, { joining })
+        if (action === 'close') settle({ status: 'network-changed' })
+        if (action === 'close-if-join-fails') switchedWhileJoining = true
+      })
 
     deciders.set(request.id, async ({ request: pendingRequest, status, force }) => {
       if (joining) throw new Error('The request is being added to the batch.')
@@ -151,14 +179,18 @@ function waitForDecision(request: PendingRequest, batch?: Batcher) {
       if (!batch) throw new Error("This request can't be added to a batch.")
 
       // A request in the batch never expires. One that can't join stays
-      // pending, with its full time to decide again.
+      // pending, with its full time to decide again, unless the network
+      // changed meanwhile: then it closes, as it would have (4001). One that
+      // joined is the batch's to close (`leaveNetwork`).
       joining = true
+      switchedWhileJoining = false
       clearTimeout(timeout)
       try {
         const { queued } = await batch(pendingRequest)
         settle({ status: 'batched', queued })
       } catch (error) {
-        timeout = setTimeout(expire, requestTimeout)
+        if (switchedWhileJoining) settle({ status: 'network-changed' })
+        else timeout = setTimeout(expire, requestTimeout)
         throw error
       } finally {
         joining = false
@@ -167,6 +199,7 @@ function waitForDecision(request: PendingRequest, batch?: Batcher) {
 
     const settle = (decision: Decision) => {
       deciders.delete(request.id)
+      closeOnNetworkChange.delete(request.id)
       clearTimeout(timeout)
       liveRequests.delete(request.id)
       stopKeepAlive()
