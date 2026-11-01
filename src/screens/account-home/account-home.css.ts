@@ -195,14 +195,6 @@ export const pill = style({
   color: rgb(t2),
 })
 
-export const pillGreen = style([
-  pill,
-  {
-    borderColor: rgb(backgroundColorVars['surface/green'], 0.55),
-    color: rgb(backgroundColorVars['surface/green']),
-  },
-])
-
 export const empty = style({
   padding: `12px ${gutter}px`,
   borderBottom: `1px solid ${rgb(faint)}`,
@@ -224,3 +216,119 @@ export const moreBleed = style([
     padding: '4px 8px',
   },
 ])
+
+////////////////////////////////////////////////////////////////////////
+// Smart-account slot, under the address: the mode, its delegation and
+// EntryPoint nonce, and the mode changes
+
+export const smart = style({
+  marginTop: 12,
+})
+
+export const smartLine = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+  minHeight: 20,
+})
+
+export const smartDetails = style({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  columnGap: 16,
+  rowGap: 6,
+  marginTop: 6,
+})
+
+// A label and its value, kept on one line; the row wraps between pairs.
+export const pair = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  whiteSpace: 'nowrap',
+})
+
+export const smartActions = style({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  gap: 6,
+  marginTop: 8,
+})
+
+export const disclosure = style({
+  appearance: 'none',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+  height: 24,
+  background: 'none',
+  border: 0,
+  padding: '0 4px',
+  cursor: 'pointer',
+  color: rgb(t2),
+  ':hover': { color: rgb(foregroundColorVars['text/primary']) },
+})
+
+export const disclosureIcon = style({
+  flexShrink: 0,
+  transition: 'transform 160ms cubic-bezier(0.16, 1, 0.3, 1)',
+  selectors: {
+    '[aria-expanded="true"] > &': { transform: 'rotate(180deg)' },
+  },
+  '@media': {
+    '(prefers-reduced-motion: reduce)': { transition: 'none' },
+  },
+})
+
+// The plain modes, in rows that bleed to the plate's edges.
+export const advanced = style({
+  margin: `8px -${gutter}px 0`,
+  borderTop: `1px solid ${rgb(faint)}`,
+})
+
+export const advancedConfirm = style({
+  padding: `0 ${gutter}px 8px`,
+})
+
+export const option = style({
+  appearance: 'none',
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: 8,
+  width: '100%',
+  padding: `8px ${gutter}px`,
+  background: 'none',
+  border: 0,
+  borderBottom: `1px solid ${rgb(faint)}`,
+  color: 'inherit',
+  textAlign: 'left',
+  cursor: 'pointer',
+  ':hover': { backgroundColor: rgb(whisper) },
+  ':disabled': { cursor: 'not-allowed' },
+  selectors: {
+    // The current mode stays at full ink; the others dim while blocked.
+    '&:disabled:not([aria-pressed="true"])': { opacity: 0.5 },
+    '&:disabled:hover': { backgroundColor: 'transparent' },
+  },
+})
+
+export const optionCheck = style({
+  flexShrink: 0,
+  width: 14,
+  height: 14,
+  color: rgb(accent),
+})
+
+export const smartConfirm = style({
+  marginTop: 8,
+})
+
+export const smartNote = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  marginTop: 8,
+  color: rgb(t3),
+})

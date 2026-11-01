@@ -23,9 +23,16 @@ export const defaultChain = {
 
 const messenger = getMessenger('background:wallet')
 
-export function buildChain({ rpcUrl }: { rpcUrl: string }): Chain {
+export function buildChain({
+  rpcUrl,
+  chainId = 31337,
+}: {
+  rpcUrl: string
+  chainId?: number
+}): Chain {
   return {
     ...defaultChain,
+    id: chainId,
     rpcUrls: {
       default: {
         http: [rpcUrl],
@@ -48,13 +55,20 @@ export type Client = Client_Base<
 >
 
 const clientCache = new Map<string, Client>()
-export function getClient({ rpcUrl }: { rpcUrl: string }): Client {
-  const cachedClient = clientCache.get(rpcUrl)
+export function getClient({
+  rpcUrl,
+  chainId = 31337,
+}: {
+  rpcUrl: string
+  chainId?: number
+}): Client {
+  const cacheKey = `${rpcUrl}.${chainId}`
+  const cachedClient = clientCache.get(cacheKey)
   if (cachedClient) return cachedClient
 
   const client = createClient({
     key: rpcUrl,
-    chain: buildChain({ rpcUrl }),
+    chain: buildChain({ rpcUrl, chainId }),
     transport: custom(
       getProvider({
         eventMessenger: messenger,
@@ -68,6 +82,6 @@ export function getClient({ rpcUrl }: { rpcUrl: string }): Client {
     .extend(testActions({ mode: 'anvil' }))
     .extend(publicActions)
     .extend(walletActions)
-  clientCache.set(rpcUrl, client)
+  clientCache.set(cacheKey, client)
   return client
 }

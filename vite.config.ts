@@ -24,13 +24,16 @@ export default defineConfig({
     react(),
     vanillaExtractPlugin(),
     webExtension({
+      // Extension pages only: the side panel, the wallet in a tab and the
+      // playgrounds open from the extension itself. None is web accessible,
+      // so no web page can frame the wallet UI (and its Approve button).
       additionalInputs: {
         html: [
           'src/index.html',
           'src/entries/iframe/index.html',
           'src/components/_playground/index.html',
           'src/design-system/_playground/index.html',
-        ],
+        ].map((fileName) => ({ fileName, webAccessible: false })),
       },
       manifest: getManifest({ dev }),
       useDynamicUrlWebAccessibleResources: false,

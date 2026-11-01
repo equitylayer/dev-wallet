@@ -7,6 +7,7 @@ import {
     createHashRouter,
     createMemoryRouter,
 } from 'react-router-dom'
+import { toast } from 'sonner'
 import { numberToHex } from 'viem'
 
 import { getTheme, setTheme } from '~/design-system'
@@ -22,8 +23,13 @@ import { getPendingTransactionsQueryKey } from '~/hooks/usePendingTransactions'
 import { usePrevious } from '~/hooks/usePrevious'
 import { getTxpoolQueryKey } from '~/hooks/useTxpool'
 import { getMessenger } from '~/messengers'
+import {
+    accountsChangedEvent,
+    chainChangedEvent,
+} from '~/messengers/page-events'
+import { sendPageEvent } from '~/messengers/sendPageEvent'
 import { QueryClientProvider, queryClient } from '~/react-query'
-import { deepEqual } from '~/utils'
+import { sameAddresses } from '~/utils/accounts'
 import { getClient } from '~/viem'
 import {
     type AccountState,
@@ -39,6 +45,7 @@ import { type AppMeta, AppMetaContext } from './contexts'
 import { useSnapshot } from './hooks/useSnapshot'
 import Layout from './screens/_layout'
 import AccountDetails from './screens/account-details'
+import BatchReview from './screens/batch-review'
 import BlockConfig from './screens/block-config'
 import BlockDetails from './screens/block-details'
 import ContractDetails from './screens/contract-details'
@@ -78,6 +85,10 @@ export function init({ type = 'standalone' }: { type?: AppMeta['type'] } = {}) {
                 {
                     path: 'transfer/:accountAddress/:tokenAddress?',
                     element: <TokenTransfer />,
+                },
+                {
+                    path: 'batch',
+                    element: <BatchReview />,
                 },
                 {
                     path: 'block-config',
@@ -144,6 +155,11 @@ export function init({ type = 'standalone' }: { type?: AppMeta['type'] } = {}) {
         setTheme(theme === 'dark' ? 'light' : 'dark')
     })
 
+    // The background's word on what it did unasked, e.g. an account upgrade.
+    backgroundMessenger.reply('notice', async ({ message }) => {
+        toast(message)
+    })
+
     backgroundMessenger.reply('transactionExecuted', async () => {
         const {
             network: { rpcUrl },
@@ -177,9 +193,7 @@ export function init({ type = 'standalone' }: { type?: AppMeta['type'] } = {}) {
 
 ////////////////////////////////////////////////////////////////////////////
 
-const inpageMessenger = getMessenger('wallet:inpage')
-
-/** Emits EIP-1193 `accountsChanged` Event */
+/** Emits EIP-1193 `accountsChanged` Event, to each connected site's pages. */
 function AccountsChangedEmitter() {
     const { account, getAccounts } = useAccountStore()
     const { sessions } = useSessionsStore()
@@ -197,11 +211,16 @@ function AccountsChangedEmitter() {
             ...accounts_.filter((x) => x.address !== account.address),
         ]
 
-        if (prevAccounts.current && !deepEqual(prevAccounts.current, accounts_))
-            inpageMessenger.send('accountsChanged', {
-                accounts: accounts_.map((x) => x.address),
-                sessions,
-            })
+        if (
+            prevAccounts.current &&
+            !sameAddresses(prevAccounts.current, accounts_)
+        )
+            void sendPageEvent(
+                accountsChangedEvent(
+                    accounts_.map((x) => x.address),
+                    sessions,
+                ),
+            )
 
         prevAccounts.current = accounts_
     }, [account])
@@ -209,7 +228,7 @@ function AccountsChangedEmitter() {
     return null
 }
 
-/** Emits EIP-1193 `chainChanged` Event */
+/** Emits EIP-1193 `chainChanged` Event, to each connected site's pages. */
 function NetworkChangedEmitter() {
     const { network } = useNetworkStore()
     const { sessions } = useSessionsStore()
@@ -219,10 +238,9 @@ function NetworkChangedEmitter() {
         if (!network.chainId) return
 
         if (prevNetwork.current && prevNetwork.current.chainId !== network.chainId)
-            inpageMessenger.send('chainChanged', {
-                chainId: numberToHex(network.chainId),
-                sessions,
-            })
+            void sendPageEvent(
+                chainChangedEvent(numberToHex(network.chainId), sessions),
+            )
 
         prevNetwork.current = network
     }, [network])

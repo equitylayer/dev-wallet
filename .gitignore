@@ -44,3 +44,7 @@ docs/superpowers/
 .github/agents/
 .github/hooks/
 .github/skills/
+
+# Smart account contracts (scripts/generate-aa-code.ts reads contracts/out)
+contracts/out
+contracts/cache

@@ -1,17 +1,21 @@
 import { useSyncExternalStoreWithTracked } from '~/hooks/useSyncExternalStoreWithTracked'
+import type { SponsorSetting } from '~/smart/types'
+
+import {
+  DEFAULT_SPONSOR,
+  type SettingsState,
+  migrateSettingsState,
+} from './settings-logic'
 import { createStore } from './utils'
 
-export type SettingsState = {
-  bypassConnectAuth?: boolean
-  bypassSignatureAuth?: boolean
-  bypassTransactionAuth?: boolean
-  etherscanApiKey?: string
-}
+export type { SettingsState } from './settings-logic'
+
 export type SettingsActions = {
   setBypassConnectAuth: (value?: boolean) => void
   setBypassSignatureAuth: (value?: boolean) => void
   setBypassTransactionAuth: (value?: boolean) => void
   setEtherscanApiKey: (value?: string) => void
+  setSponsor: (value: SponsorSetting) => void
 }
 export type SettingsStore = SettingsState & SettingsActions
 
@@ -21,6 +25,7 @@ export const settingsStore = createStore<SettingsStore>(
     bypassSignatureAuth: false,
     bypassTransactionAuth: false,
     etherscanApiKey: '',
+    sponsor: DEFAULT_SPONSOR,
     setBypassConnectAuth(value) {
       set({ bypassConnectAuth: value })
     },
@@ -33,11 +38,15 @@ export const settingsStore = createStore<SettingsStore>(
     setEtherscanApiKey(value) {
       set({ etherscanApiKey: value })
     },
+    setSponsor(value) {
+      set({ sponsor: value })
+    },
   }),
   {
     persist: {
       name: 'settings',
-      version: 1,
+      version: 2,
+      migrate: (persisted) => migrateSettingsState(persisted) as SettingsStore,
     },
   },
 )

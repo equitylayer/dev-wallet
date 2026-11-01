@@ -1,13 +1,20 @@
 // TODO: Put in ~/design-system
 import { Box } from '~/design-system'
 
-export function Spinner({ size }: { size: string }) {
+/**
+ * `color` is the stroke: white by default, for a filled button;
+ * `currentColor` follows the text around it.
+ */
+export function Spinner({
+  size,
+  color = '#fff',
+}: { size: string; color?: string }) {
   return (
     <Box
       as="svg"
       xmlns="http://www.w3.org/2000/svg"
       viewBox="-2 -2 40 40"
-      stroke="#fff"
+      stroke={color}
       style={{
         height: size,
         maxWidth: size,

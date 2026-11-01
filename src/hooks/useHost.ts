@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 
+import { normalizeHost } from '~/utils/host'
+
 export function useHost() {
   return useQuery({
     queryKey: ['host'],
@@ -9,7 +11,7 @@ export function useHost() {
         lastFocusedWindow: true,
       })
       if (!tab.url) return null
-      return new URL(tab.url).host.replace('www.', '')
+      return normalizeHost(new URL(tab.url).host)
     },
   })
 }

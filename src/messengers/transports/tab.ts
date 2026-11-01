@@ -1,9 +1,15 @@
+import { type ReplyTarget, replyTarget } from './guards'
 import type { ReplyMessage, SendMessage, Transport } from './types'
-import { isValidReply, isValidSend } from './utils'
+import { isNoReceiverError, isValidReply, isValidSend } from './utils'
 
 /**
  * Creates a "tab transport" that can be used to communicate between
  * scripts where `chrome.tabs` & `chrome.runtime` is defined.
+ *
+ * `send` goes on the runtime: a content script's message to the extension.
+ * Replies go back to whoever asked, a page's to the document it asked from.
+ * The extension reaches pages unasked only through `sendPageEvent`, which
+ * gives each page its own events.
  */
 export const createTabTransport = <TConnection extends string>(
   connection: TConnection,
@@ -25,17 +31,15 @@ export const createTabTransport = <TConnection extends string>(
       }
       chrome.runtime.onMessage.addListener(listener)
 
-      getActiveTabs().then(([tab]) => {
-        sendMessage(
-          {
-            connection: connection_ || connection,
-            topic: `> ${topic}`,
-            payload,
-            id,
-          },
-          { tabId: tab?.id },
-        )
-      })
+      sendMessage(
+        {
+          connection: connection_ || connection,
+          topic: `> ${topic}`,
+          payload,
+          id,
+        },
+        { runtime: true },
+      )
     })
   },
   reply(topic, callback, options) {
@@ -46,72 +50,71 @@ export const createTabTransport = <TConnection extends string>(
       if (!isValidSend({ message, options, topic })) return
 
       const repliedTopic = message.topic.replace('>', '<')
+      // Back to the frame that asked, never to whichever tab is active.
+      const target = replyTarget(
+        sender,
+        chrome.runtime.id,
+        chrome.runtime.getURL(''),
+      )
 
-      getActiveTabs().then(([tab]) => {
-        callback(message.payload, {
-          connection: message.connection,
-          id: message.id,
-          sender,
-          topic: message.topic,
-        })
-          .then((response) =>
-            sendMessage(
-              {
-                connection: message.connection,
-                topic: repliedTopic,
-                payload: { response },
-                id: message.id,
-              },
-              { tabId: tab?.id },
-            ),
-          )
-          .catch((error_) => {
-            const error: Record<string, unknown> = {}
-            for (const key of Object.getOwnPropertyNames(error_)) {
-              error[key] = (<Error>error_)[<keyof Error>key]
-            }
-            sendMessage(
-              {
-                connection: message.connection,
-                topic: repliedTopic,
-                payload: { error },
-                id: message.id,
-              },
-              {
-                tabId: tab?.id,
-              },
-            )
-          })
+      callback(message.payload, {
+        connection: message.connection,
+        id: message.id,
+        sender,
+        topic: message.topic,
       })
+        .then((response) =>
+          sendMessage(
+            {
+              connection: message.connection,
+              topic: repliedTopic,
+              payload: { response },
+              id: message.id,
+            },
+            target,
+          ),
+        )
+        .catch((error_) => {
+          const error: Record<string, unknown> = {}
+          for (const key of Object.getOwnPropertyNames(error_)) {
+            error[key] = (<Error>error_)[<keyof Error>key]
+          }
+          sendMessage(
+            {
+              connection: message.connection,
+              topic: repliedTopic,
+              payload: { error },
+              id: message.id,
+            },
+            target,
+          )
+        })
     }
     chrome.runtime.onMessage.addListener(listener)
     return () => chrome.runtime.onMessage.removeListener(listener)
   },
 })
 
-let activeTab: chrome.tabs.Tab
-
-function getActiveTabs() {
-  if (!chrome.tabs) return Promise.resolve([])
-  return chrome.tabs
-    .query({ active: true, lastFocusedWindow: true })
-    .then(([tab]) => {
-      if (!tab?.url?.startsWith('http') && activeTab) return [activeTab]
-      activeTab = tab
-      return [tab]
-    })
-}
-
 function sendMessage<TPayload>(
   message: SendMessage<TPayload>,
-  { tabId }: { tabId?: number } = {},
+  target: ReplyTarget,
 ) {
   try {
-    if (!tabId) {
-      chrome.runtime.sendMessage(message)
-    } else {
-      chrome.tabs.sendMessage(tabId, message)
-    }
+    const sent =
+      'runtime' in target
+        ? chrome.runtime.sendMessage(message)
+        : chrome.tabs.sendMessage(
+            target.tabId,
+            message,
+            'documentId' in target
+              ? { documentId: target.documentId }
+              : { frameId: target.frameId },
+          )
+    // The frame may be gone (navigated, closed): nobody is left to answer.
+    Promise.resolve(sent).catch((error: unknown) => {
+      if (!isNoReceiverError(error))
+        console.warn('Failed to send message:', error)
+    })
   } catch (error) {
     // Silently catch extension context invalidated errors
     // This happens when extension is reloaded/disabled

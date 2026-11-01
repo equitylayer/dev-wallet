@@ -41,6 +41,7 @@ import {
   Input,
   Stack,
   Text,
+  Toggle,
 } from '~/design-system'
 import type { Client } from '~/viem'
 
@@ -716,16 +717,23 @@ function GetCapabilities() {
       }
     | undefined
   >()
+  const [error, setError] = useState<ProviderError>()
 
   const fetch = async () => {
-    const [account] = await provider.request({
-      method: 'eth_accounts',
-    })
-    const capabilities = await provider.request({
-      method: 'wallet_getCapabilities',
-      params: [account],
-    })
-    setCapabilities(capabilities)
+    setCapabilities(undefined)
+    setError(undefined)
+    try {
+      const [account] = await provider.request({
+        method: 'eth_accounts',
+      })
+      const capabilities = await provider.request({
+        method: 'wallet_getCapabilities',
+        params: [account],
+      })
+      setCapabilities(capabilities)
+    } catch (err) {
+      setError(err as ProviderError)
+    }
   }
 
   return (
@@ -737,6 +745,7 @@ function GetCapabilities() {
         Fetch
       </Button>
       {capabilities && <Box as="pre">{stringify(capabilities, null, 2)}</Box>}
+      {error && <ErrorText error={error} />}
     </Stack>
   )
 }
@@ -744,20 +753,28 @@ function GetCapabilities() {
 function SendCalls() {
   const { provider } = useContext(Context)
 
+  // EIP-5792 v2: whether the wallet must run the calls atomically, or fail
+  // with 5760. Off, as viem's `sendCalls` defaults it.
+  const [atomicRequired, setAtomicRequired] = useState(false)
   const [id, setId] = useState<string | undefined>()
-  const [error, setError] = useState<Error>()
+  const [error, setError] = useState<ProviderError>()
 
   const handleClickSign = async () => {
     setId(undefined)
+    setError(undefined)
     try {
       const [account] = await provider.request({
         method: 'eth_accounts',
       })
       const chainId = await provider.request({ method: 'eth_chainId' })
-      const id = await provider.request({
+      const { id } = await provider.request({
         method: 'wallet_sendCalls',
         params: [
           {
+            version: '2.0.0',
+            chainId,
+            from: account,
+            atomicRequired,
             calls: [
               {
                 data: encodeFunctionData({
@@ -778,15 +795,12 @@ function SendCalls() {
                 value: numberToHex(parseEther('2')),
               },
             ],
-            chainId,
-            from: account,
-            version: '1',
           },
-        ] as any,
+        ],
       })
-      setId(id as unknown as string)
+      setId(id)
     } catch (err) {
-      setError(err as Error)
+      setError(err as ProviderError)
     }
   }
 
@@ -795,15 +809,39 @@ function SendCalls() {
       <Text size="18px" weight="semibold">
         wallet_sendCalls
       </Text>
-      <Inline wrap={false} gap="12px">
+      <Inline wrap={false} gap="12px" alignVertical="center">
         <Button onClick={handleClickSign} width="fit">
           Send calls
         </Button>
+        <Box as="label" display="flex" alignItems="center" gap="12px">
+          <Toggle checked={atomicRequired} onChange={setAtomicRequired} />
+          <Text>atomicRequired</Text>
+        </Box>
       </Inline>
       {id && <Text>ID: {id}</Text>}
-      {error && <Text>Error: {error.message}</Text>}
+      {error && <ErrorText error={error} />}
     </Stack>
   )
+}
+
+/** A provider error, with its EIP-1193 / EIP-5792 code when it has one. */
+type ProviderError = Error & { code?: number }
+
+function ErrorText({ error }: { error: ProviderError }) {
+  return (
+    <Text>
+      Error{error.code !== undefined ? ` ${error.code}` : ''}: {error.message}
+    </Text>
+  )
+}
+
+/** EIP-5792 v2 batch status codes. */
+const CALLS_STATUS: Record<number, string> = {
+  100: 'pending',
+  200: 'success',
+  400: 'failed before sending',
+  500: 'reverted',
+  600: 'partially reverted',
 }
 
 function GetCallsStatus() {
@@ -813,12 +851,13 @@ function GetCallsStatus() {
   const [status, setStatus] = useState<
     WalletGetCallsStatusReturnType | undefined
   >()
-  const [error, setError] = useState<Error>()
+  const [error, setError] = useState<ProviderError>()
 
   const handleClickSign = async () => {
     if (!id) return
 
     setStatus(undefined)
+    setError(undefined)
     try {
       const status = await provider.request({
         method: 'wallet_getCallsStatus',
@@ -826,7 +865,7 @@ function GetCallsStatus() {
       })
       setStatus(status)
     } catch (err) {
-      setError(err as Error)
+      setError(err as ProviderError)
     }
   }
 
@@ -847,8 +886,14 @@ function GetCallsStatus() {
           Fetch
         </Button>
       </Inline>
+      {status && (
+        <Text>
+          Status: {status.status} ({CALLS_STATUS[status.status] ?? 'unknown'})
+          · atomic: {String(status.atomic)}
+        </Text>
+      )}
       {status && <Box as="pre">{stringify(status, null, 2)}</Box>}
-      {error && <Text>Error: {error.message}</Text>}
+      {error && <ErrorText error={error} />}
     </Stack>
   )
 }
@@ -857,14 +902,20 @@ function ShowCallsStatus() {
   const { provider } = useContext(Context)
 
   const [id, setId] = useState('')
+  const [error, setError] = useState<ProviderError>()
 
   const handleShowCallsStatus = async () => {
     if (!id) return
 
-    await provider.request({
-      method: 'wallet_showCallsStatus',
-      params: [id],
-    })
+    setError(undefined)
+    try {
+      await provider.request({
+        method: 'wallet_showCallsStatus',
+        params: [id],
+      })
+    } catch (err) {
+      setError(err as ProviderError)
+    }
   }
 
   return (
@@ -884,6 +935,7 @@ function ShowCallsStatus() {
           Show
         </Button>
       </Inline>
+      {error && <ErrorText error={error} />}
     </Stack>
   )
 }

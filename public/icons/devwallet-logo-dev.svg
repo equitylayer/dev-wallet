@@ -1,0 +1,13 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>DevWallet (dev build)</title>
+  <defs>
+    <clipPath id="docked">
+      <rect x="640" y="0" width="384" height="1024"/>
+    </clipPath>
+  </defs>
+  <rect x="32" y="32" width="960" height="960" rx="232" fill="#191A1C"/>
+  <path d="M230 244H506C660.773 244 790 363.837 790 512C790 660.163 660.773 780 506 780H230V244ZM376 390V634H506C581.994 634 644 579.918 644 512C644 444.082 581.994 390 506 390H376Z" fill="#FFFFFF" fill-rule="evenodd"/>
+  <path d="M230 244H506C660.773 244 790 363.837 790 512C790 660.163 660.773 780 506 780H230V244ZM376 390V634H506C581.994 634 644 579.918 644 512C644 444.082 581.994 390 506 390H376Z" fill="#F9B64F" fill-rule="evenodd" clip-path="url(#docked)"/>
+  <rect x="576" y="224" width="64" height="576" fill="#191A1C"/>
+  <rect x="56" y="56" width="912" height="912" rx="208" stroke="#3898FE" stroke-width="48"/>
+</svg>

@@ -1,14 +1,12 @@
 import type { RpcRequest } from '~/types/rpc'
 import { BaseError } from './base.js'
 
-export type ProviderRpcErrorCode =
-  | -1 // Unknown
-  | 4001 // User Rejected Request
-  | 4100 // Unauthorized
-  | 4200 // Unsupported Method
-  | 4900 // Disconnected
-  | 4901 // Chain Disconnected
-  | 4902 // Chain Not Recongnized
+/**
+ * A JSON-RPC / EIP-1193 error code. Any number, since the wallet forwards the
+ * node's and EIP-5792's codes (3, 5700-5760, -32xxx) as well as the EIP-1193
+ * ones (4001, 4100, 4200, 4900, 4901, 4902).
+ */
+export type ProviderRpcErrorCode = number
 
 type ProviderRpcErrorOptions = {
   code: ProviderRpcErrorCode
@@ -85,7 +83,7 @@ export class UnauthorizedProviderError extends ProviderRpcError {
 
   override name = 'UnauthorizedProviderError'
 
-  constructor(error: Error) {
+  constructor(error: RpcError | Error) {
     super(error, {
       code: 4100,
       shortMessage:
@@ -104,7 +102,7 @@ export class UnsupportedProviderMethodError extends ProviderRpcError {
 
   override name = 'UnsupportedProviderMethodError'
 
-  constructor(error: Error) {
+  constructor(error: RpcError | Error) {
     super(error, {
       code: 4200,
       shortMessage: 'The Provider does not support the requested method.',
@@ -180,4 +178,34 @@ export class UnknownRpcError extends ProviderRpcError {
       shortMessage: 'An unknown RPC error occurred.',
     })
   }
+}
+
+/**
+ * Rebuilds the error a dApp should see from the `{ code, message, data }` the
+ * background replies with. Keeps the numeric code and `data` for every code
+ * (dApps and viem read `error.code` for EIP-5792 and `error.data` for revert
+ * data), and the class for the EIP-1193 codes that have one.
+ */
+export function toProviderError(error: {
+  code: number
+  message: string
+  data?: unknown
+}): Error {
+  if (error.code === UserRejectedRequestError.code)
+    return new UserRejectedRequestError(
+      error as RpcError<{ request: RpcRequest }>,
+    )
+  if (error.code === UnauthorizedProviderError.code)
+    return new UnauthorizedProviderError(error)
+  if (error.code === UnsupportedProviderMethodError.code)
+    return new UnsupportedProviderMethodError(error)
+
+  const providerError = new ProviderRpcError(error, {
+    code: error.code,
+    shortMessage: error.message,
+  })
+  // `BaseError` decorates the message with details and a version line, which
+  // would bury the node's own message (callers match on it).
+  if (error.message) providerError.message = error.message
+  return providerError
 }

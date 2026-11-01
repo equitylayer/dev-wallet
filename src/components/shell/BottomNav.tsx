@@ -13,7 +13,11 @@ type Section = {
 }
 
 const sections: Section[] = [
-  { label: 'Account', tab: 'account', routes: ['/account/', '/transfer/'] },
+  {
+    label: 'Account',
+    tab: 'account',
+    routes: ['/account/', '/transfer/', '/batch'],
+  },
   { label: 'Contracts', tab: 'contracts', routes: ['/contract/'] },
   { label: 'Activity', tab: 'txs', routes: ['/transaction/'] },
   { label: 'Blocks', tab: 'blocks', routes: ['/block/'] },

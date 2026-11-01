@@ -1,9 +1,17 @@
-import { ArrowDownLeft, ArrowUpRight, Code2, FilePlus2, Link2 } from 'lucide-react'
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Code2,
+  FilePlus2,
+  Layers,
+  Link2,
+} from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { Abi, Address, Transaction } from 'viem'
+import type { Abi, Address } from 'viem'
 
 import { connect, disconnect } from '~/actions'
+import { ActivityTags } from '~/components/ActivityTags'
 import { Box, Button, Text } from '~/design-system'
 import { useAccountActivity } from '~/hooks/useAccountActivity'
 import { useAccountTokens } from '~/hooks/useAccountTokens'
@@ -12,9 +20,14 @@ import { useContracts } from '~/hooks/useContracts'
 import { useEmptyTokens } from '~/hooks/useEmptyTokens'
 import { useFunctionName } from '~/hooks/useFunctionName'
 import { useHost } from '~/hooks/useHost'
-import { getMessenger } from '~/messengers'
 import { truncate } from '~/utils'
+import {
+  type ActivityItem,
+  activitySubject,
+  knownName,
+} from '~/utils/activity'
 import { useSessionsStore } from '~/zustand'
+import { sameHost } from '~/zustand/sessions-logic'
 
 import { EmptyTokensToggle } from '../account-details/EmptyTokensToggle'
 import { ImportToken } from '../account-details/ImportToken'
@@ -22,7 +35,6 @@ import { TokenRow } from '../account-details/TokenRow'
 import { formatEth } from './AccountPlate'
 import * as styles from './account-home.css'
 
-const inpageMessenger = getMessenger('wallet:inpage')
 const blockIntl = new Intl.NumberFormat('en-US')
 
 function Section({
@@ -148,7 +160,7 @@ export function ConnectedSection() {
   const { data: host } = useHost()
   const { sessions } = useSessionsStore()
   const hostConnected = Boolean(
-    host && sessions.some((session) => session.host === host),
+    host && sessions.some((session) => sameHost(session.host, host)),
   )
 
   return (
@@ -177,7 +189,7 @@ export function ConnectedSection() {
             height="24px"
             variant="stroked fill"
             width="fit"
-            onClick={() => connect({ host, messenger: inpageMessenger })}
+            onClick={() => connect({ host })}
           >
             Connect
           </Button>
@@ -190,10 +202,10 @@ export function ConnectedSection() {
             <Box style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Box className={styles.shrink}>
                 <Text size="13px" weight="medium" wrap={false}>
-                  {session.host.replace('www.', '')}
+                  {session.host}
                 </Text>
               </Box>
-              {session.host === host && (
+              {host && sameHost(session.host, host) && (
                 <Box className={styles.pill}>
                   <Text size="11px" weight="medium" wrap={false}>
                     This tab
@@ -206,9 +218,7 @@ export function ConnectedSection() {
             height="24px"
             variant="stroked fill"
             width="fit"
-            onClick={() =>
-              disconnect({ host: session.host, messenger: inpageMessenger })
-            }
+            onClick={() => disconnect({ host: session.host })}
           >
             Disconnect
           </Button>
@@ -237,7 +247,8 @@ export function RecentActivitySection({ address }: { address: Address }) {
     const lower = target.toLowerCase()
     return (
       contracts.find((c) => c.address.toLowerCase() === lower)?.name ||
-      accounts.find((a) => a.address.toLowerCase() === lower)?.displayName
+      accounts.find((a) => a.address.toLowerCase() === lower)?.displayName ||
+      knownName(target)
     )
   }
   const abiOf = (target?: Address | null) => {
@@ -269,15 +280,14 @@ export function RecentActivitySection({ address }: { address: Address }) {
             : 'Loading…'}
         </Empty>
       ) : (
-        recent.map(({ transaction, status }) => (
+        recent.map((item) => (
           <ActivityRow
-            key={transaction.hash}
+            key={item.transaction.hash}
             abiOf={abiOf}
             address={address}
+            item={item}
             nameOf={nameOf}
-            pending={status === 'pending'}
-            sponsored={sponsoredHashes.has(transaction.hash)}
-            transaction={transaction}
+            sponsored={sponsoredHashes.has(item.transaction.hash)}
           />
         ))
       )}
@@ -288,28 +298,31 @@ export function RecentActivitySection({ address }: { address: Address }) {
 function ActivityRow({
   abiOf,
   address,
+  item,
   nameOf,
-  pending,
   sponsored,
-  transaction,
 }: {
   abiOf: (target?: Address | null) => Abi | undefined
   address: Address
+  item: ActivityItem
   nameOf: (target?: Address | null) => string | undefined
-  pending: boolean
   sponsored: boolean
-  transaction: Transaction
 }) {
+  const { transaction, status, userOps } = item
+  // A user operation reads as the account's calls, not as handleOps.
+  const subject = activitySubject(item)
   const lower = address.toLowerCase()
   const outgoing = sponsored || transaction.from.toLowerCase() === lower
-  const isDeploy = !transaction.to
-  const isCall = transaction.input && transaction.input !== '0x'
+  const isDeploy = !subject.to
+  const isBatch = subject.count > 1
+  const isCall = subject.input && subject.input !== '0x'
   const functionName = useFunctionName({
-    abi: abiOf(transaction.to),
-    data: isCall && outgoing && !isDeploy ? transaction.input : undefined,
+    abi: abiOf(subject.to),
+    data:
+      isCall && outgoing && !isDeploy && !isBatch ? subject.input : undefined,
   })
 
-  const counterparty = outgoing ? transaction.to : transaction.from
+  const counterparty = outgoing ? subject.to : transaction.from
   const counterpartyLabel =
     nameOf(counterparty) ||
     (counterparty ? truncate(counterparty, { start: 6, end: 4 }) : '')
@@ -318,13 +331,19 @@ function ActivityRow({
     ? [FilePlus2, 'Deployed contract', transaction.hash]
     : !outgoing
       ? [ArrowDownLeft, 'Received', `from ${counterpartyLabel}`]
-      : isCall
+      : isBatch
         ? [
-            Code2,
-            `${functionName ?? 'Call'} ${nameOf(transaction.to) ?? ''}`.trim(),
-            `to ${truncate(transaction.to!, { start: 6, end: 4 })}`,
+            Layers,
+            `Batch of ${subject.count} calls`,
+            `to ${counterpartyLabel} +${subject.count - 1}`,
           ]
-        : [ArrowUpRight, 'Sent', `to ${counterpartyLabel}`]
+        : isCall
+          ? [
+              Code2,
+              `${functionName ?? 'Call'} ${nameOf(subject.to) ?? ''}`.trim(),
+              `to ${truncate(subject.to!, { start: 6, end: 4 })}`,
+            ]
+          : [ArrowUpRight, 'Sent', `to ${counterpartyLabel}`]
 
   return (
     <Link to={`/transaction/${transaction.hash}`} className={styles.rowLink}>
@@ -336,16 +355,14 @@ function ActivityRow({
               {title}
             </Text>
           </Box>
-          {sponsored && (
-            <Box
-              className={styles.pillGreen}
-              title={`Gas paid by ${transaction.from}`}
-            >
-              <Text size="11px" weight="medium" wrap={false}>
-                Sponsored
-              </Text>
-            </Box>
-          )}
+          <ActivityTags
+            payer={
+              sponsored
+                ? nameOf(transaction.from) || transaction.from
+                : undefined
+            }
+            reverted={userOps?.success === false}
+          />
         </Box>
         <Box paddingTop="6px">
           <Text color="text/tertiary" family="mono" size="12px" wrap={false}>
@@ -355,9 +372,7 @@ function ActivityRow({
       </Box>
       <Box className={styles.rowEnd}>
         <Text align="right" family="mono" size="13px" tabular wrap={false}>
-          {transaction.value
-            ? `${formatEth(transaction.value)} ETH`
-            : '0'}
+          {subject.value ? `${formatEth(subject.value)} ETH` : '0'}
         </Text>
         <Box paddingTop="6px">
           <Text
@@ -367,7 +382,7 @@ function ActivityRow({
             size="12px"
             wrap={false}
           >
-            {pending || transaction.blockNumber === null
+            {status === 'pending' || transaction.blockNumber === null
               ? 'Pending'
               : `#${blockIntl.format(transaction.blockNumber)}`}
           </Text>

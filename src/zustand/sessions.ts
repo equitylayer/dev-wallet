@@ -1,9 +1,14 @@
 import { useSyncExternalStoreWithTracked } from '~/hooks/useSyncExternalStoreWithTracked'
 
+import {
+  type Session,
+  findSession,
+  withSession,
+  withoutSession,
+} from './sessions-logic'
 import { createStore } from './utils'
 
 type Host = string
-type Session = { host: Host; autoApprove?: boolean }
 
 export type SessionsState = {
   sessions: Session[]
@@ -15,29 +20,24 @@ export type SessionsActions = {
 }
 export type SessionsStore = SessionsState & SessionsActions
 
+// Hosts are stored and matched normalized, and no host is no site
+// (`sessions-logic`).
 export const sessionsStore = createStore<SessionsStore>(
   (set, get) => ({
     sessions: [],
     addSession({ session }) {
-      if (get().sessions.find((s) => s.host === session.host)) return
-      set((state) => ({
-        ...state,
-        sessions: [...state.sessions, session],
-      }))
+      const sessions = withSession(get().sessions, session)
+      if (sessions === get().sessions) return
+      set((state) => ({ ...state, sessions }))
     },
     getSession({ host }) {
-      return get().sessions.find((session) => session.host === host)
+      return findSession(get().sessions, host)
     },
     removeSession({ host }) {
-      set((state) => {
-        const sessions = state.sessions.filter(
-          (session) => session.host !== host,
-        )
-        return {
-          ...state,
-          sessions,
-        }
-      })
+      set((state) => ({
+        ...state,
+        sessions: withoutSession(state.sessions, host),
+      }))
     },
   }),
   {

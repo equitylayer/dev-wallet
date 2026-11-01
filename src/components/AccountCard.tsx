@@ -27,6 +27,7 @@ import { truncate } from '~/utils'
 import { useAccountStore } from '~/zustand'
 import type { Account } from '~/zustand/account'
 
+import { AccountModeLabel } from './AccountModeLabel'
 import { Spinner } from './svgs'
 
 const ALIAS_MAX_LENGTH = 24
@@ -302,6 +303,11 @@ export function AccountCard({ account }: { account: Account }) {
               />
             )}
           </Inline>
+        )}
+
+        {/* ROW 4: the account's mode (smart, plain, delegated) */}
+        {!isLoading && account.address && (
+          <AccountModeLabel address={account.address} />
         )}
           </Stack>
         </Box>

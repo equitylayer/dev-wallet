@@ -318,7 +318,7 @@ components:
 
 DevWallet is a terminal pane docked beside the browser. It sits in Chrome's side panel next to the dApp being built and reads like an instrument the developer glances at between keystrokes. Readouts are dense, every edge is hard, and color appears only when the chain has something to say. The panel is a narrow column of hairline-ruled cells framed by two ground-colored bands: an account switcher across the top, and the section nav over a one-line node status at the bottom. Between them, on the raised canvas, sit the screen's plate and its lists of rows. Hierarchy comes from type size, ink weight and tonal steps between surfaces. It never comes from cards, shadows or ornament. The exception is the single layer that floats over content, the account switcher's list, which casts one soft shadow.
 
-There are two grounds and they are not mirror images. **Warm Paper** (light) is an unbleached off-white with warm grey-brown ink, a lab notebook on the bench. **Terminal Black** (dark) is pure black under a near-black working canvas with cool grey glyphs, the classic terminal. Each theme has exactly one accent: **Prompt Teal** on paper, taken from the cyan end of the logo's prompt glyph, and **Phosphor Amber** on black, after amber-phosphor CRTs. The accent marks what is active, selected or focused, and nothing else.
+There are two grounds and they are not mirror images. **Warm Paper** (light) is an unbleached off-white with warm grey-brown ink, a lab notebook on the bench. **Terminal Black** (dark) is pure black under a near-black working canvas with cool grey glyphs, the classic terminal. Each theme has exactly one accent: **Prompt Teal** on paper and **Phosphor Amber** on black, after amber-phosphor CRTs. The accent marks what is active, selected or focused, and nothing else.
 
 Type is split by who wrote the words. Humans get Inter: labels, headings, buttons, prose. Machines get IBM Plex Mono with tabular numerals: addresses, hashes, balances, block numbers, RPC URLs, calldata, ABI signatures. This pairing matches the obolos dApp's sans-serif faces. DevWallet does not use obolos's serif or script faces.
 
@@ -444,7 +444,7 @@ The system is flat, with one floating layer. Depth comes from tonal layering: pa
 
 ## Shapes
 
-Corners are square. Buttons, inputs, the switcher bar and its list, nav items, tabs, tags, rows, banners, dialogs and toasts all use a radius of 0 (the toaster explicitly sets `--border-radius: 0`). The only rounding is functional. Status dots and separator end caps are full circles (9999px). The toggle uses a softly squared 4px track and a 2px knob so it still reads as a physical switch. The logo tile, a rounded square with a dark teal-to-navy gradient holding a cream "D" and a mint-to-cyan prompt chevron, is the only rounded rectangle in the product. It is an identity asset, not a pattern to repeat.
+Corners are square. Buttons, inputs, the switcher bar and its list, nav items, tabs, tags, rows, banners, dialogs and toasts all use a radius of 0 (the toaster explicitly sets `--border-radius: 0`). The only rounding is functional. Status dots and separator end caps are full circles (9999px). The toggle uses a softly squared 4px track and a 2px knob so it still reads as a physical switch. The logo tile, a rounded square holding the Docked D, is the only rounded rectangle in the product. It is an identity asset, not a pattern to repeat.
 
 Icons are Lucide outlines at a 1.75 stroke, 13–15px in the shell and rows, always in secondary or tertiary ink unless they carry a signal.
 
@@ -452,6 +452,13 @@ Icons are Lucide outlines at a 1.75 stroke, 13–15px in the shell and rows, alw
 **The Square Corner Rule.** If it is a surface or a control, its corners are square. A circle means a status. The logo is the only rounded rectangle.
 
 ## Components
+
+### Logo
+The **Docked D**: a heavy D cut once from top to bottom (a 4-unit gap on a 64-unit grid). The left of the letter stays ink. The right of the bowl takes the accent and reads as the panel docked beside the page, which is what DevWallet is. It sits on a rounded-square tile (60 units, 14.5 radius), the product's only rounded rectangle. It is flat: no gradient, no shadow. The docked panel is the accent's one use outside active, selected or focused.
+- **In the app** it follows the theme: the raised paper canvas with an ink D and a Prompt Teal panel, or the raised terminal canvas with a white D and a Phosphor Amber panel. The tile carries a 1px ink hairline at 0.14. It appears at 22px in the switcher's home cell and at 96px on the onboarding start screen (`DevWalletIcon`).
+- **Outside the app** (the toolbar and store icon, and the EIP-6963 icon in dApp wallet pickers) it is always the dark version, because one icon has to sit on light and dark browsers.
+- **The -dev build** adds a 3-unit Signal Blue rim (#3898fe) inside the tile edge, so the two builds can be told apart in the toolbar.
+- **Source:** `public/icons/devwallet-logo.svg` and `devwallet-logo-dev.svg`. Running `bun scripts/generate-icons.ts` writes the PNGs.
 
 ### Buttons
 Utilitarian and quiet: square, flat, and sized by the job.
@@ -489,7 +496,7 @@ The global quick switch and the answer to "who am I acting as" on every screen. 
 - **Keyboard:** arrow keys move the highlight and wrap, Enter switches, and the digit keys switch directly without opening the list.
 
 ### Account Plate (signature component)
-The top of the Account home and the full answer to "who am I acting as". The identity row holds the alias at 20px medium (or "Add alias" in tertiary, which opens rename), an Impersonated tag, and a 24px ghost rename button pushed right. Under it the full address runs in Data Small secondary ink beside a 20px copy button. The readout row is a grid (1.5fr 1fr 1fr) of Balance, Nonce and Code. Each cell has an 11px tertiary label over a value whose bottom edge is its baseline: Data Readout for balance (with an 11px tertiary "ETH") and nonce, and Inter 14px for Code (None, 7702 or Contract). Cells after the first carry a paper-rule left divider with 12px padding on both sides. The actions are three equal 28px buttons with 6px gaps: Send (primary, with a send icon), Edit state, Impersonate. Edit state swaps the readouts for 24px inputs and Save / Cancel in place. A slot under the address is reserved for smart-account mode and delegation and renders nothing until the store holds that data.
+The top of the Account home and the full answer to "who am I acting as". The identity row holds the alias at 20px medium (or "Add alias" in tertiary, which opens rename), an Impersonated tag, and a 24px ghost rename button pushed right. Under it the full address runs in Data Small secondary ink beside a 20px copy button. The readout row is a grid (1.5fr 1fr 1fr) of Balance, Nonce and Code. Each cell has an 11px tertiary label over a value whose bottom edge is its baseline: Data Readout for balance (with an 11px tertiary "ETH") and nonce, and Inter 14px for Code (None, 7702 or Contract). Cells after the first carry a paper-rule left divider with 12px padding on both sides. The actions are three equal 28px buttons with 6px gaps: Send (primary, with a send icon), Edit state, Impersonate. Edit state swaps the readouts for 24px inputs and Save / Cancel in place. The smart-account slot sits 12px under the address. Its first line is the mode label in Body ("Smart · Kernel v3.3", "Plain (upgradable)", "Plain", "Contract", or "Delegated to 0x5FbD…0aa3 (not Kernel)" with the target in mono and a 20px copy button). A Kernel account adds a 12px line, 6px below: "Delegates to" in tertiary ink with the Kernel address in secondary mono and a copy button, and "EntryPoint nonce" with its value in mono. The mode actions follow 8px below as 24px buttons: Switch to smart, Switch to Kernel or, for a smart account the node hasn't delegated, Delegate to Kernel (stroked), or Revoke delegation (ghost red, which asks in place with a solid red confirmation), and a secondary-ink "Advanced" text disclosure with a chevron. Open, Advanced lists the two plain modes as full-bleed rows under a faint rule, each a 13px name over a 12px tertiary sentence, with an accent check on the current one. A change shows a tertiary status line with a spinner while the node updates and a red 12px sentence if it fails. Contract code gets the label alone. When the network's AA addresses hold unknown code, a yellow notice under the plate names them and the actions that delegate to Kernel are disabled.
 
 **Arrival:** when the active account changes, the plate takes an accent wash at 12% and lets it go over 600ms (`cubic-bezier(0.16, 1, 0.3, 1)`). It is the one authored moment in the product and it is off under `prefers-reduced-motion`.
 
@@ -525,7 +532,7 @@ The pickaxe in the status line swings once (0° to 45° and back, 300ms linear) 
 - **Do** turn off authored motion (the plate's arrival wash, the pickaxe swing, the switcher list's entrance and chevron turn) under `prefers-reduced-motion`.
 
 ### Don't:
-- **Don't** drift toward a consumer crypto wallet: no rounded balance cards, gradient fills, glassy surfaces or oversized hero balances. The logo is the only gradient.
+- **Don't** drift toward a consumer crypto wallet: no rounded balance cards, gradient fills, glassy surfaces or oversized hero balances. Nothing uses a gradient, the logo included.
 - **Don't** drift toward a generic SaaS dashboard: no card grids, soft drop shadows on resting surfaces, pill badges or big rounded buttons. The floating-layer shadow belongs to layers that float over content and nowhere else.
 - **Don't** add sci-fi HUD kitsch: no neon glow, scanlines, glitch effects, the old #39ff14 neon green, or display fonts like Orbitron.
 - **Don't** use the accent as a status color or a CTA fill. Primary actions stay ink-on-paper or white-on-black.

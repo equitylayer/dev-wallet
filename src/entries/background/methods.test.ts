@@ -1,0 +1,563 @@
+import { describe, expect, test } from 'bun:test'
+
+import { WalletRpcError } from '~/smart/errors'
+
+import {
+  SIGNATURE_METHODS,
+  TRANSACTION_METHODS,
+  assertEthAccountsRequest,
+  closesOnNetworkChange,
+  declinedError,
+  isSignatureMethod,
+  isTransactionMethod,
+  needsSession,
+  networkSwitched,
+  onNetworkChange,
+  openToAnyPage,
+  opensSidebar,
+  refusedFromPage,
+  takesFrom,
+  permissionsFor,
+  requestRpcUrl,
+  requiresApproval,
+  withSerializedErrors,
+} from './methods'
+
+test('method lists', () => {
+  expect(SIGNATURE_METHODS).toEqual([
+    'eth_sign',
+    'personal_sign',
+    'eth_signTypedData_v4',
+  ])
+  expect(TRANSACTION_METHODS).toEqual(['eth_sendTransaction', 'wallet_sendCalls'])
+})
+
+test('isTransactionMethod is true only for the send methods', () => {
+  expect(isTransactionMethod('eth_sendTransaction')).toBe(true)
+  expect(isTransactionMethod('wallet_sendCalls')).toBe(true)
+  expect(isTransactionMethod('eth_sendRawTransaction')).toBe(false)
+  expect(isTransactionMethod('wallet_getCallsStatus')).toBe(false)
+})
+
+test('isSignatureMethod is true only for the signatures the approval shows', () => {
+  for (const method of SIGNATURE_METHODS)
+    expect(isSignatureMethod(method)).toBe(true)
+  for (const method of [
+    'eth_signTypedData',
+    'eth_signTypedData_v3',
+    'eth_signTransaction',
+    'eth_sendTransaction',
+    'toString',
+  ])
+    expect(isSignatureMethod(method)).toBe(false)
+})
+
+test('transaction methods need approval unless bypassed', () => {
+  expect(requiresApproval('eth_sendTransaction', {})).toBe(true)
+  expect(requiresApproval('wallet_sendCalls', {})).toBe(true)
+  expect(
+    requiresApproval('eth_sendTransaction', { bypassTransactionAuth: true }),
+  ).toBe(false)
+  expect(
+    requiresApproval('wallet_sendCalls', { bypassTransactionAuth: true }),
+  ).toBe(false)
+})
+
+test('signature methods need approval unless bypassed', () => {
+  for (const method of SIGNATURE_METHODS) {
+    expect(requiresApproval(method, {})).toBe(true)
+    expect(requiresApproval(method, { bypassSignatureAuth: true })).toBe(false)
+  }
+})
+
+test('the signature and transaction bypasses are independent', () => {
+  expect(
+    requiresApproval('eth_sendTransaction', { bypassSignatureAuth: true }),
+  ).toBe(true)
+  expect(
+    requiresApproval('personal_sign', { bypassTransactionAuth: true }),
+  ).toBe(true)
+})
+
+test('read-only methods never need approval', () => {
+  expect(requiresApproval('eth_call', {})).toBe(false)
+  expect(requiresApproval('eth_requestAccounts', {})).toBe(false)
+  expect(requiresApproval('wallet_getCallsStatus', {})).toBe(false)
+})
+
+describe('opensSidebar', () => {
+  const connected = { connected: true }
+
+  test('covers every approval method plus connect and status', () => {
+    expect(opensSidebar('wallet_requestPermissions', {}, connected)).toBe(true)
+    expect(opensSidebar('eth_requestAccounts', {}, connected)).toBe(true)
+    expect(opensSidebar('wallet_showCallsStatus', {}, connected)).toBe(true)
+    expect(opensSidebar('eth_sendTransaction', {}, connected)).toBe(true)
+    expect(opensSidebar('personal_sign', {}, connected)).toBe(true)
+  })
+
+  test('honours the bypass settings for approval methods only', () => {
+    expect(
+      opensSidebar(
+        'eth_sendTransaction',
+        { bypassTransactionAuth: true },
+        connected,
+      ),
+    ).toBe(false)
+    expect(
+      opensSidebar('eth_sign', { bypassSignatureAuth: true }, connected),
+    ).toBe(false)
+    expect(
+      opensSidebar(
+        'eth_requestAccounts',
+        { bypassSignatureAuth: true, bypassTransactionAuth: true },
+        connected,
+      ),
+    ).toBe(true)
+    expect(opensSidebar('eth_call', {}, connected)).toBe(false)
+    expect(opensSidebar('wallet_getPermissions', {}, connected)).toBe(false)
+  })
+
+  // Whether the panel opens would tell the page the bypass settings (R53).
+  test('a site that is not connected opens it only to connect, whatever the settings', () => {
+    const settings = [
+      {},
+      { bypassSignatureAuth: true },
+      { bypassTransactionAuth: true },
+      { bypassSignatureAuth: true, bypassTransactionAuth: true },
+    ]
+    const unconnected = { connected: false }
+    for (const s of settings) {
+      for (const method of [
+        ...SIGNATURE_METHODS,
+        ...TRANSACTION_METHODS,
+        'wallet_showCallsStatus',
+        'eth_call',
+      ])
+        expect(opensSidebar(method, s, unconnected)).toBe(false)
+      for (const method of ['eth_requestAccounts', 'wallet_requestPermissions'])
+        expect(opensSidebar(method, s, unconnected)).toBe(true)
+    }
+  })
+})
+
+test('permissionsFor reports eth_accounts for a connected origin', () => {
+  const permissions = permissionsFor('https://a', true)
+  expect(permissions).toHaveLength(1)
+  expect(permissions[0]).toEqual({
+    invoker: 'https://a',
+    parentCapability: 'eth_accounts',
+    caveats: [],
+  })
+})
+
+test('permissionsFor is empty when not connected', () => {
+  expect(permissionsFor('https://a', false)).toEqual([])
+})
+
+test('assertEthAccountsRequest accepts a lone eth_accounts request', () => {
+  expect(() => assertEthAccountsRequest([{ eth_accounts: {} }])).not.toThrow()
+})
+
+test('assertEthAccountsRequest rejects other capabilities with -32602', () => {
+  const rejected = (params: unknown) => {
+    try {
+      assertEthAccountsRequest(params)
+    } catch (e) {
+      return (e as { code: number }).code
+    }
+  }
+  expect(rejected([{ eth_accounts: {}, eth_sendTransaction: {} }])).toBe(-32602)
+  expect(rejected([{ eth_sendTransaction: {} }])).toBe(-32602)
+})
+
+test('assertEthAccountsRequest rejects malformed params with -32602', () => {
+  const rejected = (params: unknown) => {
+    try {
+      assertEthAccountsRequest(params)
+    } catch (e) {
+      return (e as { code: number }).code
+    }
+  }
+  expect(rejected(undefined)).toBe(-32602)
+  expect(rejected([])).toBe(-32602)
+  expect(rejected([{}])).toBe(-32602)
+  expect(rejected([null])).toBe(-32602)
+  expect(rejected([[]])).toBe(-32602)
+  expect(rejected([{ eth_accounts: null }])).toBe(-32602)
+  expect(rejected([{ eth_accounts: 'yes' }])).toBe(-32602)
+  expect(rejected({ eth_accounts: {} })).toBe(-32602)
+  expect(rejected([{ eth_accounts: {} }, { eth_accounts: {} }])).toBe(-32602)
+})
+
+test('withSerializedErrors keeps the code of a thrown WalletRpcError', async () => {
+  const handler = withSerializedErrors(async () => {
+    throw new WalletRpcError(5760, 'no', { why: 'x' })
+  })
+  expect(await handler({ request: { id: 7 } }, {})).toEqual({
+    id: 7,
+    jsonrpc: '2.0',
+    error: { code: 5760, message: 'no', data: { why: 'x' } },
+  })
+})
+
+test('withSerializedErrors turns a plain Error into -32603', async () => {
+  const handler = withSerializedErrors(async () => {
+    throw new Error('boom')
+  })
+  expect(await handler({ request: { id: 8 } }, {})).toStrictEqual({
+    id: 8,
+    jsonrpc: '2.0',
+    error: { code: -32603, message: 'boom' },
+  })
+})
+
+test('withSerializedErrors never replies with a string error', async () => {
+  const handler = withSerializedErrors(async () => {
+    throw 'a string'
+  })
+  const reply = await handler({ request: { id: 9 } }, {})
+  expect(typeof reply.error).toBe('object')
+  expect(reply.error).toStrictEqual({ code: -32603, message: 'a string' })
+})
+
+test('withSerializedErrors passes a normal reply through, with its arguments', async () => {
+  const seen: unknown[] = []
+  const handler = withSerializedErrors(async (payload, meta) => {
+    seen.push(payload, meta)
+    return { id: 1, jsonrpc: '2.0', result: '0x1' } as const
+  })
+  const payload = { request: { id: 1 } }
+  const meta = { sender: 'tab' }
+  expect(await handler(payload, meta)).toEqual({
+    id: 1,
+    jsonrpc: '2.0',
+    result: '0x1',
+  })
+  expect(seen).toEqual([payload, meta])
+})
+
+describe('declinedError', () => {
+  const request = { id: 3, method: 'wallet_sendCalls', params: [] }
+
+  test('a rejection is 4001 and carries the request', () => {
+    const error = declinedError(request, 'rejected')
+    expect(error).toBeInstanceOf(WalletRpcError)
+    expect(error.code).toBe(4001)
+    expect(error.message).toBe('The user rejected the request.')
+    expect(error.data).toEqual({ request })
+  })
+
+  test('a timeout is 4001 and says so', () => {
+    const error = declinedError(request, 'expired')
+    expect(error.code).toBe(4001)
+    expect(error.message).toBe('The request timed out waiting for approval.')
+  })
+
+  test('a network change is 4001 and says so, even for an upgrade', () => {
+    for (const upgrade of [false, true]) {
+      const error = declinedError(request, 'network-changed', { upgrade })
+      expect(error.code).toBe(4001)
+      expect(error.message).toBe(
+        'The network changed while the request waited for approval.',
+      )
+      expect(error.data).toEqual({ request })
+    }
+  })
+
+  test('a rejected account upgrade is 5750; a timed out one stays 4001', () => {
+    expect(declinedError(request, 'rejected', { upgrade: true }).code).toBe(
+      5750,
+    )
+    expect(declinedError(request, 'expired', { upgrade: true }).code).toBe(
+      4001,
+    )
+  })
+})
+
+describe('requestRpcUrl', () => {
+  const current = 'http://127.0.0.1:8545'
+
+  test("a page's request goes to the wallet's network, whatever it names", () => {
+    expect(
+      requestRpcUrl({ fromPage: true, requested: 'http://evil.test', current }),
+    ).toBe(current)
+    expect(
+      requestRpcUrl({ fromPage: true, requested: undefined, current }),
+    ).toBe(current)
+  })
+
+  test('a wallet screen may name its network', () => {
+    expect(
+      requestRpcUrl({
+        fromPage: false,
+        requested: 'http://127.0.0.1:9545',
+        current,
+      }),
+    ).toBe('http://127.0.0.1:9545')
+  })
+
+  test("a wallet screen that names none gets the wallet's", () => {
+    expect(
+      requestRpcUrl({ fromPage: false, requested: undefined, current }),
+    ).toBe(current)
+    expect(requestRpcUrl({ fromPage: false, requested: '', current })).toBe(
+      current,
+    )
+  })
+})
+
+describe('needsSession', () => {
+  test.each([
+    'eth_sign',
+    'personal_sign',
+    'eth_signTypedData',
+    'eth_signTypedData_v3',
+    'eth_signTypedData_v4',
+    'eth_signTransaction',
+    'eth_sendTransaction',
+    'eth_sendTransactionSync',
+    'eth_sendUnsignedTransaction',
+    'wallet_sendCalls',
+  ])('%s signs or sends with an account key: a site must be connected', (method) => {
+    expect(needsSession(method)).toBe(true)
+  })
+
+  test('covers every method that needs approval, whatever the bypass settings', () => {
+    for (const method of [...SIGNATURE_METHODS, ...TRANSACTION_METHODS])
+      expect(needsSession(method)).toBe(true)
+  })
+
+  test.each([
+    'eth_chainId',
+    'eth_accounts',
+    'eth_requestAccounts',
+    'wallet_requestPermissions',
+    'wallet_getPermissions',
+    'wallet_getCapabilities',
+    'wallet_getCallsStatus',
+    'wallet_showCallsStatus',
+    'eth_call',
+    'eth_sendRawTransaction',
+    // Signed by the page itself: a connected page may send it (R53).
+    'eth_sendRawTransactionSync',
+    'toString',
+    '',
+  ])('%p does not', (method) => {
+    expect(needsSession(method)).toBe(false)
+  })
+})
+
+describe('refusedFromPage', () => {
+  const settings = [
+    {},
+    { bypassSignatureAuth: true },
+    { bypassTransactionAuth: true },
+    { bypassSignatureAuth: true, bypassTransactionAuth: true },
+  ]
+
+  test.each([
+    'eth_signTransaction',
+    'eth_sendTransactionSync',
+    'eth_sendUnsignedTransaction',
+  ])(
+    '%s skips the approval and the smart core: refused unless transactions are bypassed',
+    (method) => {
+      expect(settings.map((s) => refusedFromPage(method, s))).toEqual([
+        true,
+        true,
+        false,
+        false,
+      ])
+    },
+  )
+
+  // The approval renders v4 only; these the node would sign unasked, and v3
+  // covers an EIP-2612 permit (R52).
+  test.each(['eth_signTypedData', 'eth_signTypedData_v3'])(
+    '%s skips the approval: refused unless signatures are bypassed',
+    (method) => {
+      expect(settings.map((s) => refusedFromPage(method, s))).toEqual([
+        true,
+        false,
+        true,
+        false,
+      ])
+    },
+  )
+
+  test.each([
+    'eth_sendTransaction',
+    'wallet_sendCalls',
+    'personal_sign',
+    'eth_sign',
+    'eth_signTypedData_v4',
+    'eth_sendRawTransaction',
+    'eth_chainId',
+    'toString',
+    '',
+  ])('%p is not refused', (method) => {
+    for (const s of settings) expect(refusedFromPage(method, s)).toBe(false)
+  })
+})
+
+describe('takesFrom', () => {
+  test.each([
+    'eth_sendTransaction',
+    'eth_signTransaction',
+    'eth_sendTransactionSync',
+    'eth_sendUnsignedTransaction',
+  ])('%s is a transaction from an account', (method) => {
+    expect(takesFrom(method)).toBe(true)
+  })
+
+  test.each([
+    'wallet_sendCalls',
+    'personal_sign',
+    'eth_sendRawTransaction',
+    'eth_call',
+    'toString',
+    '',
+  ])('%p is not', (method) => {
+    expect(takesFrom(method)).toBe(false)
+  })
+})
+
+describe('openToAnyPage', () => {
+  // What a page may ask before it is connected: reads, and connecting (R53).
+  test.each([
+    'eth_chainId',
+    'net_version',
+    'eth_blockNumber',
+    'eth_call',
+    'eth_estimateGas',
+    'eth_createAccessList',
+    'eth_simulateV1',
+    'eth_feeHistory',
+    'eth_gasPrice',
+    'eth_maxPriorityFeePerGas',
+    'eth_blobBaseFee',
+    'eth_syncing',
+    'web3_clientVersion',
+    'eth_getProof',
+    'eth_getBalance',
+    'eth_getCode',
+    'eth_getStorageAt',
+    'eth_getTransactionCount',
+    'eth_getBlockByNumber',
+    'eth_getBlockByHash',
+    'eth_getBlockReceipts',
+    'eth_getTransactionByHash',
+    'eth_getTransactionReceipt',
+    'eth_getLogs',
+    'eth_newFilter',
+    'eth_newBlockFilter',
+    'eth_getFilterChanges',
+    'eth_getFilterLogs',
+    'eth_uninstallFilter',
+    'eth_requestAccounts',
+    'eth_accounts',
+    'wallet_requestPermissions',
+    'wallet_getPermissions',
+  ])('%s is open', (method) => {
+    expect(openToAnyPage(method)).toBe(true)
+  })
+
+  test.each([
+    // The EIP-5792 reads reconcile, which writes code (R53).
+    'wallet_getCapabilities',
+    'wallet_getCallsStatus',
+    'wallet_showCallsStatus',
+    // Sends and signatures.
+    'eth_sendTransaction',
+    'eth_sendTransactionSync',
+    'eth_sendRawTransaction',
+    'eth_sendRawTransactionSync',
+    'eth_sendUnsignedTransaction',
+    'wallet_sendCalls',
+    'eth_sign',
+    'personal_sign',
+    'eth_signTypedData',
+    'eth_signTypedData_v3',
+    'eth_signTypedData_v4',
+    'eth_signTransaction',
+    // The node's cheats.
+    'anvil_setBalance',
+    'anvil_setCode',
+    'anvil_setStorageAt',
+    'anvil_reset',
+    'anvil_dumpState',
+    'anvil_setRpcUrl',
+    'anvil_impersonateAccount',
+    'hardhat_setBalance',
+    'hardhat_reset',
+    'evm_mine',
+    'evm_setAutomine',
+    'evm_snapshot',
+    'evm_revert',
+    'eth_getWork',
+    'eth_subscribe',
+    'wallet_switchEthereumChain',
+    'toString',
+    '__proto__',
+    '',
+  ])('%p is not', (method) => {
+    expect(openToAnyPage(method)).toBe(false)
+  })
+
+  test('nothing that needs a session is open', () => {
+    for (const method of [
+      ...SIGNATURE_METHODS,
+      ...TRANSACTION_METHODS,
+      'eth_signTypedData',
+      'eth_signTypedData_v3',
+      'eth_signTransaction',
+      'eth_sendTransactionSync',
+      'eth_sendUnsignedTransaction',
+    ]) {
+      expect(needsSession(method)).toBe(true)
+      expect(openToAnyPage(method)).toBe(false)
+    }
+  })
+})
+
+describe('a network change', () => {
+  test('closes the approvals of sends and signatures, which ran on the old one', () => {
+    for (const method of [...SIGNATURE_METHODS, ...TRANSACTION_METHODS])
+      expect(closesOnNetworkChange(method)).toBe(true)
+    for (const method of [
+      'eth_requestAccounts',
+      'wallet_requestPermissions',
+      'eth_call',
+      'toString',
+      '',
+    ])
+      expect(closesOnNetworkChange(method)).toBe(false)
+  })
+
+  test('closes a send or signature now, or once a join under way fails; never a connection', () => {
+    for (const method of ['personal_sign', 'eth_sendTransaction']) {
+      expect(onNetworkChange(method, { joining: false })).toBe('close')
+      // A join that succeeds is the batch's to close; one that fails must
+      // not put the old network's approval back.
+      expect(onNetworkChange(method, { joining: true })).toBe(
+        'close-if-join-fails',
+      )
+    }
+    for (const joining of [false, true])
+      expect(onNetworkChange('eth_requestAccounts', { joining })).toBe('keep')
+  })
+
+  test("is a change of the network's rpcUrl", () => {
+    const on = (rpcUrl?: string) => ({
+      network: rpcUrl === undefined ? undefined : { rpcUrl },
+    })
+    expect(networkSwitched(on('http://a'), on('http://b'))).toBe(true)
+    expect(networkSwitched(on('http://a'), on(undefined))).toBe(true)
+    expect(networkSwitched(on('http://a'), on('http://a'))).toBe(false)
+    // Another field of the network changing is no switch.
+    const before = { network: { rpcUrl: 'http://a', chainId: 1 } }
+    const after = { network: { rpcUrl: 'http://a', chainId: 2 } }
+    expect(networkSwitched(after, before)).toBe(false)
+  })
+})

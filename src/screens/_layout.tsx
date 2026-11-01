@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 
 import { Toaster } from '~/components'
+import { BatchBar } from '~/components/BatchBar'
 import {
   AccountSwitcher,
   BottomNav,
@@ -17,7 +18,6 @@ import { footer } from '~/components/shell/shell.css'
 import * as styles from './_layout.css'
 
 const backgroundMessenger = getMessenger('background:wallet')
-const contentMessenger = getMessenger('wallet:contentScript')
 
 export default function Layout() {
   const { network, onboarded } = useNetworkStore()
@@ -34,7 +34,8 @@ export default function Layout() {
     isNetworkOffline && !location.pathname.startsWith('/networks')
 
   useEffect(() => {
-    contentMessenger.reply('pushRoute', async (route) => {
+    // On the extension channel, so only extension pages can drive navigation.
+    return backgroundMessenger.reply('pushRoute', async (route) => {
       navigate(route)
       return
     })
@@ -55,13 +56,15 @@ export default function Layout() {
       {showOfflineBanner && <OfflineBanner />}
       <Box className={styles.content}>
         {hasPendingRequest ? (
-          <PendingRequest request={pendingRequest} />
+          // A new request starts over: no edits, previews or state carried.
+          <PendingRequest key={pendingRequest.id} request={pendingRequest} />
         ) : (
           <Outlet />
         )}
       </Box>
       {onboarded && (
         <footer className={footer}>
+          {!hasPendingRequest && <BatchBar />}
           {!hasPendingRequest && <BottomNav />}
           <StatusLine offline={isNetworkOffline} />
         </footer>

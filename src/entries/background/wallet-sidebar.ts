@@ -1,22 +1,27 @@
-import { settingsStore } from '../../zustand'
+import { openWalletMessage } from '~/messengers/transports/guards'
+import { senderHost } from '~/utils/host'
+import { sessionsStore, settingsStore } from '~/zustand'
+
+import { opensSidebar } from './methods'
 
 export function setupWalletSidebarHandler() {
   chrome.runtime.onMessage.addListener((message, sender) => {
-    if (message.type === 'openWallet') {
-      const { bypassSignatureAuth, bypassTransactionAuth } =
-        settingsStore.getState()
-      const { method } = message.payload
-      if (
-        method === 'eth_requestAccounts' ||
-        method === 'wallet_showCallsStatus' ||
-        (method === 'eth_sendTransaction' && !bypassTransactionAuth) ||
-        (method === 'eth_sign' && !bypassSignatureAuth) ||
-        (method === 'eth_signTypedData_v4' && !bypassSignatureAuth) ||
-        (method === 'personal_sign' && !bypassSignatureAuth) ||
-        (method === 'wallet_sendCalls' && !bypassTransactionAuth)
-      ) {
-        chrome.sidePanel.open({ tabId: sender.tab!.id! })
-      }
+    // A content script's `openWallet`: a method, from a tab.
+    const openWallet = openWalletMessage(message)
+    const tabId = sender.tab?.id
+    if (!openWallet || typeof tabId !== 'number') return
+    // The asking frame's own site, as `rpc.ts` checks it (R53). Read now, not
+    // after waiting for the stores: the panel opens only in answer to the
+    // user's gesture.
+    const connected = !!sessionsStore
+      .getState()
+      .getSession({ host: senderHost(sender) })
+    if (
+      opensSidebar(openWallet.payload.method, settingsStore.getState(), {
+        connected,
+      })
+    ) {
+      chrome.sidePanel.open({ tabId })
     }
   })
 }

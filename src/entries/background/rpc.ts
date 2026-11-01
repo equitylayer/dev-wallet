@@ -1,45 +1,118 @@
-import {
-  type Address,
-  type RpcTransactionReceipt,
-  type RpcTransactionRequest,
-  keccak256,
-  numberToHex,
-  stringToHex,
-} from 'viem'
-import { type HttpRpcClient, getHttpRpcClient } from 'viem/utils'
+import { type Address, numberToHex } from 'viem'
 
 import {
   UnauthorizedProviderError,
   UnsupportedProviderMethodError,
-  UserRejectedRequestError,
 } from '~/errors'
 import { type Messenger, getMessenger } from '~/messengers'
+import { connectEvent } from '~/messengers/page-events'
+import { sendPageEvent } from '~/messengers/sendPageEvent'
+import type { Schema } from '~/messengers/schema'
+import { isPageSender } from '~/messengers/transports/guards'
+import type { CallbackOptions } from '~/messengers/transports/types'
+import { serializeError } from '~/smart/errors'
+import { connectNode } from '~/smart/node'
+import { DEVWALLET_ORIGIN } from '~/smart/queue'
+import { withFrom } from '~/smart/transaction-call'
 import type { RpcRequest, RpcResponse } from '~/types/rpc'
+import { defaultAccount } from '~/utils/accounts'
+import { senderHost } from '~/utils/host'
 import {
   accountStore,
-  batchCallsStore,
   networkStore,
   sessionsStore,
   settingsStore,
 } from '~/zustand'
 
-import { type Decision, requestUserDecision } from './pending-requests'
+import {
+  assertEthAccountsRequest,
+  declinedError,
+  isSignatureMethod,
+  isTransactionMethod,
+  needsSession,
+  openToAnyPage,
+  permissionsFor,
+  refusedFromPage,
+  requestRpcUrl,
+  requiresApproval,
+  takesFrom,
+  withSerializedErrors,
+} from './methods'
+import {
+  type PlainDecision,
+  hydrated,
+  requestUserDecision,
+} from './pending-requests'
+import {
+  reconcileBeforeAnswering,
+  showCallsStatus,
+  walletRequest,
+} from './smart'
+import { handleSend } from './smart-sends'
 
-const inpageMessenger = getMessenger('background:inpage')
 const walletMessenger = getMessenger('background:wallet')
 
-export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
-  messenger.reply('request', async ({ request, rpcUrl: rpcUrl_ }, meta) => {
-    const isInpage =
-        meta.sender.tab &&
-        !meta.sender.tab?.url?.includes('extension://') &&
-        (!meta.sender.frameId || meta.sender.frameId === 0)
+/**
+ * How long `eth_accounts` and a page's signature request wait for a reconcile
+ * before going on anyway.
+ */
+const ETH_ACCOUNTS_RECONCILE_MS = 1500
 
-    const rpcUrl = rpcUrl_ || networkStore.getState().network.rpcUrl
-    const rpcClient = getHttpRpcClient(rpcUrl)
+// A page picks its own JSON-RPC ids, so two tabs (or a page on purpose) can
+// send the same one; and the pending requests, the decisions and the batch
+// queue are all keyed by id. So each request gets an id of the background's
+// own, and the page gets its id back. Ids count up from the clock at each
+// worker start, so they never meet those of requests an earlier worker
+// persisted.
+let lastRequestId = Date.now() * 1000
+
+function nextRequestId(): number {
+  return ++lastRequestId
+}
+
+export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
+  // Only extension pages may use the wallet channel: what comes on it comes
+  // from DevWallet's own screens.
+  const fromWallet = messenger.connection === 'background:wallet'
+
+  messenger.reply('request', withSerializedErrors(async (payload, meta) => {
+    const response = await handle(
+        { ...payload, request: { ...payload.request, id: nextRequestId() } },
+        meta,
+    )
+    return { ...response, id: payload.request.id }
+  }))
+
+  /** Answers a request that carries the background's own id. */
+  async function handle(
+    payload: Schema['request'][0],
+    meta: CallbackOptions,
+  ): Promise<RpcResponse> {
+    const { request, rpcUrl: rpcUrl_ } = payload
+    // A woken worker must not take "not loaded yet" for "not connected", the
+    // default network or no bypass: every store read below has loaded first.
+    await Promise.all(
+      [sessionsStore, networkStore, settingsStore, accountStore].map(hydrated),
+    )
+    // Anything that isn't one of our extension pages is a page: a content
+    // script in any frame, top or not. Each frame is its own site.
+    const isInpage = isPageSender(
+        meta.sender,
+        chrome.runtime.id,
+        chrome.runtime.getURL(''),
+    )
+
+    const rpcUrl = requestRpcUrl({
+      fromPage: isInpage,
+      requested: rpcUrl_,
+      current: networkStore.getState().network.rpcUrl,
+    })
 
     const { getSession } = sessionsStore.getState()
-    const host = new URL(meta.sender.url || '').host
+    // The asking frame's own host, as sessions are stored.
+    const host = senderHost(meta.sender)
+    // `file://` pages report the opaque origin `'null'`.
+    const origin = meta.sender.origin ?? new URL(meta.sender.url || '').origin
     const session = getSession({ host })
 
     const hasOnboarded = isInpage ? networkStore.getState().onboarded : rpcUrl
@@ -53,25 +126,91 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
         },
       } as RpcResponse
 
-    const { bypassSignatureAuth, bypassTransactionAuth } =
-        settingsStore.getState()
-    // If the method is a "signable" method, request approval from the user.
-    if (
-        (request.method === 'eth_sendTransaction' && !bypassTransactionAuth) ||
-        (request.method === 'eth_sign' && !bypassSignatureAuth) ||
-        (request.method === 'eth_signTypedData_v4' && !bypassSignatureAuth) ||
-        (request.method === 'personal_sign' && !bypassSignatureAuth) ||
-        (request.method === 'wallet_sendCalls' && !bypassTransactionAuth)
-    ) {
-      if (isInpage && !session)
-        return {
-          id: request.id,
-          jsonrpc: '2.0',
-          error: {
-            code: UnauthorizedProviderError.code,
-          },
-        } as RpcResponse
+    // A "signable" method needs the user's approval, unless it is bypassed.
+    const needsApproval = requiresApproval(
+        request.method,
+        settingsStore.getState(),
+    )
+    // Signing or sending with an account's key needs a connected site, bypass
+    // or not: the bypass skips asking the user, not authorizing the site.
+    if (isInpage && !session && needsSession(request.method))
+      return unauthorized(request)
+    // Nor may it reach the node, beyond reading it (R53): its cheats, raw
+    // sends and the EIP-5792 reads (which reconcile, and so write code) wait
+    // for a session. Asked before anything that reads the settings.
+    if (isInpage && !session && !openToAnyPage(request.method))
+      return unauthorized(request)
 
+    // The node would sign these unasked, so a page gets them only with their
+    // kind bypassed (R49, R52). Checked after the session, so a site that
+    // isn't connected learns nothing of the settings.
+    if (isInpage && refusedFromPage(request.method, settingsStore.getState()))
+      return {
+        id: request.id,
+        jsonrpc: '2.0',
+        error: {
+          code: UnsupportedProviderMethodError.code,
+          message: `DevWallet doesn't let a page call ${request.method} unless its approval is bypassed.`,
+        },
+      } as RpcResponse
+
+    // A page's transaction that names no account goes from the active one,
+    // the first `eth_accounts` gives, never from the node's default (R50).
+    // The request itself carries it: the approval, the batch queue and the
+    // pass-through all read it.
+    if (isInpage && takesFrom(request.method)) {
+      const { network } = networkStore.getState()
+      const { account: active, accounts } = accountStore.getState()
+      const account = defaultAccount({
+        account: active,
+        accounts,
+        rpcUrl: network.rpcUrl,
+      })
+      if (!account) return unauthorized(request)
+      const params = Array.isArray(request.params) ? request.params : []
+      ;(request as { params: unknown[] }).params = [
+        withFrom(params[0], account.address),
+        ...params.slice(1),
+      ]
+    }
+
+    // What a page signs may be checked against its account's code (ERC-1271,
+    // or d1 picking a raw or wrapped signature), so the code must match the
+    // account's mode first, as for `eth_accounts`: asked or not (bypass).
+    if (isInpage && isSignatureMethod(request.method))
+      await reconcileBeforeAnswering(rpcUrl, {
+        timeoutMs: ETH_ACCOUNTS_RECONCILE_MS,
+      })
+
+    // Sends go through the smart-account execution core, which asks for the
+    // approval itself; plain `eth_sendTransaction`s come back to pass through.
+    // A send that waited in the batch queue comes back with its response.
+    if (isTransactionMethod(request.method)) {
+      const outcome = await handleSend({
+        rpcUrl,
+        request,
+        // `file://` pages have no host.
+        origin: fromWallet ? DEVWALLET_ORIGIN : host || meta.sender.url || '',
+        ask: needsApproval
+            ? (pending, options) =>
+                requestUserDecision({ ...pending, sender: meta.sender }, options)
+            : undefined,
+      })
+      const response =
+          'passThrough' in outcome
+              ? await execute(rpcUrl, outcome.passThrough)
+              : 'response' in outcome
+                  ? outcome.response
+                  : ({
+                    id: request.id,
+                    jsonrpc: '2.0',
+                    result: outcome.result,
+                  } as RpcResponse)
+      walletMessenger.send('transactionExecuted', undefined)
+      return response
+    }
+
+    if (needsApproval) {
       const decision = await requestUserDecision({
         ...request,
         sender: meta.sender,
@@ -80,11 +219,37 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
         return declinedResponse(request, decision.status)
 
       const { id, method, params } = decision.request
-      return execute(rpcClient, { method, params, id } as RpcRequest)
+      return execute(rpcUrl, {
+        method,
+        params,
+        id,
+      } as RpcRequest)
     }
 
+    // EIP-5792 reads are the wallet's to answer, never the node's.
+    if (
+        request.method === 'wallet_getCapabilities' ||
+        request.method === 'wallet_getCallsStatus'
+    )
+      return {
+        id: request.id,
+        jsonrpc: '2.0',
+        result: await walletRequest(rpcUrl, request),
+      } as RpcResponse
+    if (request.method === 'wallet_showCallsStatus')
+      return {
+        id: request.id,
+        jsonrpc: '2.0',
+        result: await showCallsStatus(rpcUrl, request.params),
+      } as RpcResponse
+
     if (isInpage) {
-      if (request.method === 'eth_requestAccounts') {
+      // Connecting the site: shared by `eth_requestAccounts` and
+      // `wallet_requestPermissions`, which differ only in what they return.
+      const connect = async () => {
+        // A frame with no host (an opaque origin) is no site to connect.
+        if (!host) return { declined: unauthorized(request) }
+
         const authorize = () => {
           const { getAccounts } = accountStore.getState()
           const { network } = networkStore.getState()
@@ -95,35 +260,72 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
             rpcUrl: network.rpcUrl,
           })
 
-          const host = new URL(meta.sender.url || '').host.replace('www.', '')
           const addresses = accounts.map((x) => x.address) as Address[]
 
           addSession({ session: { host } })
-          inpageMessenger.send('connect', {
-            chainId: numberToHex(network.chainId),
-          })
+          // The site's pages, in any tab or frame, and no other site's.
+          void sendPageEvent(connectEvent(host, numberToHex(network.chainId)))
 
-          return {
-            id: request.id,
-            jsonrpc: '2.0',
-            result: addresses,
-          } as RpcResponse
+          return { addresses }
         }
 
         const { bypassConnectAuth } = settingsStore.getState()
-        if (bypassConnectAuth) return authorize()
+        if (!bypassConnectAuth) {
+          // The approval screen renders connection requests by method, so a
+          // permissions request is shown as the connection it amounts to.
+          const decision = await requestUserDecision({
+            ...request,
+            method: 'eth_requestAccounts',
+            params: undefined,
+            sender: meta.sender,
+          })
+          if (decision.status !== 'approved')
+            return { declined: declinedResponse(request, decision.status) }
+        }
 
-        const decision = await requestUserDecision({
-          ...request,
-          sender: meta.sender,
-        })
-        if (decision.status !== 'approved')
-          return declinedResponse(request, decision.status)
-
+        // The dApp may read the accounts' code next: match it to their modes.
+        await reconcileBeforeAnswering(rpcUrl)
         return authorize()
       }
 
+      if (request.method === 'eth_requestAccounts') {
+        const connection = await connect()
+        if ('declined' in connection) return connection.declined
+
+        return {
+          id: request.id,
+          jsonrpc: '2.0',
+          result: connection.addresses,
+        } as RpcResponse
+      }
+
+      if (request.method === 'wallet_requestPermissions') {
+        assertEthAccountsRequest(request.params)
+
+        const connection = await connect()
+        if ('declined' in connection) return connection.declined
+
+        return {
+          id: request.id,
+          jsonrpc: '2.0',
+          result: permissionsFor(origin, true),
+        } as RpcResponse
+      }
+
+      if (request.method === 'wallet_getPermissions') {
+        return {
+          id: request.id,
+          jsonrpc: '2.0',
+          result: permissionsFor(origin, !!session),
+        } as RpcResponse
+      }
+
       if (request.method === 'eth_accounts') {
+        // dApps poll this, so a slow node only holds the answer so long.
+        if (session)
+          await reconcileBeforeAnswering(rpcUrl, {
+            timeoutMs: ETH_ACCOUNTS_RECONCILE_MS,
+          })
         const { getAccounts } = accountStore.getState()
         const { network } = networkStore.getState()
 
@@ -141,228 +343,46 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
           result: addresses,
         } as RpcResponse
       }
-
-      if (request.method === 'wallet_getCallsStatus') {
-        const batchId = request.params![0]
-        const { batch } = batchCallsStore.getState()
-        const { transactionHashes } = batch[batchId]
-
-        const responses = await Promise.allSettled(
-            transactionHashes.map((hash) =>
-                rpcClient.request({
-                  body: {
-                    method: 'eth_getTransactionReceipt',
-                    params: [hash],
-                  },
-                }),
-            ),
-        )
-        const pending = responses.some(
-            (response) =>
-                response.status === 'rejected' || !response.value.result,
-        )
-
-        return {
-          id: request.id,
-          jsonrpc: '2.0',
-          result: {
-            status: pending ? 'PENDING' : 'CONFIRMED',
-            receipts: pending
-                ? []
-                : responses
-                    .map((response) => {
-                      if (response.status === 'rejected') return
-                      const receipt = response.value
-                          .result as RpcTransactionReceipt
-                      return {
-                        blockHash: receipt.blockHash,
-                        blockNumber: receipt.blockNumber,
-                        gasUsed: receipt.gasUsed,
-                        logs: receipt.logs,
-                        transactionHash: receipt.transactionHash,
-                        status: receipt.status,
-                      }
-                    })
-                    .filter(Boolean),
-          },
-        } as RpcResponse
-      }
-
-      if (request.method === 'wallet_getCapabilities') {
-        const { networks } = networkStore.getState()
-        return {
-          id: request.id,
-          jsonrpc: '2.0',
-          result: networks.reduce((capabilities, network) => {
-            return {
-              ...capabilities,
-              [numberToHex(network.chainId)]: {
-                atomicBatch: {
-                  supported: false,
-                },
-              },
-            }
-          }, {}),
-        } as RpcResponse
-      }
-
-      if (request.method === 'wallet_showCallsStatus') {
-        const batchId = request.params![0]
-        const { batch } = batchCallsStore.getState()
-        const { transactionHashes } = batch[batchId]
-        walletMessenger.send(
-            'pushRoute',
-            `/transaction/${transactionHashes[0]}`,
-        )
-        return {
-          id: request.id,
-          jsonrpc: '2.0',
-          result: undefined,
-        } as RpcResponse
-      }
     }
 
-    return execute(rpcClient, request)
-  })
+    return execute(rpcUrl, request)
+  }
 }
 
-function declinedResponse(
-    request: RpcRequest,
-    status: Exclude<Decision['status'], 'approved'>,
-) {
+function unauthorized(request: RpcRequest) {
   return {
     id: request.id,
     jsonrpc: '2.0',
     error: {
-      code: UserRejectedRequestError.code,
+      code: UnauthorizedProviderError.code,
       message:
-          status === 'expired'
-              ? 'The request timed out waiting for approval.'
-              : UserRejectedRequestError.message,
-      data: { request },
+        'The requested account and/or method has not been authorized by the user.',
     },
+  } as RpcResponse
+}
+
+function declinedResponse(
+    request: RpcRequest,
+    status: Exclude<PlainDecision['status'], 'approved'>,
+) {
+  return {
+    id: request.id,
+    jsonrpc: '2.0',
+    error: serializeError(declinedError(request, status)),
   } satisfies RpcResponse
 }
 
-async function execute(rpcClient: HttpRpcClient, request: RpcRequest) {
-  // Anvil doesn't support `personal_sign` – use `eth_sign` instead.
+async function execute(rpcUrl: string, request: RpcRequest) {
+  // Sent to the node as `eth_sign` (params swapped), which signs the same
+  // EIP-191 personal message. Anvil 1.7.1 answers `personal_sign` too; one
+  // method keeps every node on the same path.
   if (request.method === 'personal_sign') {
     request.method = 'eth_sign' as any
     request.params = [request.params[1], request.params[0]]
   }
 
-  const response = (await (() => {
-    if (request.method === 'wallet_sendCalls') {
-      return handleSendCalls({
-        ...request.params![0],
-        id: request.id,
-        rpcClient,
-      } as any)
-    }
-
-    return rpcClient.request({
-      body: request,
-    })
-  })()) as unknown as RpcResponse
-
-  if (
-      request.method === 'eth_sendTransaction' ||
-      request.method === 'wallet_sendCalls'
-  )
-    walletMessenger.send('transactionExecuted', undefined)
-
-  if ((response as { success?: boolean }).success === false)
-    return {
-      id: request.id,
-      jsonrpc: '2.0',
-      error: 'An unknown error occurred.',
-    } as RpcResponse
-
-  return response
-}
-
-async function handleSendCalls({
-                                 calls,
-                                 from,
-                                 id,
-                                 rpcClient,
-                               }: {
-  calls: RpcTransactionRequest[]
-  from: Address
-  id: number
-  rpcClient: HttpRpcClient
-}) {
-  const { setBatch } = batchCallsStore.getState()
-
-  // Simulate calls for errors (to ensure atomicity).
-  for (const call of calls) {
-    const { error } = await rpcClient.request({
-      body: {
-        method: 'eth_call',
-        params: [{ ...call, from: from ?? call.from, nonce: undefined }],
-      },
-    })
-    if (error) throw new Error(error.message)
-  }
-
-  // Disable automining (if enabled) to mine transactions atomically.
-  const automine = await rpcClient
-      .request({
-        body: {
-          method: 'anvil_getAutomine',
-        },
-      })
-      .catch(() => {})
-  if (automine?.result)
-    await rpcClient.request({
-      body: {
-        method: 'evm_setAutomine',
-        params: [false],
-      },
-    })
-
-  try {
-    const transactionHashes = []
-    for (let i = 0; i < calls.length; i++) {
-      const call = calls[i]
-      const { result, error } = await rpcClient.request({
-        body: {
-          method: 'eth_sendTransaction',
-          params: [
-            {
-              ...call,
-              from: from ?? call.from,
-              nonce: undefined,
-            },
-          ],
-        },
-      })
-      if (error) throw new Error(error.message)
-
-      transactionHashes.push(result)
-    }
-
-    // Mine a block if automining was originally enabled.
-    if (automine?.result)
-      await rpcClient.request({
-        body: {
-          method: 'anvil_mine',
-          params: ['0x1', '0x0'],
-        },
-      })
-
-    const batchId = keccak256(stringToHex(JSON.stringify(transactionHashes)))
-    setBatch(batchId, { calls, transactionHashes })
-
-    return { id, jsonrpc: '2.0', result: batchId }
-  } finally {
-    // Re-enable automining (if previously enabled).
-    if (automine?.result)
-      await rpcClient.request({
-        body: {
-          method: 'evm_setAutomine',
-          params: [true],
-        },
-      })
-  }
+  // Hardhat exposes the Anvil cheat methods under `hardhat_*`; the node
+  // notices when the node on the url changed kind.
+  const node = await connectNode({ rpcUrl })
+  return (await node.forward(request)) as unknown as RpcResponse
 }

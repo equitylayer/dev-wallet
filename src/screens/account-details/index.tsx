@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { Address } from 'viem'
 
 import { TabsContent, TabsList } from '~/components'
+import { AccountModeLabel } from '~/components/AccountModeLabel'
 import {
     Box,
     Button,
@@ -52,6 +53,9 @@ export default function AccountDetails() {
                         <Text family="address" size="11px">
                             {truncate(address, { start: 5, end: 10 })}
                         </Text>
+                        <Box paddingTop="2px">
+                            <AccountModeLabel address={address as Address} />
+                        </Box>
                     </Stack>
                 </Inline>
             </Box>

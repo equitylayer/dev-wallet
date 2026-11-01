@@ -1,3 +1,7 @@
+import { senderHost } from '~/utils/host'
+
+import { eventIn, pageEventFor, providerPost } from '../page-events'
+import { isRelayedConnection } from './guards'
 import { createTabTransport } from './tab'
 import type { Transport } from './types'
 import { createWindowTransport } from './window'
@@ -28,6 +32,10 @@ export function setupBridgeTransportRelay() {
   // inpage -> content script -> background
   windowTransport.reply('*', async (payload, { connection, topic, id }) => {
     if (!topic) return
+    // The page controls everything it posts, so it may only speak on the
+    // inpage connections. Anything else (`background:wallet`, …) would reach
+    // listeners meant for the extension's own pages.
+    if (!isRelayedConnection(connection)) return
 
     const topic_ = topic.replace('> ', '')
     const response = await tabTransport.send(topic_, payload, {
@@ -38,6 +46,8 @@ export function setupBridgeTransportRelay() {
   })
 
   // background -> content script -> inpage
+  // Only extension contexts can reach a content script (`chrome.tabs`), so
+  // this direction needs no allowlist.
   tabTransport.reply('*', async (payload, { connection, topic, id }) => {
     if (!topic) return
 
@@ -47,5 +57,19 @@ export function setupBridgeTransportRelay() {
       connection,
     })
     return response
+  })
+
+  // background -> content script -> inpage, for events: every frame gets each
+  // one (`sendPageEvent`) and passes on only its own host's. Posted, not
+  // sent: nothing waits for the provider's answer (a frame with no provider
+  // never gives one), and nothing answers the extension.
+  chrome.runtime.onMessage.addListener((message: unknown) => {
+    // A sandboxed frame's origin is opaque (`self.origin`), whatever its url.
+    const origin = self.origin === 'null' ? 'null' : location.origin
+    const event = pageEventFor(
+      eventIn(message),
+      senderHost({ origin, url: location.href }),
+    )
+    if (event) window.postMessage(providerPost(event), '*')
   })
 }

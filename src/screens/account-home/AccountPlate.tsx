@@ -1,7 +1,7 @@
 import { Send as SendIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { formatEther, parseEther } from 'viem'
+import { formatEther, parseEther, size } from 'viem'
 
 import { ImportAccount } from '~/components/ImportAccount'
 import { Box, Button, Input, Text } from '~/design-system'
@@ -10,10 +10,13 @@ import { useBytecode } from '~/hooks/useBytecode'
 import { useNonce } from '~/hooks/useNonce'
 import { useSetBalance } from '~/hooks/useSetBalance'
 import { useSetNonce } from '~/hooks/useSetNonce'
+import { KERNEL_V3_3 } from '~/smart/constants'
+import { classifyCode } from '~/smart/kernel'
 import { formatEth } from '~/utils'
 import { useAccountStore } from '~/zustand'
 import type { Account } from '~/zustand/account'
 
+import { SmartAccount } from './SmartAccount'
 import * as styles from './account-home.css'
 
 const ALIAS_MAX_LENGTH = 24
@@ -47,8 +50,7 @@ export function AccountPlate({
         <Button.Copy height="20px" text={account.address} variant="ghost primary" />
       </Box>
 
-      {/* Smart-account slot: the mode, delegation and payer line goes here
-          once engineering stores it. Until then it renders nothing. */}
+      <SmartAccount account={account} online={online} />
 
       {mode === 'edit' ? (
         <EditState
@@ -242,16 +244,24 @@ function Readouts({ account }: { account: Account }) {
     address: account.address,
   })
 
+  // Classified the way the smart-account slot's mode label is, so the two
+  // never disagree.
   const code_ = (() => {
     if (!codeLoaded) return { label: '—' }
-    if (!code || code === '0x') return { label: 'None' }
-    // EIP-7702 delegation designator: 0xef0100 ++ delegate address.
-    if (code.startsWith('0xef0100'))
-      return {
-        label: '7702',
-        title: `Delegates to 0x${code.slice(8)}`,
-      }
-    return { label: 'Contract', title: `${(code.length - 2) / 2} bytes` }
+    const onchain = classifyCode(code ?? '0x')
+    switch (onchain.kind) {
+      case 'eoa':
+        return { label: 'None' }
+      case 'kernel':
+        return {
+          label: '7702',
+          title: `Delegates to Kernel v3.3 (${KERNEL_V3_3})`,
+        }
+      case 'delegated':
+        return { label: '7702', title: `Delegates to ${onchain.target}` }
+      case 'contract':
+        return { label: 'Contract', title: `${size(code!)} bytes` }
+    }
   })()
 
   return (
