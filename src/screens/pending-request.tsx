@@ -14,6 +14,7 @@ import * as styles from '~/components/approval/approval.css'
 import { Box, Text } from '~/design-system'
 import { dropsExtras, sendTransactionCall } from '~/smart/transaction-call'
 import { type RpcCall, toRpcCall } from '~/smart/types'
+import { defaultAccount } from '~/utils/accounts'
 import { asSent } from '~/utils/asSent'
 import { normalizeHost } from '~/utils/host'
 import {
@@ -24,7 +25,7 @@ import {
 } from '~/utils/signRequest'
 import type { RpcTransaction } from '~/utils/transactionForm'
 import { parseTypedData, typedDataNotice } from '~/utils/typedData'
-import { useAccountStore } from '~/zustand'
+import { useAccountStore, useNetworkStore } from '~/zustand'
 import type { PendingRequest } from '~/zustand/pending-requests'
 
 type ExtractRequest<Method extends string> = Extract<
@@ -83,7 +84,8 @@ function rpcCall(call: unknown): RpcCall {
 function SendCallsRequest({
   request,
 }: { request: ExtractRequest<'wallet_sendCalls'> }) {
-  const { account } = useAccountStore()
+  const { account, accounts } = useAccountStore()
+  const { network } = useNetworkStore()
   const params = request.params?.[0] as
     | { from?: Address; calls?: unknown[]; atomicRequired?: boolean }
     | undefined
@@ -97,7 +99,13 @@ function SendCallsRequest({
       request={request}
       origin={originOf(request)}
       method="wallet_sendCalls"
-      from={params?.from ?? account?.address ?? zeroAddress}
+      from={
+        params?.from ??
+        // As the background picks it: the first `eth_accounts` lists.
+        defaultAccount({ account, accounts, rpcUrl: network.rpcUrl })
+          ?.address ??
+        zeroAddress
+      }
       calls={calls}
       atomicRequired={params?.atomicRequired === true}
     />

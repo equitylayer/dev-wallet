@@ -28,7 +28,7 @@ import {
   findAccount,
   handleWalletRequest,
 } from '~/smart/wallet-core'
-import { filterAccounts } from '~/utils/accounts'
+import { defaultAccount, filterAccounts } from '~/utils/accounts'
 import { serialPerKey } from '~/utils/serial'
 import {
   accountModesStore,
@@ -122,8 +122,10 @@ async function computeSnapshot(rpcUrl: string): Promise<Snapshot> {
       node,
       rpcUrl,
       chainId,
-      // What `eth_accounts` lists first.
-      activeAccount: visible[0]?.address ?? zeroAddress,
+      // What `eth_accounts` lists first (`defaultAccount`), as the approval
+      // screen shows it.
+      activeAccount:
+        defaultAccount({ account, accounts, rpcUrl })?.address ?? zeroAddress,
       accounts: state.accounts.map(({ address, mode, onchain, canSign }) => ({
         address,
         mode,

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { type Address, getAddress } from 'viem'
 
-import { filterAccounts, sameAddresses } from './accounts'
+import { defaultAccount, filterAccounts, sameAddresses } from './accounts'
 
 const rpcA = 'http://127.0.0.1:8545'
 const rpcB = 'http://127.0.0.1:8546'
@@ -155,5 +155,31 @@ describe('sameAddresses', () => {
         [{ address: a1.toLowerCase() as Address }],
       ),
     ).toBe(true)
+  })
+})
+
+describe('defaultAccount', () => {
+  const accounts = [accountB1, accountA1, accountLocal, accountA2]
+
+  test('is the active account when it is on the network', () => {
+    expect(defaultAccount({ account: accountA2, accounts, rpcUrl: rpcA })).toBe(
+      accountA2,
+    )
+    expect(
+      defaultAccount({ account: accountLocal, accounts, rpcUrl: rpcA }),
+    ).toBe(accountLocal)
+  })
+
+  test("an active account on another network isn't: the network's first is", () => {
+    expect(defaultAccount({ account: accountB1, accounts, rpcUrl: rpcA })).toBe(
+      accountA1,
+    )
+  })
+
+  test('is the first visible account with none active, and undefined with none', () => {
+    expect(defaultAccount({ accounts, rpcUrl: rpcA })).toBe(accountA1)
+    expect(
+      defaultAccount({ account: accountB1, accounts: [accountB1], rpcUrl: rpcA }),
+    ).toBeUndefined()
   })
 })

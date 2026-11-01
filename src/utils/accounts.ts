@@ -29,6 +29,17 @@ export function filterAccounts<
   ]
 }
 
+/**
+ * The account a request that names none goes from on `rpcUrl`: the first
+ * that `eth_accounts` lists there, so the active account when it is visible.
+ * The approval screen and the background both pick it this way.
+ */
+export function defaultAccount<
+  T extends { address: Address; rpcUrl?: string },
+>(args: { account?: T; accounts: readonly T[]; rpcUrl?: string }): T | undefined {
+  return filterAccounts({ ...args, activeFirst: true })[0]
+}
+
 /** Whether both lists hold the same addresses in the same order. */
 export function sameAddresses(
   a: readonly { address: Address }[],

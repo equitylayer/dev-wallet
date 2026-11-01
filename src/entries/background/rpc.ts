@@ -15,6 +15,7 @@ import { connectNode } from '~/smart/node'
 import { DEVWALLET_ORIGIN } from '~/smart/queue'
 import { withFrom } from '~/smart/transaction-call'
 import type { RpcRequest, RpcResponse } from '~/types/rpc'
+import { defaultAccount } from '~/utils/accounts'
 import { senderHost } from '~/utils/host'
 import {
   accountStore,
@@ -159,9 +160,12 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
     // pass-through all read it.
     if (isInpage && takesFrom(request.method)) {
       const { network } = networkStore.getState()
-      const [account] = accountStore
-          .getState()
-          .getAccounts({ activeFirst: true, rpcUrl: network.rpcUrl })
+      const { account: active, accounts } = accountStore.getState()
+      const account = defaultAccount({
+        account: active,
+        accounts,
+        rpcUrl: network.rpcUrl,
+      })
       if (!account) return unauthorized(request)
       const params = Array.isArray(request.params) ? request.params : []
       ;(request as { params: unknown[] }).params = [
