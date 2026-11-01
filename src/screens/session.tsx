@@ -16,7 +16,7 @@ export default function Session() {
   return (
     <>
       <Box>
-        <Container dismissable fit header={host?.replace('www.', '')}>
+        <Container dismissable fit header={host}>
           {isConnected ? (
             <Button
               onClick={() =>
@@ -51,7 +51,7 @@ export default function Session() {
                   >
                     <LabelledContent label="Host" width="fit">
                       <Text size="12px">
-                        {session.host.replace('www.', '')}
+                        {session.host}
                       </Text>
                     </LabelledContent>
                     <Button.Symbol

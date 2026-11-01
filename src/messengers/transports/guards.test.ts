@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   isExtensionPageSender,
+  isPageSender,
   isRelayedConnection,
   openWalletMessage,
 } from './guards'
@@ -139,5 +140,54 @@ describe('openWalletMessage', () => {
     { type: 'openWallet', payload: { method: { toString: 'eth_sign' } } },
   ])('%p is dropped', (data) => {
     expect(openWalletMessage(data)).toBeUndefined()
+  })
+})
+
+describe('isPageSender', () => {
+  test("a page's top frame, through the content script, is a page", () => {
+    expect(
+      isPageSender(
+        { id, url: 'https://dapp.test/', tab: { id: 7 }, frameId: 0 },
+        id,
+        origin,
+      ),
+    ).toBe(true)
+  })
+
+  test('so is any of its subframes', () => {
+    expect(
+      isPageSender(
+        {
+          id,
+          url: 'https://evil.test/frame',
+          origin: 'https://evil.test',
+          tab: { id: 7 },
+          frameId: 4,
+        },
+        id,
+        origin,
+      ),
+    ).toBe(true)
+  })
+
+  test('the side panel, the wallet in a tab and the worker are not', () => {
+    expect(isPageSender({ id, url: `${origin}src/index.html` }, id, origin)).toBe(
+      false,
+    )
+    expect(
+      isPageSender(
+        { id, url: `${origin}src/index.html`, tab: { id: 7 }, frameId: 0 },
+        id,
+        origin,
+      ),
+    ).toBe(false)
+    expect(
+      isPageSender({ id, url: `${origin}service-worker-loader.js` }, id, origin),
+    ).toBe(false)
+  })
+
+  test('anything unidentified counts as a page', () => {
+    expect(isPageSender({}, id, origin)).toBe(true)
+    expect(isPageSender({ id }, id, origin)).toBe(true)
   })
 })

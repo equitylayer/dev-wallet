@@ -15,6 +15,7 @@ import { Box, Text } from '~/design-system'
 import { sendTransactionCall } from '~/smart/transaction-call'
 import { type RpcCall, toRpcCall } from '~/smart/types'
 import { asSent } from '~/utils/asSent'
+import { normalizeHost } from '~/utils/host'
 import {
   canonicalParams,
   payloadBytes,
@@ -59,7 +60,7 @@ function originOf(request: PendingRequest): string | undefined {
   if (!url) return undefined
   if (url.startsWith('chrome-extension://')) return 'DevWallet'
   try {
-    return new URL(url).host.replace(/^www\./, '') || url
+    return normalizeHost(new URL(url).host) || url
   } catch {
     return url
   }

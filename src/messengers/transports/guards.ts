@@ -33,6 +33,19 @@ export function isExtensionPageSender(
   return sender.url.startsWith(prefix)
 }
 
+/**
+ * Whether a message comes from a web page: anything that isn't one of our
+ * extension pages, which is every frame's content script, top or not. A page
+ * request is checked against its frame's own session.
+ */
+export function isPageSender(
+  sender: MessageSenderLike,
+  extensionId: string,
+  extensionOrigin: string,
+): boolean {
+  return !isExtensionPageSender(sender, extensionId, extensionOrigin)
+}
+
 /** The connections a web page may use through the content-script relay. */
 export const RELAYED_CONNECTIONS = ['background:inpage', 'wallet:inpage'] as const
 

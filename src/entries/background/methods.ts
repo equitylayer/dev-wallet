@@ -51,6 +51,24 @@ export function opensSidebar(method: string, s: ApprovalSettings): boolean {
   return requiresApproval(method, s) || isOneOf(SIDEBAR_METHODS, method)
 }
 
+/**
+ * The node a request goes to. A page's always goes to the wallet's network:
+ * the page posts the message itself, so the `rpcUrl` in it is the page's to
+ * pick. A wallet screen may name one (the network it shows).
+ */
+export function requestRpcUrl({
+  fromPage,
+  requested,
+  current,
+}: {
+  fromPage: boolean
+  requested: string | undefined
+  current: string
+}): string {
+  if (fromPage) return current
+  return requested || current
+}
+
 /** EIP-1193: the user rejected the request. */
 export const USER_REJECTED = 4001
 /** EIP-5792: the user declined the account upgrade a batch needed. */

@@ -10,6 +10,7 @@ import {
   isTransactionMethod,
   opensSidebar,
   permissionsFor,
+  requestRpcUrl,
   requiresApproval,
   withSerializedErrors,
 } from './methods'
@@ -205,6 +206,38 @@ describe('declinedError', () => {
     )
     expect(declinedError(request, 'expired', { upgrade: true }).code).toBe(
       4001,
+    )
+  })
+})
+
+describe('requestRpcUrl', () => {
+  const current = 'http://127.0.0.1:8545'
+
+  test("a page's request goes to the wallet's network, whatever it names", () => {
+    expect(
+      requestRpcUrl({ fromPage: true, requested: 'http://evil.test', current }),
+    ).toBe(current)
+    expect(
+      requestRpcUrl({ fromPage: true, requested: undefined, current }),
+    ).toBe(current)
+  })
+
+  test('a wallet screen may name its network', () => {
+    expect(
+      requestRpcUrl({
+        fromPage: false,
+        requested: 'http://127.0.0.1:9545',
+        current,
+      }),
+    ).toBe('http://127.0.0.1:9545')
+  })
+
+  test("a wallet screen that names none gets the wallet's", () => {
+    expect(
+      requestRpcUrl({ fromPage: false, requested: undefined, current }),
+    ).toBe(current)
+    expect(requestRpcUrl({ fromPage: false, requested: '', current })).toBe(
+      current,
     )
   })
 })

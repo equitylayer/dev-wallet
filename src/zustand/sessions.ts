@@ -1,4 +1,5 @@
 import { useSyncExternalStoreWithTracked } from '~/hooks/useSyncExternalStoreWithTracked'
+import { normalizeHost } from '~/utils/host'
 
 import { createStore } from './utils'
 
@@ -15,23 +16,29 @@ export type SessionsActions = {
 }
 export type SessionsStore = SessionsState & SessionsActions
 
+/** Hosts are stored and matched normalized (`normalizeHost`). */
+const sameHost = (a: Host, b: Host) => normalizeHost(a) === normalizeHost(b)
+
 export const sessionsStore = createStore<SessionsStore>(
   (set, get) => ({
     sessions: [],
     addSession({ session }) {
-      if (get().sessions.find((s) => s.host === session.host)) return
+      if (get().sessions.find((s) => sameHost(s.host, session.host))) return
       set((state) => ({
         ...state,
-        sessions: [...state.sessions, session],
+        sessions: [
+          ...state.sessions,
+          { ...session, host: normalizeHost(session.host) },
+        ],
       }))
     },
     getSession({ host }) {
-      return get().sessions.find((session) => session.host === host)
+      return get().sessions.find((session) => sameHost(session.host, host))
     },
     removeSession({ host }) {
       set((state) => {
         const sessions = state.sessions.filter(
-          (session) => session.host !== host,
+          (session) => !sameHost(session.host, host),
         )
         return {
           ...state,

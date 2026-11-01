@@ -81,6 +81,7 @@ function observable<T>(initial: T) {
 }
 const batchQueue = observable<{ queue: BatchQueue | null }>({ queue: null })
 const network = observable({ network: { rpcUrl: '' }, onboarded: true })
+let connectedHosts: Set<string> | null = null
 const pendingRequests: (RpcRequest & {
   sender?: { tab?: { id?: number } }
 })[] = []
@@ -121,10 +122,15 @@ mock.module('~/zustand', () => ({
     subscribe: network.subscribe,
     getState: network.get,
   },
-  // Every site is connected.
+  // Every site is connected, unless a test names the connected hosts.
   sessionsStore: {
     persist,
-    getState: () => ({ getSession: ({ host }: { host: string }) => ({ host }) }),
+    getState: () => ({
+      getSession: ({ host }: { host: string }) =>
+        connectedHosts === null || connectedHosts.has(host)
+          ? { host }
+          : undefined,
+    }),
   },
   pendingRequestsStore: {
     persist,
@@ -1193,6 +1199,17 @@ describe('batch queue', () => {
 describe('request ids', () => {
   type Handler = (payload: unknown, meta: unknown) => Promise<RpcResponse>
   let rpcHandler: Handler | undefined
+  // The handler tells a page from DevWallet's own screens by the extension's
+  // id and url; only those two are needed.
+  beforeEach(() => {
+    const id = 'abcdefghijklmnopabcdefghijklmnop'
+    ;(globalThis as { chrome?: unknown }).chrome = {
+      runtime: { id, getURL: (path: string) => `chrome-extension://${id}/${path}` },
+    }
+  })
+  afterEach(() => {
+    delete (globalThis as { chrome?: unknown }).chrome
+  })
   setupRpcHandler({
     messenger: {
       connection: 'background:inpage',
@@ -1280,6 +1297,88 @@ describe('request ids', () => {
     }
     await waitForReceipt(node, hash)
     expect(await node.getBalance(X)).toBe(2n)
+  })
+})
+
+describe('page requests', () => {
+  type Handler = (payload: unknown, meta: unknown) => Promise<RpcResponse>
+  let rpcHandler: Handler | undefined
+  setupRpcHandler({
+    messenger: {
+      connection: 'background:inpage',
+      reply: (_topic: string, handler: Handler) => {
+        rpcHandler = handler
+        return () => {}
+      },
+    } as unknown as Parameters<typeof setupRpcHandler>[0]['messenger'],
+  })
+  beforeEach(() => {
+    const id = 'abcdefghijklmnopabcdefghijklmnop'
+    ;(globalThis as { chrome?: unknown }).chrome = {
+      runtime: { id, getURL: (path: string) => `chrome-extension://${id}/${path}` },
+    }
+    connectedHosts = new Set(['dapp.test'])
+  })
+  afterEach(() => {
+    delete (globalThis as { chrome?: unknown }).chrome
+    connectedHosts = null
+  })
+
+  type Sender = Record<string, unknown>
+  /** The top frame of a tab on `host`. */
+  const top = (host: string): Sender => ({
+    tab: { id: 1, url: `https://${host}/` },
+    url: `https://${host}/`,
+    origin: `https://${host}`,
+    frameId: 0,
+  })
+  /** A frame on `host` inside a tab on `tabHost`. */
+  const subframe = (host: string, tabHost: string): Sender => ({
+    tab: { id: 1, url: `https://${tabHost}/` },
+    url: `https://${host}/frame.html`,
+    origin: `https://${host}`,
+    frameId: 3,
+  })
+  function ask(method: string, params: unknown, sender: Sender, url?: string) {
+    if (!rpcHandler) throw new Error('no rpc handler')
+    return rpcHandler(
+      { request: { id: 1, method, params }, rpcUrl: url },
+      { sender },
+    )
+  }
+
+  test("the page's rpcUrl is ignored: the wallet's network answers", async () => {
+    expect(
+      await ask('eth_chainId', [], top('dapp.test'), 'http://127.0.0.1:1'),
+    ).toEqual({ id: 1, jsonrpc: '2.0', result: '0x7a69' })
+  })
+
+  test("a subframe is checked against its own host, not its tab's", async () => {
+    const permissions = async (sender: Sender) =>
+      (await ask('wallet_getPermissions', [], sender)).result
+    expect(await permissions(top('dapp.test'))).toHaveLength(1)
+    expect(await permissions(subframe('evil.test', 'dapp.test'))).toEqual([])
+    expect(
+      await ask(
+        'personal_sign',
+        ['0x68656c6c6f', smart],
+        subframe('evil.test', 'dapp.test'),
+      ),
+    ).toMatchObject({ id: 1, error: { code: 4100 } })
+    expect(pendingRequests).toHaveLength(0)
+  })
+
+  test("a connected site's own subframe is connected", async () => {
+    expect(
+      (await ask('wallet_getPermissions', [], subframe('dapp.test', 'x.test')))
+        .result,
+    ).toHaveLength(1)
+  })
+
+  test('www. is the same site as its bare host', async () => {
+    expect(
+      (await ask('wallet_getPermissions', [], top('www.dapp.test'))).result,
+    ).toHaveLength(1)
   })
 })
 

@@ -7,11 +7,13 @@ import {
 } from '~/errors'
 import { type Messenger, getMessenger } from '~/messengers'
 import type { Schema } from '~/messengers/schema'
+import { isPageSender } from '~/messengers/transports/guards'
 import type { CallbackOptions } from '~/messengers/transports/types'
 import { serializeError } from '~/smart/errors'
 import { connectNode, nodeMethod } from '~/smart/node'
 import { DEVWALLET_ORIGIN } from '~/smart/queue'
 import type { RpcRequest, RpcResponse } from '~/types/rpc'
+import { senderHost } from '~/utils/host'
 import {
   accountStore,
   networkStore,
@@ -24,6 +26,7 @@ import {
   declinedError,
   isTransactionMethod,
   permissionsFor,
+  requestRpcUrl,
   requiresApproval,
   withSerializedErrors,
 } from './methods'
@@ -72,16 +75,24 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
     meta: CallbackOptions,
   ): Promise<RpcResponse> {
     const { request, rpcUrl: rpcUrl_ } = payload
-    const isInpage =
-        meta.sender.tab &&
-        !meta.sender.tab?.url?.includes('extension://') &&
-        (!meta.sender.frameId || meta.sender.frameId === 0)
+    // Anything that isn't one of our extension pages is a page: a content
+    // script in any frame, top or not. Each frame is its own site.
+    const isInpage = isPageSender(
+        meta.sender,
+        chrome.runtime.id,
+        chrome.runtime.getURL(''),
+    )
 
-    const rpcUrl = rpcUrl_ || networkStore.getState().network.rpcUrl
+    const rpcUrl = requestRpcUrl({
+      fromPage: isInpage,
+      requested: rpcUrl_,
+      current: networkStore.getState().network.rpcUrl,
+    })
     const rpcClient = getHttpRpcClient(rpcUrl)
 
     const { getSession } = sessionsStore.getState()
-    const host = new URL(meta.sender.url || '').host
+    // The asking frame's own host, as sessions are stored.
+    const host = senderHost(meta.sender)
     // `file://` pages report the opaque origin `'null'`.
     const origin = meta.sender.origin ?? new URL(meta.sender.url || '').origin
     const session = getSession({ host })
@@ -188,7 +199,6 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
             rpcUrl: network.rpcUrl,
           })
 
-          const host = new URL(meta.sender.url || '').host.replace('www.', '')
           const addresses = accounts.map((x) => x.address) as Address[]
 
           addSession({ session: { host } })

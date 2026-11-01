@@ -203,7 +203,7 @@ export function ConnectedSection() {
             <Box style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Box className={styles.shrink}>
                 <Text size="13px" weight="medium" wrap={false}>
-                  {session.host.replace('www.', '')}
+                  {session.host}
                 </Text>
               </Box>
               {session.host === host && (
