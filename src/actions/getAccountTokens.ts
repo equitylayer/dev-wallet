@@ -1,29 +1,29 @@
 import type { Address, GetLogsParameters } from 'viem'
 import {
-  AbiDecodingDataSizeInvalidError,
-  AbiDecodingDataSizeTooSmallError,
-  AbiDecodingZeroDataError,
   BaseError,
-  ContractFunctionRevertedError,
-  ContractFunctionZeroDataError,
+  HttpRequestError,
+  SocketClosedError,
+  TimeoutError,
+  WebSocketRequestError,
   erc20Abi,
 } from 'viem'
 
 import type { Client } from '~/viem'
 
-// A call that reverted, returned nothing or returned undecodable data says
-// "this address is not an ERC-20". Anything else (HTTP, timeout, ...) says
-// nothing about the token, so the caller must not treat it as a verdict.
-function isNotAnErc20(err: unknown) {
+// Only a failure to reach the node says nothing about the token; the caller
+// must not treat it as a verdict. Any answer from the node (a revert, whatever
+// error code the node uses for it, empty or undecodable data) means "not an
+// ERC-20". Nodes differ on revert codes, so this checks for transport errors
+// rather than listing revert shapes.
+function isTransportFailure(err: unknown) {
   if (!(err instanceof BaseError)) return false
   return Boolean(
     err.walk(
       (e) =>
-        e instanceof ContractFunctionRevertedError ||
-        e instanceof ContractFunctionZeroDataError ||
-        e instanceof AbiDecodingZeroDataError ||
-        e instanceof AbiDecodingDataSizeTooSmallError ||
-        e instanceof AbiDecodingDataSizeInvalidError,
+        e instanceof HttpRequestError ||
+        e instanceof TimeoutError ||
+        e instanceof WebSocketRequestError ||
+        e instanceof SocketClosedError,
     ),
   )
 }
@@ -95,8 +95,8 @@ export async function getAccountTokens(
         }
         return isValid ? tokenAddress : null
       } catch (err) {
-        if (isNotAnErc20(err)) return null
-        throw err
+        if (isTransportFailure(err)) throw err
+        return null
       }
     }),
   )

@@ -98,6 +98,24 @@ describe('getAccountTokens', () => {
     ).toEqual([TOKEN_OK])
   })
 
+  test('skips a revert whatever error code the node reports it with', async () => {
+    const { client } = makeClient({
+      getLogs: () => [log(TOKEN_OK), log(TOKEN_REVERTS)],
+      call: (to) => {
+        if (to === TOKEN_OK) return decimals18
+        // geth-style: -32000 and no data, not code 3
+        throw new RpcRequestError({
+          body: {},
+          url: 'http://localhost:8545',
+          error: { code: -32000, message: 'execution reverted' },
+        })
+      },
+    })
+    expect(
+      await getAccountTokens(client, { address: account, toBlock: 'latest' }),
+    ).toEqual([TOKEN_OK])
+  })
+
   test('rejects when getLogs fails, so a failed scan cannot look like "no tokens"', async () => {
     const { client } = makeClient({
       getLogs: () => {
