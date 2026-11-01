@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-01T03:47:13+00:00",
+  "generatedAt": "2026-11-01T04:31:20+00:00",
   "title": "Design System: DevWallet",
   "extensions": {
     "colorMeta": {
@@ -752,15 +752,15 @@
       },
       "body": {
         "displayName": "Body",
-        "purpose": "Workhorse: bottom nav labels, 28px button labels, row titles and section headers (medium)."
+        "purpose": "Workhorse: bottom nav labels, 28px button labels, the switcher's alias (medium) and filter text, row titles and section headers (medium)."
       },
       "caption": {
         "displayName": "Caption",
-        "purpose": "Account chips, row metadata, section-header actions, 24px button labels, status-line words."
+        "purpose": "Row metadata, the switcher list's note, footer link and hint, section-header actions, 24px button labels, status-line words."
       },
       "label": {
         "displayName": "Label",
-        "purpose": "11px sentence-case readout labels, units beside a number, tags; the floor."
+        "purpose": "11px sentence-case readout labels, units beside a number, tags; the floor. Switcher shortcut digits take 11px mono."
       },
       "data-readout": {
         "displayName": "Data Readout",
@@ -768,28 +768,38 @@
       },
       "data": {
         "displayName": "Data",
-        "purpose": "Balances and amounts at the right of rows (IBM Plex Mono, tabular)."
+        "purpose": "Balances and amounts at the right of rows (IBM Plex Mono, tabular); two decimals from 1 ETH up so columns align."
       },
       "data-small": {
         "displayName": "Data Small",
-        "purpose": "Full and truncated addresses, token names, status-line host, chain id and block, compact hex inputs."
+        "purpose": "Full and truncated addresses (plate, switcher, rows), switcher balances, token names, status-line host, chain id and block, compact hex inputs."
       }
     },
     "shadows": [
       {
+        "name": "floating-layer",
+        "value": "0 14px 32px -12px rgb(0 0 0 / 0.5)",
+        "purpose": "The one depth shadow, only on a layer that floats over content (the account switcher's list), always with a 1px paper-rule border."
+      },
+      {
         "name": "toggle-knob",
         "value": "0 1px 3px rgba(0, 0, 0, 0.3)",
-        "purpose": "Physical cue on the toggle knob only; the system is otherwise flat."
+        "purpose": "Physical cue on the toggle knob only; resting surfaces are otherwise flat."
       },
       {
         "name": "accent-rule-bottom",
         "value": "inset 0 -1.5px 0 <theme accent>",
-        "purpose": "Active account chip, \"All\" and active in-screen tab: a structural rule on the edge facing the content, not elevation."
+        "purpose": "Open account switcher and active in-screen tab: a structural rule on the edge facing the content, not elevation."
       },
       {
         "name": "accent-rule-top",
         "value": "inset 0 1.5px 0 <theme accent>",
         "purpose": "Active bottom-nav item: the rule sits on the top edge, facing the content."
+      },
+      {
+        "name": "active-highlight-ring",
+        "value": "inset 0 0 0 1px <theme accent at 0.45>",
+        "purpose": "Switcher list row that is both the active account and the highlight, so the highlight reads on the accent wash. Not depth."
       },
       {
         "name": "focus-outline",
@@ -811,7 +821,17 @@
       {
         "name": "shell-state",
         "value": "background-color, color 120ms ease-out",
-        "purpose": "Hover and state changes on account chips and nav items."
+        "purpose": "Hover and state changes on the switcher bar and nav items."
+      },
+      {
+        "name": "switcher-enter",
+        "value": "opacity 0.4 to 1, translateY(-4px) to none, 160ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "The account switcher's list entering under the bar. Off under reduced motion."
+      },
+      {
+        "name": "switcher-chevron",
+        "value": "transform rotate(180deg), 160ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "The switcher chevron turning while the list is open. Off under reduced motion."
       },
       {
         "name": "row-tools-reveal",
@@ -893,12 +913,12 @@
       "css": ".ds-input { width: 300px; height: 24px; padding: 0 6px; background: #fdfcfb; color: #2a2520; border: 1px solid rgb(42 37 32 / 0.2); border-radius: 0; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 11px; line-height: 15px; transition: border-color 100ms ease; caret-color: #00717f; } .ds-input::placeholder { color: #7a7570; } .ds-input::selection { background: rgb(0 113 127 / 0.28); } .ds-input:hover { border-color: rgb(42 37 32 / 0.3); } .ds-input:focus, .ds-input:focus-visible { outline: none; border-color: #00717f; } .ds-input[aria-invalid=\"true\"] { border-color: #dc3d43; }"
     },
     {
-      "name": "Account Strip",
+      "name": "Account Switcher",
       "kind": "nav",
-      "refersTo": "account-chip-active",
-      "description": "Global quick switch on the ground color: home cell, scrolling account chips (active = raised canvas + 1.5px accent bottom rule), \"All\" with the count.",
-      "html": "<nav class=\"ds-strip\" aria-label=\"Accounts\"><a class=\"ds-strip-home\" href=\"#\" aria-label=\"Account home\"><span class=\"ds-logo\"></span></a><div class=\"ds-chips\"><button class=\"ds-chip\" aria-current=\"true\">deployer</button><button class=\"ds-chip ds-mono\">0x7099…79C8</button><button class=\"ds-chip ds-mono\">0x3C44…93BC</button><button class=\"ds-chip\">alice</button></div><a class=\"ds-all\" href=\"#\">All <span class=\"ds-count\">10</span></a></nav>",
-      "css": ".ds-strip { display: flex; align-items: stretch; width: 340px; height: 40px; background: #f9f7f4; border-bottom: 1px solid #dcd9d4; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px; line-height: 16px; letter-spacing: 0.1px; } .ds-strip-home { display: grid; place-items: center; width: 40px; flex-shrink: 0; border-right: 1px solid #ebe8e3; } .ds-strip-home:hover { background: #faf9f7; } .ds-logo { width: 22px; height: 22px; border-radius: 5px; background: linear-gradient(135deg, #0d4f5c, #1b2a4a); } .ds-chips { display: flex; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); } .ds-chip { flex-shrink: 0; padding: 0 12px; background: none; border: 0; border-right: 1px solid #ebe8e3; color: #5a5550; font: inherit; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background-color 120ms ease-out, color 120ms ease-out; } .ds-chip.ds-mono { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; font-weight: 400; letter-spacing: 0; } .ds-chip:hover { background: #faf9f7; color: #2a2520; } .ds-chip[aria-current=\"true\"] { cursor: default; color: #2a2520; background: #fdfcfb; box-shadow: inset 0 -1.5px 0 #00717f; } .ds-chip:focus-visible, .ds-all:focus-visible { outline: 1.5px solid #00717f; outline-offset: -1.5px; } .ds-all { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 0 12px; color: #5a5550; text-decoration: none; border-left: 1px solid #dcd9d4; } .ds-all:hover { background: #faf9f7; color: #2a2520; } .ds-count { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; color: #7a7570; }"
+      "refersTo": "account-switcher-open",
+      "description": "Global quick switch: a 40px ground bar (logo home cell, one button naming the active account; open = raised canvas + 1.5px accent bottom rule) over a floating list with a 28px filter, 36px rows (shortcut digit, label, tabular balance, accent check on the active row) and an \"All accounts\" footer.",
+      "html": "<div class=\"ds-sw\"><nav class=\"ds-sw-bar\" aria-label=\"Account\"><a class=\"ds-sw-home\" href=\"#\" aria-label=\"Account home\"><span class=\"ds-logo\"></span></a><button class=\"ds-sw-btn\" type=\"button\" data-state=\"open\" aria-label=\"Switch account. Active: deployer\"><span class=\"ds-sw-name\">deployer</span><span class=\"ds-sw-addr\">0xf39F…2266</span><svg class=\"ds-sw-chev\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m6 9 6 6 6-6\"/></svg></button></nav><div class=\"ds-sw-pop\" role=\"dialog\" aria-label=\"Switch account\"><div class=\"ds-sw-filter\"><input class=\"ds-sw-input\" role=\"combobox\" placeholder=\"Filter, or paste an address to impersonate\"></div><div class=\"ds-sw-list\" role=\"listbox\" aria-label=\"Accounts\"><div class=\"ds-sw-opt\" role=\"option\" data-active><span class=\"ds-sw-key\">1</span><span class=\"ds-sw-name\">deployer</span><span class=\"ds-sw-addr\">0xf39F…2266</span><span class=\"ds-sw-bal\">9,998.42</span><svg class=\"ds-sw-check\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-label=\"Active\"><path d=\"M20 6 9 17l-5-5\"/></svg></div><div class=\"ds-sw-opt\" role=\"option\" data-highlighted><span class=\"ds-sw-key\">2</span><span class=\"ds-sw-addr ds-sw-alone\">0x7099…79C8</span><span class=\"ds-sw-bal\">10,000.00</span><span class=\"ds-sw-check\"></span></div><div class=\"ds-sw-opt\" role=\"option\"><span class=\"ds-sw-key\">3</span><span class=\"ds-sw-name\">alice</span><span class=\"ds-sw-addr\">0x3C44…93BC</span><span class=\"ds-sw-bal\">0.25</span><span class=\"ds-sw-check\"></span></div></div><div class=\"ds-sw-foot\"><a class=\"ds-sw-link\" href=\"#\">All accounts</a><span class=\"ds-sw-hint\">Arrow keys move, Enter switches</span></div></div></div>",
+      "css": ".ds-sw { width: 340px; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 13px; line-height: 17px; color: #2a2520; } .ds-sw-bar { display: flex; align-items: stretch; height: 40px; background: #f9f7f4; border-bottom: 1px solid #dcd9d4; } .ds-sw-home { display: grid; place-items: center; width: 40px; flex-shrink: 0; border-right: 1px solid #ebe8e3; } .ds-sw-home:hover { background: #faf9f7; } .ds-logo { width: 22px; height: 22px; border-radius: 5px; background: linear-gradient(135deg, #0d4f5c, #1b2a4a); } .ds-sw-btn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: none; border: 0; font: inherit; color: #2a2520; white-space: nowrap; cursor: pointer; transition: background-color 120ms ease-out; } .ds-sw-btn:hover { background: #faf9f7; } .ds-sw-btn[data-state=\"open\"] { background: #fdfcfb; box-shadow: inset 0 -1.5px 0 #00717f; } .ds-sw-btn:focus-visible, .ds-sw-home:focus-visible, .ds-sw-link:focus-visible { outline: 1.5px solid #00717f; outline-offset: -1.5px; } .ds-sw-chev { margin-left: auto; flex-shrink: 0; color: #7a7570; transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-sw-btn[data-state=\"open\"] .ds-sw-chev { transform: rotate(180deg); } .ds-sw-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 500; color: #2a2520; } .ds-sw-addr { flex-shrink: 0; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; line-height: 16px; color: #7a7570; } .ds-sw-opt .ds-sw-alone { color: #5a5550; } .ds-sw-btn .ds-sw-alone { color: #2a2520; } .ds-sw-pop { width: 324px; margin: 4px 0 0 8px; background: #fdfcfb; border: 1px solid #dcd9d4; box-shadow: 0 14px 32px -12px rgb(0 0 0 / 0.5); animation: ds-sw-in 160ms cubic-bezier(0.16, 1, 0.3, 1); } @keyframes ds-sw-in { from { opacity: 0.4; transform: translateY(-4px); } to { opacity: 1; transform: none; } } .ds-sw-filter { padding: 8px; border-bottom: 1px solid #ebe8e3; } .ds-sw-input { display: block; width: 100%; box-sizing: border-box; height: 28px; padding: 0 8px; background: #fdfcfb; color: #2a2520; border: 1px solid rgb(42 37 32 / 0.2); border-radius: 0; font: inherit; font-size: 13px; caret-color: #00717f; transition: border-color 100ms ease; } .ds-sw-input::placeholder { color: #7a7570; } .ds-sw-input:hover { border-color: rgb(42 37 32 / 0.3); } .ds-sw-input:focus, .ds-sw-input:focus-visible { outline: none; border-color: #00717f; } .ds-sw-list { max-height: 360px; overflow-y: auto; padding: 4px 0; } .ds-sw-opt { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; white-space: nowrap; cursor: pointer; } .ds-sw-opt:hover, .ds-sw-opt[data-highlighted] { background: #ede9e4; } .ds-sw-opt[data-active] { background: #e3eff0; } .ds-sw-opt[data-active][data-highlighted] { box-shadow: inset 0 0 0 1px rgb(0 113 127 / 0.45); } .ds-sw-key { width: 10px; flex-shrink: 0; text-align: center; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 11px; line-height: 15px; color: #7a7570; } .ds-sw-bal { margin-left: auto; padding-left: 8px; flex-shrink: 0; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; line-height: 16px; font-variant-numeric: tabular-nums; color: #5a5550; } .ds-sw-check { width: 14px; height: 14px; flex-shrink: 0; color: #00717f; } .ds-sw-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border-top: 1px solid #ebe8e3; font-size: 12px; line-height: 16px; } .ds-sw-link { flex-shrink: 0; color: #5a5550; text-decoration: none; } .ds-sw-link:hover { color: #2a2520; text-decoration: underline; text-underline-offset: 2px; } .ds-sw-hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #7a7570; } @media (prefers-reduced-motion: reduce) { .ds-sw-pop { animation: none; } .ds-sw-chev { transition: none; } }"
     },
     {
       "name": "Bottom Nav and Status Line",
@@ -912,7 +932,7 @@
       "name": "Offline Banner",
       "kind": "custom",
       "refersTo": "offline-banner",
-      "description": "Inline, non-blocking red-tint band under the strip when the node is unreachable; the last known state stays readable.",
+      "description": "Inline, non-blocking red-tint band under the switcher bar when the node is unreachable; the last known state stays readable.",
       "html": "<div class=\"ds-offline\" role=\"status\"><svg class=\"ds-offline-icon\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 20h.01\"/><path d=\"M8.5 16.429a5 5 0 0 1 7 0\"/><path d=\"M5 12.859a10 10 0 0 1 5.17-2.69\"/><path d=\"M19 12.859a10 10 0 0 0-2.007-1.523\"/><path d=\"M2 8.82a15 15 0 0 1 4.177-2.643\"/><path d=\"M22 8.82a15 15 0 0 0-11.288-3.764\"/><path d=\"m2 2 20 20\"/></svg><div class=\"ds-offline-main\"><div class=\"ds-offline-title\">Node offline</div><div class=\"ds-offline-body\">127.0.0.1:8545 isn't responding. Showing the last known state; it reconnects on its own.</div></div><button class=\"ds-offline-action\">Networks</button></div>",
       "css": ".ds-offline { display: flex; align-items: flex-start; gap: 8px; width: 316px; padding: 10px 12px; background: #ffe5e4; color: #2a2520; border-bottom: 1px solid rgb(220 61 67 / 0.4); font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; } .ds-offline-icon { flex-shrink: 0; margin-top: 1px; color: #dc3d43; } .ds-offline-main { flex: 1; min-width: 0; } .ds-offline-title { font-size: 13px; font-weight: 600; line-height: 17px; color: #dc3d43; } .ds-offline-body { padding-top: 4px; font-size: 12px; line-height: 16px; letter-spacing: 0.1px; } .ds-offline-action { align-self: center; flex-shrink: 0; padding: 4px 8px; background: none; border: 1px solid rgb(220 61 67 / 0.5); border-radius: 0; color: inherit; font: inherit; font-size: 12px; cursor: pointer; } .ds-offline-action:hover { background: rgb(220 61 67 / 0.12); } .ds-offline-action:focus-visible { outline: 1.5px solid #00717f; outline-offset: -1.5px; }"
     },
@@ -935,18 +955,18 @@
     {
       "name": "Toggle",
       "kind": "custom",
-      "description": "Softly squared switch (4px track, 2px knob); the only shadowed element. On uses the theme accent with a white knob (On Amber knob in dark).",
+      "description": "Softly squared switch (4px track, 2px knob); the only shadowed control. On uses the theme accent with a white knob (On Amber knob in dark).",
       "html": "<button class=\"ds-toggle\" role=\"switch\" aria-checked=\"true\" aria-label=\"Auto-mine\"></button> <button class=\"ds-toggle\" role=\"switch\" aria-checked=\"false\" aria-label=\"Interval mining\"></button>",
       "css": ".ds-toggle { position: relative; width: 37px; height: 20px; border: none; border-radius: 4px; background: #e8e5e0; cursor: pointer; vertical-align: middle; } .ds-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 2px; background: #ffffff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); transition: left 200ms ease; } .ds-toggle[aria-checked=\"true\"] { background: #00717f; } .ds-toggle[aria-checked=\"true\"]::after { left: 19px; } .ds-toggle:focus-visible { outline: 1.5px solid #00717f; outline-offset: 2px; } @media (prefers-reduced-motion: reduce) { .ds-toggle::after { transition: none; } }"
     }
   ],
   "narrative": {
     "northStar": "The Terminal Sidecar",
-    "overview": "DevWallet is a terminal pane docked beside the browser. It sits in Chrome's side panel next to the dApp being built and reads like an instrument the developer glances at between keystrokes. Readouts are dense, every edge is hard, and color appears only when the chain has something to say. The panel is a narrow column of hairline-ruled cells framed by two ground-colored bands: an account strip across the top, and the section nav over a one-line node status at the bottom. Between them, on the raised canvas, sit the screen's plate and its lists of rows. Hierarchy comes from type size, ink weight and tonal steps between surfaces. It never comes from cards, shadows or ornament.\n\nThere are two grounds and they are not mirror images. **Warm Paper** (light) is an unbleached off-white with warm grey-brown ink, a lab notebook on the bench. **Terminal Black** (dark) is pure black under a near-black working canvas with cool grey glyphs, the classic terminal. Each theme has exactly one accent: **Prompt Teal** on paper, taken from the cyan end of the logo's prompt glyph, and **Phosphor Amber** on black, after amber-phosphor CRTs. The accent marks what is active, selected or focused, and nothing else.\n\nType is split by who wrote the words. Humans get Inter: labels, headings, buttons, prose. Machines get IBM Plex Mono with tabular numerals: addresses, hashes, balances, block numbers, RPC URLs, calldata, ABI signatures. This pairing matches the obolos dApp's sans-serif faces. DevWallet does not use obolos's serif or script faces.\n\nConfirmed anti-references: DevWallet never looks like a **consumer crypto wallet** (rounded balance cards, gradients, glassy surfaces, hero coin numbers), a **generic SaaS dashboard** (card grids, soft drop shadows, pill badges, big rounded buttons), or **sci-fi HUD kitsch** (neon glow, scanlines, glitch effects, display fonts like Orbitron).",
+    "overview": "DevWallet is a terminal pane docked beside the browser. It sits in Chrome's side panel next to the dApp being built and reads like an instrument the developer glances at between keystrokes. Readouts are dense, every edge is hard, and color appears only when the chain has something to say. The panel is a narrow column of hairline-ruled cells framed by two ground-colored bands: an account switcher across the top, and the section nav over a one-line node status at the bottom. Between them, on the raised canvas, sit the screen's plate and its lists of rows. Hierarchy comes from type size, ink weight and tonal steps between surfaces. It never comes from cards, shadows or ornament. The exception is the single layer that floats over content, the account switcher's list, which casts one soft shadow.\n\nThere are two grounds and they are not mirror images. **Warm Paper** (light) is an unbleached off-white with warm grey-brown ink, a lab notebook on the bench. **Terminal Black** (dark) is pure black under a near-black working canvas with cool grey glyphs, the classic terminal. Each theme has exactly one accent: **Prompt Teal** on paper, taken from the cyan end of the logo's prompt glyph, and **Phosphor Amber** on black, after amber-phosphor CRTs. The accent marks what is active, selected or focused, and nothing else.\n\nType is split by who wrote the words. Humans get Inter: labels, headings, buttons, prose. Machines get IBM Plex Mono with tabular numerals: addresses, hashes, balances, block numbers, RPC URLs, calldata, ABI signatures. This pairing matches the obolos dApp's sans-serif faces. DevWallet does not use obolos's serif or script faces.\n\nConfirmed anti-references: DevWallet never looks like a **consumer crypto wallet** (rounded balance cards, gradients, glassy surfaces, hero coin numbers), a **generic SaaS dashboard** (card grids, soft drop shadows, pill badges, big rounded buttons), or **sci-fi HUD kitsch** (neon glow, scanlines, glitch effects, display fonts like Orbitron).",
     "keyCharacteristics": [
       "Narrow, dense, column-first. It is designed for the side panel, not the page, and no functional text is set below 11px.",
       "Square corners everywhere. Circles appear only on status dots.",
-      "1px hairlines and tonal steps instead of shadows.",
+      "1px hairlines and tonal steps instead of shadows. Only a floating layer casts one.",
       "Inter for people, IBM Plex Mono for the machine.",
       "Monochrome base. Hue means state (signal) or focus (accent), never decoration.",
       "One accent per theme: Prompt Teal on Warm Paper, Phosphor Amber on Terminal Black."
@@ -979,12 +999,12 @@
       },
       {
         "name": "The Panel Width Rule",
-        "body": "Design at side-panel width first. Nothing scrolls horizontally except code, calldata and the account strip. Long values truncate in the middle (`0x7099…79C8`) in lists, chips and rows. The plate is the one place that shows a full address; at widths too narrow for one line it may break, and it is never truncated.",
+        "body": "Design at side-panel width first. Nothing scrolls horizontally except code and calldata. Long values truncate in the middle (`0x7099…79C8`) in lists, the switcher and rows. The plate is the one place that shows a full address; at widths too narrow for one line it may break, and it is never truncated.",
         "section": "layout"
       },
       {
         "name": "The Two Bands Rule",
-        "body": "Chrome lives in two ground-colored bands, the account strip on top and the nav over the status line at the bottom. Screens never add a header strip of chain state; node state belongs to the status line.",
+        "body": "Chrome lives in two ground-colored bands, the account switcher bar on top and the nav over the status line at the bottom. Screens never add a header strip of chain state; node state belongs to the status line.",
         "section": "layout"
       },
       {
@@ -993,8 +1013,13 @@
         "section": "elevation"
       },
       {
+        "name": "The Floating Layer Rule",
+        "body": "Only a layer that floats over content casts a depth shadow, and it is always the same one (`0 14px 32px -12px rgb(0 0 0 / 0.5)`) on top of a 1px paper-rule border. Today that is the account switcher's list. Nothing that rests in the column ever takes it.",
+        "section": "elevation"
+      },
+      {
         "name": "The Joined Tab Rule",
-        "body": "The active chip or nav item takes the raised canvas color and an accent rule on the edge facing the content. It never takes an accent fill.",
+        "body": "The open switcher or active nav item takes the raised canvas color and an accent rule on the edge facing the content. It never takes an accent fill.",
         "section": "elevation"
       },
       {
@@ -1007,16 +1032,16 @@
       "**Do** set every chain-produced value (address, hash, balance, block, chain id, RPC URL, token name, calldata) in IBM Plex Mono with tabular numerals, and every human label in Inter.",
       "**Do** keep corners square (0px) on every surface and control. Use circles only for status dots.",
       "**Do** separate content with 1px hairlines (#dcd9d4 on paper, #3c3f43 on black) and tonal steps instead of gaps, cards or shadows.",
-      "**Do** use Prompt Teal (#00717f) on Warm Paper and Phosphor Amber (#f9b64f) on Terminal Black, and only for active, selected and focused states: a 1.5px rule on the active chip, nav item or tab, the wash on a selected row, a focus outline or border, the caret and the selection.",
+      "**Do** use Prompt Teal (#00717f) on Warm Paper and Phosphor Amber (#f9b64f) on Terminal Black, and only for active, selected and focused states: a 1.5px rule on the open switcher, the active nav item or tab, the wash on a selected row, the check on the active account, a focus outline or border, the caret and the selection.",
       "**Do** keep every piece of text at 11px or larger, units included; label readouts with 11px sentence-case tertiary Inter above the value.",
-      "**Do** truncate long hex in the middle in chips and rows, and give the full value through a copy button or tooltip.",
-      "**Do** keep node state in the status line and account switching in the strip, at side-panel width (about 320–480px).",
+      "**Do** truncate long hex in the middle in the switcher and rows, and give the full value through a copy button or tooltip.",
+      "**Do** keep node state in the status line and account switching in the switcher bar, at side-panel width (about 320–480px).",
       "**Do** report the node offline inline (red status line plus the banner) and leave the last known state readable.",
-      "**Do** turn off authored motion (the plate's arrival wash, the pickaxe swing) under `prefers-reduced-motion`."
+      "**Do** turn off authored motion (the plate's arrival wash, the pickaxe swing, the switcher list's entrance and chevron turn) under `prefers-reduced-motion`."
     ],
     "donts": [
-      "**Don't** drift toward a consumer crypto wallet: no rounded balance cards, gradient fills, glassy surfaces or oversized hero balances. The strip's overflow fade is a mask, not a fill, and is the only gradient outside the logo.",
-      "**Don't** drift toward a generic SaaS dashboard: no card grids, soft drop shadows, pill badges or big rounded buttons.",
+      "**Don't** drift toward a consumer crypto wallet: no rounded balance cards, gradient fills, glassy surfaces or oversized hero balances. The logo is the only gradient.",
+      "**Don't** drift toward a generic SaaS dashboard: no card grids, soft drop shadows on resting surfaces, pill badges or big rounded buttons. The floating-layer shadow belongs to layers that float over content and nowhere else.",
       "**Don't** add sci-fi HUD kitsch: no neon glow, scanlines, glitch effects, the old #39ff14 neon green, or display fonts like Orbitron.",
       "**Don't** use the accent as a status color or a CTA fill. Primary actions stay ink-on-paper or white-on-black.",
       "**Don't** use Phosphor Amber for a warning. Warnings use the yellow tint plus an icon or label.",

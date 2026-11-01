@@ -16,6 +16,8 @@ const whisper = backgroundColorVars['surface/fill/quarternary']
 const rule = foregroundColorVars['separator/tertiary']
 const faint = foregroundColorVars['separator/quarternary']
 const accent = foregroundColorVars['text/accent/active']
+const activeFill = backgroundColorVars['surface/fill/devwallet/active']
+const highlightFill = backgroundColorVars['surface/fill/secondary']
 const t1 = foregroundColorVars['text/primary']
 const t2 = foregroundColorVars['text/secondary']
 const t3 = foregroundColorVars['text/tertiary']
@@ -33,9 +35,9 @@ const reset = {
 } as const
 
 ////////////////////////////////////////////////////////////////////////
-// Account strip
+// Account switcher: one bar, a list on demand
 
-export const strip = style({
+export const bar = style({
   display: 'flex',
   alignItems: 'stretch',
   height: 40,
@@ -44,7 +46,7 @@ export const strip = style({
   borderBottom: `1px solid ${rgb(rule)}`,
 })
 
-export const stripHome = style({
+export const barHome = style({
   ...reset,
   display: 'grid',
   placeItems: 'center',
@@ -54,69 +56,197 @@ export const stripHome = style({
   ':hover': { backgroundColor: rgb(whisper) },
 })
 
-// The trailing fade says "there is more" when chips overflow.
-const fade = 'linear-gradient(to right, #000 calc(100% - 24px), transparent)'
-
-export const chips = style({
-  display: 'flex',
-  alignItems: 'stretch',
+export const switcher = style({
+  ...reset,
   flex: 1,
   minWidth: 0,
-  overflowX: 'auto',
-  scrollbarWidth: 'none',
-  maskImage: fade,
-  WebkitMaskImage: fade,
-  selectors: { '&::-webkit-scrollbar': { display: 'none' } },
-})
-
-export const chip = style({
-  ...reset,
-  position: 'relative',
   display: 'flex',
   alignItems: 'center',
-  gap: 6,
-  flexShrink: 0,
+  gap: 8,
   padding: '0 12px',
-  color: rgb(t2),
-  borderRight: `1px solid ${rgb(faint)}`,
-  transition: 'background-color 120ms ease-out, color 120ms ease-out',
-  ':hover': { backgroundColor: rgb(whisper), color: rgb(t1) },
+  whiteSpace: 'nowrap',
+  color: rgb(t1),
+  transition: 'background-color 120ms ease-out',
+  ':hover': { backgroundColor: rgb(whisper) },
   selectors: {
-    '&[aria-current="true"]': {
-      cursor: 'default',
-      color: rgb(t1),
+    '&[data-state="open"]': {
       backgroundColor: rgb(raised),
       boxShadow: `inset 0 -1.5px 0 ${rgb(accent)}`,
     },
   },
 })
 
-export const chipIcon = style({ color: rgb(t3), flexShrink: 0 })
-
-export const chipKey = style({
+export const switcherChevron = style({
+  marginLeft: 'auto',
   flexShrink: 0,
+  color: rgb(t3),
+  transition: 'transform 160ms cubic-bezier(0.16, 1, 0.3, 1)',
+  selectors: {
+    [`${switcher}[data-state="open"] &`]: { transform: 'rotate(180deg)' },
+  },
+  '@media': {
+    '(prefers-reduced-motion: reduce)': { transition: 'none' },
+  },
+})
+
+export const switcherEmpty = style({
+  fontSize: 13,
+  lineHeight: '17px',
+  color: rgb(t3),
+})
+
+// Shared by the bar and the list rows: alias, then the short address.
+export const accountIcon = style({ flexShrink: 0, color: rgb(t3) })
+
+export const accountName = style({
+  flex: '0 1 auto',
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  fontFamily: fontFamily.default,
+  fontSize: 13,
+  lineHeight: '17px',
+  fontWeight: 500,
+  color: rgb(t1),
+})
+
+export const accountAddress = style({
+  flexShrink: 0,
+  fontFamily: fontFamily.mono,
+  fontSize: 12,
+  lineHeight: '16px',
+  color: rgb(t3),
+  selectors: {
+    // No alias: the address is the name.
+    '&[data-alone]': { color: rgb(t1) },
+    '&[data-alone][data-muted]': { color: rgb(t2) },
+  },
+})
+
+const popIn = keyframes({
+  from: { opacity: 0.4, transform: 'translateY(-4px)' },
+  to: { opacity: 1, transform: 'none' },
+})
+
+export const pop = style({
+  zIndex: 10,
+  width: 'calc(var(--radix-popover-trigger-width) - 16px)',
+  fontFamily: fontFamily.default,
+  fontSize: 13,
+  lineHeight: '17px',
+  color: rgb(t1),
+  backgroundColor: rgb(raised),
+  border: `1px solid ${rgb(rule)}`,
+  boxShadow: '0 14px 32px -12px rgb(0 0 0 / 0.5)',
+  outline: 'none',
+  animation: `${popIn} 160ms cubic-bezier(0.16, 1, 0.3, 1)`,
+  '@media': {
+    '(prefers-reduced-motion: reduce)': { animation: 'none' },
+  },
+})
+
+export const popFilter = style({
+  padding: 8,
+  borderBottom: `1px solid ${rgb(faint)}`,
+})
+
+export const list = style({
+  maxHeight: 'min(360px, 55vh)',
+  overflowY: 'auto',
+  padding: '4px 0',
+  selectors: { '&:empty': { display: 'none' } },
+})
+
+export const option = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  height: 36,
+  padding: '0 10px',
+  whiteSpace: 'nowrap',
+  cursor: 'pointer',
+  selectors: {
+    '&[data-highlighted]': { backgroundColor: rgb(highlightFill) },
+    '&[data-active]': { backgroundColor: rgb(activeFill) },
+    // Keyboard focus on the active row still needs to read as focus.
+    '&[data-active][data-highlighted]': {
+      boxShadow: `inset 0 0 0 1px ${rgb(accent, 0.45)}`,
+    },
+  },
+})
+
+export const optionKey = style({
+  width: 10,
+  flexShrink: 0,
+  textAlign: 'center',
   fontFamily: fontFamily.mono,
   fontSize: 11,
   lineHeight: '15px',
   color: rgb(t3),
 })
 
-export const stripAll = style({
-  ...reset,
+export const optionBalance = style({
+  marginLeft: 'auto',
+  paddingLeft: 8,
+  flexShrink: 0,
+  fontFamily: fontFamily.mono,
+  fontSize: 12,
+  lineHeight: '16px',
+  fontVariantNumeric: 'tabular-nums',
+  color: rgb(t2),
+})
+
+export const optionCheck = style({
+  width: 14,
+  height: 14,
+  flexShrink: 0,
+  color: rgb(accent),
+})
+
+export const popNote = style({
+  margin: 0,
+  padding: '0 10px 10px 30px',
+  fontSize: 12,
+  lineHeight: '16px',
+  color: rgb(t3),
+})
+
+export const popEmpty = style({
+  margin: 0,
+  padding: 10,
+  fontSize: 12,
+  lineHeight: '16px',
+  color: rgb(t2),
+})
+
+export const popFoot = style({
   display: 'flex',
   alignItems: 'center',
-  gap: 6,
+  justifyContent: 'space-between',
+  gap: 12,
+  padding: '8px 10px',
+  borderTop: `1px solid ${rgb(faint)}`,
+  fontSize: 12,
+  lineHeight: '16px',
+})
+
+export const popFootLink = style({
+  ...reset,
   flexShrink: 0,
-  padding: '0 12px',
   color: rgb(t2),
-  borderLeft: `1px solid ${rgb(rule)}`,
-  ':hover': { backgroundColor: rgb(whisper), color: rgb(t1) },
-  selectors: {
-    '&[aria-current="page"]': {
-      color: rgb(t1),
-      boxShadow: `inset 0 -1.5px 0 ${rgb(accent)}`,
-    },
+  ':hover': {
+    color: rgb(t1),
+    textDecoration: 'underline',
+    textUnderlineOffset: 2,
   },
+})
+
+export const popHint = style({
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  color: rgb(t3),
 })
 
 ////////////////////////////////////////////////////////////////////////

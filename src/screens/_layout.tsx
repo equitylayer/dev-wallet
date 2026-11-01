@@ -3,7 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 
 import { Toaster } from '~/components'
 import {
-  AccountStrip,
+  AccountSwitcher,
   BottomNav,
   OfflineBanner,
   StatusLine,
@@ -51,7 +51,7 @@ export default function Layout() {
       className={styles.shell}
     >
       <Toaster />
-      {onboarded && <AccountStrip />}
+      {onboarded && <AccountSwitcher />}
       {showOfflineBanner && <OfflineBanner />}
       <Box className={styles.content}>
         {hasPendingRequest ? (

@@ -10,6 +10,7 @@ import { useBytecode } from '~/hooks/useBytecode'
 import { useNonce } from '~/hooks/useNonce'
 import { useSetBalance } from '~/hooks/useSetBalance'
 import { useSetNonce } from '~/hooks/useSetNonce'
+import { formatEth } from '~/utils'
 import { useAccountStore } from '~/zustand'
 import type { Account } from '~/zustand/account'
 
@@ -17,12 +18,8 @@ import * as styles from './account-home.css'
 
 const ALIAS_MAX_LENGTH = 24
 
-export function formatEth(value: bigint) {
-  const ether = Number(formatEther(value))
-  return new Intl.NumberFormat('en-US', {
-    maximumFractionDigits: ether !== 0 && Math.abs(ether) < 1 ? 6 : 2,
-  }).format(ether)
-}
+// Sections imports it from here.
+export { formatEth }
 
 type Mode = 'view' | 'edit' | 'impersonate'
 

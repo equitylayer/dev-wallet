@@ -3,11 +3,11 @@ import type { ReactNode } from 'react'
 import type { UseFormRegister } from 'react-hook-form'
 
 import { Select, Stack, Text } from '~/design-system'
-import type { InputProps } from '~/design-system/components/Input'
+import type { SelectProps } from '~/design-system/components/Select'
 
 export type SelectFieldProps = {
   children: ReactNode
-  height?: InputProps['height']
+  height?: SelectProps['height']
   hideLabel?: boolean
   label: string
   register: ReturnType<UseFormRegister<any>>

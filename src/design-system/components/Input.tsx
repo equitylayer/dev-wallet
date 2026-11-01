@@ -54,6 +54,9 @@ export const stylesForHeight = {
   '24px': {
     paddingHorizontal: '6px',
   },
+  '28px': {
+    paddingHorizontal: '8px',
+  },
   '36px': {
     paddingHorizontal: '12px',
   },
@@ -62,6 +65,9 @@ export const stylesForHeight = {
 export const textStylesForHeight = {
   '24px': {
     fontSize: '11px',
+  },
+  '28px': {
+    fontSize: '13px',
   },
   '36px': {
     fontSize: '15px',
