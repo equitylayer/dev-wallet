@@ -225,8 +225,7 @@ export function userOpOutcomeFromReceipt(
   if (end === -1) return null
 
   const [event] = parseEventLogs({
-    abi: entryPoint07Abi,
-    eventName: 'UserOperationEvent',
+    abi: [USER_OPERATION_EVENT],
     logs: [receipt.logs[end] as RpcTransactionReceipt['logs'][number]],
   })
   if (!event) return null

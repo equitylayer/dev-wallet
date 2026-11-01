@@ -3,13 +3,8 @@
 // section header, faint rules between blocks, square corners.
 import { style } from '@vanilla-extract/css'
 
-import { foregroundColorVars } from '~/design-system/styles/theme.css'
-
-const rgb = (v: string) => `rgb(${v})`
-
-const faint = foregroundColorVars['separator/quarternary']
-
-const gutter = 12
+import { faint, gutter } from '~/components/approval/approval.css'
+import { rgb } from '~/components/approval/rgb'
 
 /** One authorization, or one operation's readouts. */
 export const block = style({

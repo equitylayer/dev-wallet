@@ -303,7 +303,12 @@ export default function TransactionDetails() {
           {transaction.type === 'eip7702' && (
             <Authorizations transaction={transaction} />
           )}
-          {userOps && <UserOperations ops={userOps} />}
+          {userOps && (
+            <UserOperations
+              ops={userOps}
+              reverted={receipt?.status === 'reverted'}
+            />
+          )}
           <Tabs.Root asChild defaultValue={params.get('tab') ?? 'data'}>
             <Box display="flex" flexDirection="column" height="full">
               <TabsList

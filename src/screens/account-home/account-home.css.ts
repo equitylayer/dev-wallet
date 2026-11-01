@@ -195,22 +195,6 @@ export const pill = style({
   color: rgb(t2),
 })
 
-export const pillGreen = style([
-  pill,
-  {
-    borderColor: rgb(backgroundColorVars['surface/green'], 0.55),
-    color: rgb(backgroundColorVars['surface/green']),
-  },
-])
-
-export const pillRed = style([
-  pill,
-  {
-    borderColor: rgb(backgroundColorVars['surface/red'], 0.55),
-    color: rgb(backgroundColorVars['surface/red']),
-  },
-])
-
 export const empty = style({
   padding: `12px ${gutter}px`,
   borderBottom: `1px solid ${rgb(faint)}`,

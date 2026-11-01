@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { type Address, formatEther } from 'viem'
 
 import { LoadMore, useVirtualList } from '~/components'
+import { ActivityTags } from '~/components/ActivityTags'
 import {
     Box,
     Column,
@@ -12,9 +13,8 @@ import {
     SFSymbol,
     Text,
 } from '~/design-system'
-import { activitySubject, useAccountActivity } from '~/hooks/useAccountActivity'
-
-import { ActivityTags } from '../account-home/Sections'
+import { useAccountActivity } from '~/hooks/useAccountActivity'
+import { activitySubject, knownName } from '~/utils/activity'
 
 const numberIntl4SigFigs = new Intl.NumberFormat('en-US', {
     maximumSignificantDigits: 4,
@@ -203,7 +203,12 @@ export function Activity({ accountAddress }: { accountAddress: Address }) {
                                                         )}
                                                     </Box>
                                                     <ActivityTags
-                                                        payer={isSponsored ? transaction.from : undefined}
+                                                        payer={
+                                                            isSponsored
+                                                                ? knownName(transaction.from) ??
+                                                                  transaction.from
+                                                                : undefined
+                                                        }
                                                         reverted={userOps?.success === false}
                                                     />
                                                 </Box>

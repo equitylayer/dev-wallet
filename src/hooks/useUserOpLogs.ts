@@ -42,6 +42,9 @@ export function useUserOpLogs({
         fromBlock,
         toBlock: 'latest',
       }),
+    // Refetched every block, and each range is a new key: none of it is worth
+    // keeping once unused, or persisting (zero gcTime isn't dehydrated).
+    gcTime: 0,
     // Loading older blocks widens the range: keep the rows already found,
     // but never another account's or network's.
     placeholderData: (previous, previousQuery) =>

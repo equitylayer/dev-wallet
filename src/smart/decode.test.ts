@@ -7,25 +7,30 @@ import {
   encodeFunctionData,
   getAddress,
   parseEther,
+  zeroAddress,
 } from 'viem'
-import {
-  entryPoint07Abi,
-  toPackedUserOperation,
-} from 'viem/account-abstraction'
+import { entryPoint07Abi } from 'viem/account-abstraction'
 
 import { DEVWALLET_PAYMASTER, ENTRY_POINT_07, KERNEL_V3_3 } from './constants'
 import { USER_OPERATION_EVENT, decodeHandleOps } from './decode'
-import { encodeKernelBatch, setDelegation } from './kernel'
+import { setDelegation } from './kernel'
 import { type Node, connectNode } from './node'
 import { ensureAaContracts } from './setup'
 import { prepareSponsor } from './sponsor'
 import { DEV_ACCOUNTS, startAnvil, waitForReceipt } from './testing/anvil'
+import {
+  handleOpsInput,
+  revertReasonLog,
+  testOp,
+  userOperationEventLog,
+} from './testing/entrypoint'
 import type { Call } from './types'
 import { buildUserOp, signUserOp, submitUserOp } from './userop'
 
 const account = DEV_ACCOUNTS[1]
 const X = getAddress('0x00000000000000000000000000000000000a0a0a')
 const Y = getAddress('0x00000000000000000000000000000000000b0b0b')
+const SPOOF = getAddress('0x0000000000000000000000000000000000005900')
 
 type RpcTransaction = { from: Address; to: Address | null; input: Hex }
 
@@ -101,25 +106,92 @@ describe('decodeHandleOps on Anvil', () => {
 })
 
 describe('decodeHandleOps', () => {
-  const op = {
-    sender: account,
-    nonce: 7n,
-    callData: encodeKernelBatch([{ to: X, value: 1n }]),
-    callGasLimit: 100_000n,
-    verificationGasLimit: 500_000n,
-    preVerificationGas: 60_000n,
-    maxFeePerGas: 2n,
-    maxPriorityFeePerGas: 1n,
-    paymaster: DEVWALLET_PAYMASTER,
-    paymasterVerificationGasLimit: 100_000n,
-    paymasterPostOpGasLimit: 0n,
-    paymasterData: '0x',
-    signature: '0x',
-  } as const
-  const handleOps = encodeFunctionData({
-    abi: entryPoint07Abi,
-    functionName: 'handleOps',
-    args: [[toPackedUserOperation(op)], DEV_ACCOUNTS[0]],
+  const B = DEV_ACCOUNTS[2]
+  const handleOps = handleOpsInput([
+    testOp({
+      sender: account,
+      nonce: 7n,
+      calls: [{ to: X, value: 1n }],
+      paymaster: DEVWALLET_PAYMASTER,
+    }),
+  ])
+
+  test('matches each op to its own event by sender and nonce', () => {
+    const input = handleOpsInput([
+      testOp({
+        sender: account,
+        nonce: 0n,
+        calls: [{ to: X, value: 1n }],
+        paymaster: DEVWALLET_PAYMASTER,
+      }),
+      testOp({ sender: B, nonce: 0n, calls: [{ to: X, value: 3n }] }),
+      testOp({
+        sender: account,
+        nonce: 1n,
+        calls: [{ to: Y, value: 2n }],
+        paymaster: DEVWALLET_PAYMASTER,
+      }),
+    ])
+    // Out of order, with a lookalike event from another contract ahead of the
+    // real one for (account, 1), and that op's revert reason.
+    const logs = [
+      userOperationEventLog({
+        address: SPOOF,
+        sender: account,
+        nonce: 1n,
+        success: true,
+        actualGasCost: 999n,
+        paymaster: DEVWALLET_PAYMASTER,
+      }),
+      revertReasonLog({ sender: account, nonce: 1n }),
+      userOperationEventLog({
+        sender: account,
+        nonce: 1n,
+        success: false,
+        actualGasCost: 30n,
+        paymaster: DEVWALLET_PAYMASTER,
+      }),
+      userOperationEventLog({
+        sender: B,
+        nonce: 0n,
+        success: true,
+        actualGasCost: 20n,
+      }),
+      userOperationEventLog({
+        sender: account,
+        nonce: 0n,
+        success: true,
+        actualGasCost: 10n,
+        paymaster: DEVWALLET_PAYMASTER,
+      }),
+    ]
+
+    expect(decodeHandleOps({ to: ENTRY_POINT_07, input }, { logs })).toEqual([
+      {
+        sender: account,
+        nonce: 0n,
+        success: true,
+        actualGasCost: 10n,
+        paymaster: DEVWALLET_PAYMASTER,
+        calls: [{ to: X, value: 1n, data: '0x' }],
+      },
+      {
+        sender: B,
+        nonce: 0n,
+        success: true,
+        actualGasCost: 20n,
+        paymaster: zeroAddress,
+        calls: [{ to: X, value: 3n, data: '0x' }],
+      },
+      {
+        sender: account,
+        nonce: 1n,
+        success: false,
+        actualGasCost: 30n,
+        paymaster: DEVWALLET_PAYMASTER,
+        calls: [{ to: Y, value: 2n, data: '0x' }],
+      },
+    ])
   })
 
   test('an op without its event did not run', () => {
@@ -139,14 +211,9 @@ describe('decodeHandleOps', () => {
   })
 
   test('calls are null when the op is not a Kernel batch', () => {
-    const input = encodeFunctionData({
-      abi: entryPoint07Abi,
-      functionName: 'handleOps',
-      args: [
-        [toPackedUserOperation({ ...op, callData: '0x12345678' })],
-        DEV_ACCOUNTS[0],
-      ],
-    })
+    const input = handleOpsInput([
+      testOp({ sender: account, nonce: 0n, callData: '0x12345678' }),
+    ])
     const [summary] = decodeHandleOps(
       { to: ENTRY_POINT_07, input },
       { logs: [] },

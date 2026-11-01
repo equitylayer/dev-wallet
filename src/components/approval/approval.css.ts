@@ -11,18 +11,17 @@ import {
 } from '~/design-system/styles/theme.css'
 import { fontFamily } from '~/design-system/tokens'
 
-const rgb = (v: string, a?: number) =>
-  a === undefined ? `rgb(${v})` : `rgb(${v} / ${a})`
+import { rgb } from './rgb'
 
 const whisper = backgroundColorVars['surface/fill/quarternary']
 const recess = backgroundColorVars['surface/secondary']
 const rule = foregroundColorVars['separator/tertiary']
-const faint = foregroundColorVars['separator/quarternary']
+export const faint = foregroundColorVars['separator/quarternary']
 const t1 = foregroundColorVars['text/primary']
 const t2 = foregroundColorVars['text/secondary']
 const t3 = foregroundColorVars['text/tertiary']
 
-const gutter = 12
+export const gutter = 12
 
 const reset = {
   appearance: 'none',

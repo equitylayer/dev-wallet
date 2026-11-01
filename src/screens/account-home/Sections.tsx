@@ -11,12 +11,9 @@ import { Link } from 'react-router-dom'
 import type { Abi, Address } from 'viem'
 
 import { connect, disconnect } from '~/actions'
+import { ActivityTags } from '~/components/ActivityTags'
 import { Box, Button, Text } from '~/design-system'
-import {
-  type ActivityItem,
-  activitySubject,
-  useAccountActivity,
-} from '~/hooks/useAccountActivity'
+import { useAccountActivity } from '~/hooks/useAccountActivity'
 import { useAccountTokens } from '~/hooks/useAccountTokens'
 import { useAccounts } from '~/hooks/useAccounts'
 import { useContracts } from '~/hooks/useContracts'
@@ -25,6 +22,11 @@ import { useFunctionName } from '~/hooks/useFunctionName'
 import { useHost } from '~/hooks/useHost'
 import { getMessenger } from '~/messengers'
 import { truncate } from '~/utils'
+import {
+  type ActivityItem,
+  activitySubject,
+  knownName,
+} from '~/utils/activity'
 import { useSessionsStore } from '~/zustand'
 
 import { EmptyTokensToggle } from '../account-details/EmptyTokensToggle'
@@ -248,7 +250,8 @@ export function RecentActivitySection({ address }: { address: Address }) {
     const lower = target.toLowerCase()
     return (
       contracts.find((c) => c.address.toLowerCase() === lower)?.name ||
-      accounts.find((a) => a.address.toLowerCase() === lower)?.displayName
+      accounts.find((a) => a.address.toLowerCase() === lower)?.displayName ||
+      knownName(target)
     )
   }
   const abiOf = (target?: Address | null) => {
@@ -292,40 +295,6 @@ export function RecentActivitySection({ address }: { address: Address }) {
         ))
       )}
     </Section>
-  )
-}
-
-/**
- * An activity row's tags: Sponsored, naming who paid the gas in its title,
- * and Reverted, for user operations whose calls reverted.
- */
-export function ActivityTags({
-  payer,
-  reverted,
-}: {
-  payer?: string
-  reverted: boolean
-}) {
-  return (
-    <>
-      {payer && (
-        <Box className={styles.pillGreen} title={`Gas paid by ${payer}`}>
-          <Text size="11px" weight="medium" wrap={false}>
-            Sponsored
-          </Text>
-        </Box>
-      )}
-      {reverted && (
-        <Box
-          className={styles.pillRed}
-          title="The user operation reverted, so its calls had no effect."
-        >
-          <Text size="11px" weight="medium" wrap={false}>
-            Reverted
-          </Text>
-        </Box>
-      )}
-    </>
   )
 }
 

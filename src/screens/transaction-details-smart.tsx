@@ -150,28 +150,50 @@ export function Authorizations({
 ////////////////////////////////////////////////////////////////////////
 // User operations
 
-export function UserOperations({ ops }: { ops: UserOpSummary[] }) {
+/**
+ * The operations a mined `handleOps` carried. When the transaction itself
+ * reverted, none of them ran: they have no outcome, only their content.
+ */
+export function UserOperations({
+  ops,
+  reverted,
+}: {
+  ops: UserOpSummary[]
+  reverted: boolean
+}) {
   return (
     <SmartSection
       title="User operations"
       count={plural(ops.length, 'operation')}
     >
-      {ops.length === 0 && (
+      {(ops.length === 0 || reverted) && (
         <Box className={styles.empty}>
           <Text color="text/secondary" size="12px">
-            This handleOps ran no operations.
+            {reverted
+              ? 'The transaction reverted, so none of its operations ran.'
+              : 'This handleOps ran no operations.'}
           </Text>
         </Box>
       )}
       {ops.map((op) => (
-        <UserOperation key={`${op.sender}-${op.nonce}`} op={op} />
+        <UserOperation
+          key={`${op.sender}-${op.nonce}`}
+          op={op}
+          ran={!reverted}
+        />
       ))}
     </SmartSection>
   )
 }
 
-function UserOperation({ op }: { op: UserOpSummary }) {
+/** One operation: its sender and outcome, its readouts, its decoded calls. */
+function UserOperation({ op, ran }: { op: UserOpSummary; ran: boolean }) {
   const gasCost = ethAmount(op.actualGasCost)
+  const [tag, outcome] = !ran
+    ? [styles.tag, 'Not run']
+    : op.success
+      ? [styles.tagGreen, 'Succeeded']
+      : [styles.tagRed, 'Reverted']
   return (
     <div className={styles.request}>
       <div className={styles.requestHeader}>
@@ -187,9 +209,9 @@ function UserOperation({ op }: { op: UserOpSummary }) {
                 {truncate(op.sender, { start: 6, end: 4 })}
               </Text>
             </Box>
-            <Box className={op.success ? styles.tagGreen : styles.tagRed}>
+            <Box className={tag}>
               <Text size="11px" weight="medium" wrap={false}>
-                {op.success ? 'Succeeded' : 'Reverted'}
+                {outcome}
               </Text>
             </Box>
           </Box>
@@ -214,12 +236,20 @@ function UserOperation({ op }: { op: UserOpSummary }) {
             )}
           </Readout>
           <Readout label="Actual gas cost">
-            <Text family="mono" size="12px" tabular wrap={false}>
-              {gasCost.amount}
-            </Text>
-            <Text color="text/tertiary" size="11px" wrap={false}>
-              {gasCost.unit}
-            </Text>
+            {ran ? (
+              <>
+                <Text family="mono" size="12px" tabular wrap={false}>
+                  {gasCost.amount}
+                </Text>
+                <Text color="text/tertiary" size="11px" wrap={false}>
+                  {gasCost.unit}
+                </Text>
+              </>
+            ) : (
+              <Text size="12px" wrap={false}>
+                None
+              </Text>
+            )}
           </Readout>
           <Readout label="Nonce">
             <Text family="mono" size="12px" tabular wrap={false}>
