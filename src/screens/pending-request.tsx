@@ -175,6 +175,10 @@ function SendTransactionRequest({
 ////////////////////////////////////////////////////////////////////////
 // Signatures: plain signatures by the account's key, in every mode
 
+/** A payload the node can't decode, as the site sent it. */
+const asSent = (data: unknown) =>
+  typeof data === 'string' ? data : JSON.stringify(data)
+
 /**
  * The request as the decision forwards it: its payload as the 0x-prefixed
  * bytes the screen shows, so what is shown is what gets signed.
@@ -220,7 +224,7 @@ function SignRequest({ request }: { request: ExtractRequest<'eth_sign'> }) {
           </Text>
           <Box className={styles.hexBox}>
             <Text family="mono" size="12px" wrap="anywhere">
-              {bytes ?? String(data)}
+              {bytes ?? asSent(data)}
             </Text>
           </Box>
         </Box>
@@ -278,7 +282,7 @@ function SignMessageRequest({
               size={hex ? '12px' : '13px'}
               wrap="anywhere"
             >
-              {text ?? bytes ?? String(data)}
+              {text ?? bytes ?? asSent(data)}
             </Text>
           </Box>
         </Box>

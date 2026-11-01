@@ -9,19 +9,25 @@
 // operation, accepts that signature.
 //
 // Anvil 1.7.1 (alloy `Bytes`) decodes the payload as hex with or without a
-// lowercase `0x`, in either case, and refuses anything else: odd length,
-// `0X`, non-hex, plain text (probed against a local anvil). So the payload is
-// read the way it decodes, shown as the 0x-prefixed bytes, and forwarded in
-// that form: what the screen shows is what gets signed.
-import { type Hex, hexToBytes, size } from 'viem'
+// lowercase `0x`, in either case, or as a JSON array of u8 (an empty one is 0
+// bytes). It refuses anything else: odd length, `0X`, non-hex, plain text, an
+// array element that isn't an integer 0–255 (probed against a local anvil).
+// So the payload is read the way it decodes, shown as the 0x-prefixed bytes,
+// and forwarded in that form: what the screen shows is what gets signed.
+import { type Hex, bytesToHex, hexToBytes, size } from 'viem'
 
 const NODE_HEX = /^(?:0x)?((?:[0-9a-fA-F]{2})*)$/
+
+const isByte = (item: unknown): item is number =>
+  typeof item === 'number' && Number.isInteger(item) && item >= 0 && item <= 255
 
 /**
  * The bytes the node signs for a payload, as 0x-prefixed lowercase hex, or
  * `null` when the node refuses it.
  */
 export function payloadBytes(data: unknown): Hex | null {
+  if (Array.isArray(data))
+    return data.every(isByte) ? bytesToHex(new Uint8Array(data)) : null
   if (typeof data !== 'string') return null
   const match = NODE_HEX.exec(data)
   return match ? `0x${(match[1] as string).toLowerCase()}` : null

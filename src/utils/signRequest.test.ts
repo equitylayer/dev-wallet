@@ -34,6 +34,24 @@ describe('payloadBytes: the bytes the node signs', () => {
   })
 })
 
+// alloy's `Bytes` also takes a JSON array of u8 (anvil 1.7.1, probed): an
+// empty one is 0 bytes; any element that isn't an integer 0–255 is refused.
+describe('payloadBytes: a byte array', () => {
+  test('integers 0–255 are those bytes, as 0x-prefixed hex', () => {
+    expect(payloadBytes(Array(32).fill(171))).toBe(HASH)
+    expect(payloadBytes([1, 2, 255])).toBe('0x0102ff')
+    expect(payloadBytes([])).toBe('0x')
+  })
+
+  test('anything else in it is refused', () => {
+    for (const bad of [256, -1, 1.5, '1', null, true, [1]]) {
+      expect(payloadBytes([1, bad])).toBeNull()
+    }
+    expect(payloadBytes({ 0: 1 })).toBeNull()
+    expect(payloadBytes(7)).toBeNull()
+  })
+})
+
 describe('looksLikeHash', () => {
   test('32 bytes as the node decodes them', () => {
     expect(looksLikeHash(HASH)).toBe(true)
@@ -51,6 +69,14 @@ describe('signNotice', () => {
       expect(signNotice('eth_sign', data)).toBe('hash')
       expect(signNotice('personal_sign', data)).toBe('hash')
     }
+  })
+
+  test('a 32-byte array is a hash too, in either method', () => {
+    const array = Array(32).fill(171)
+    expect(signNotice('eth_sign', array)).toBe('hash')
+    expect(signNotice('personal_sign', array)).toBe('hash')
+    expect(signNotice('eth_sign', [1, 2, 3])).toBe('prefixed')
+    expect(signNotice('eth_sign', [1, 256])).toBe('refused')
   })
 
   test("eth_sign's other data: a note that it signs a prefixed message", () => {
@@ -90,6 +116,17 @@ describe('canonicalParams: what the decision forwards', () => {
     expect(canonicalParams('eth_sign', [ACCOUNT, H])).toEqual([ACCOUNT, HASH])
     expect(canonicalParams('personal_sign', [H.toUpperCase(), ACCOUNT])).toEqual([
       HASH,
+      ACCOUNT,
+    ])
+  })
+
+  test('a byte array goes as its hex, never as the array', () => {
+    expect(canonicalParams('eth_sign', [ACCOUNT, Array(32).fill(171)])).toEqual([
+      ACCOUNT,
+      HASH,
+    ])
+    expect(canonicalParams('personal_sign', [[104, 105], ACCOUNT])).toEqual([
+      '0x6869',
       ACCOUNT,
     ])
   })

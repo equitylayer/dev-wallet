@@ -33,8 +33,8 @@ export function SignNotice({ kind }: { kind: SignNoticeKind | null }) {
     return (
       <Box paddingTop="16px">
         <Text color="text/tertiary" size="12px">
-          The node signs only hex data: it will refuse this, and the site gets
-          its error.
+          The node can't read this as bytes (hex, or an array of bytes): it
+          will refuse it, and the site gets its error.
         </Text>
       </Box>
     )
