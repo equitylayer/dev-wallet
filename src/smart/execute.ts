@@ -1,6 +1,6 @@
 import { type Address, type Hash, type Hex, numberToHex } from 'viem'
 
-import { INVALID_PARAMS, WalletRpcError } from './errors'
+import { INVALID_PARAMS, WalletRpcError, atomicityUnsupported } from './errors'
 import { encodeKernelBatch } from './kernel'
 import { atomicStatus } from './modes'
 import type { Node } from './node'
@@ -57,7 +57,6 @@ export type ExecutionResult = ExecutionPlan & {
 }
 
 const EXECUTION_REVERTED = 3
-const ATOMICITY_NOT_SUPPORTED = 5760
 
 const IMPERSONATED_REASON =
   "Impersonated accounts can't sign, so they pay their own gas."
@@ -151,12 +150,7 @@ export async function planExecution(
   }
 
   if (atomicStatus(account.mode, account.onchain) !== 'supported') {
-    if (atomicRequired) {
-      throw new WalletRpcError(
-        ATOMICITY_NOT_SUPPORTED,
-        "This account can't execute calls atomically",
-      )
-    }
+    if (atomicRequired) throw atomicityUnsupported()
     const simulation = await simulateCalls(node, {
       from,
       atomic: false,

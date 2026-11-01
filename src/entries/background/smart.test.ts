@@ -1,6 +1,18 @@
 // The background glue against a real Anvil. The chrome-bound stores and
 // messengers are replaced by in-memory fakes before `./smart` is imported.
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
+//
+// `mock.module` replaces `~/zustand` and `~/messengers` for the whole `bun test`
+// process and is never restored: any test file that imports them after this
+// one runs gets these fakes too.
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  mock,
+  spyOn,
+  test,
+} from 'bun:test'
 import {
   type Address,
   type Hex,
@@ -88,12 +100,13 @@ mock.module('~/messengers', () => ({
 }))
 
 const {
-  handleSend,
+  reconcileBeforeAnswering,
   reconcileForRpc,
   setupSmartHandlers,
   showCallsStatus,
   walletRequest,
 } = await import('./smart')
+const { handleSend } = await import('./smart-sends')
 setupSmartHandlers()
 
 // -- helpers ------------------------------------------------------------------
@@ -247,6 +260,29 @@ describe('reconcileForRpc', () => {
     ).toMatchObject({ code: 5730 })
   })
 
+  test('reconcileBeforeAnswering waits for a slow node only so long', async () => {
+    // A node that never answers.
+    const server = Bun.serve({ port: 0, fetch: () => new Promise(() => {}) })
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+    let warnings = 0
+    try {
+      const started = Date.now()
+      await reconcileBeforeAnswering(`http://127.0.0.1:${server.port}`, {
+        timeoutMs: 100,
+      })
+      expect(Date.now() - started).toBeLessThan(1000)
+    } finally {
+      server.stop(true)
+      // The reconcile carries on until the server hangs up, then warns.
+      for (let i = 0; i < 50 && warn.mock.calls.length === 0; i++) {
+        await Bun.sleep(20)
+      }
+      warnings = warn.mock.calls.length
+      warn.mockRestore()
+    }
+    expect(warnings).toBe(1)
+  })
+
   test('a failed reconcile is not remembered', async () => {
     accountState.accounts = []
     const down = 'http://127.0.0.1:9'
@@ -329,16 +365,19 @@ describe('wallet_sendCalls', () => {
     expect(error.code).toBe(code)
   })
 
-  test('plain-never: atomicRequired is 5760, otherwise one transaction per call', async () => {
+  test('plain-never: atomicRequired is 5760 before anyone is asked, otherwise one transaction per call', async () => {
+    const { ask, asked } = approve()
     const error = await codeOf(
       handleSend({
         rpcUrl,
         request: sendCallsRequest(never, [transfer, transfer], {
           atomicRequired: true,
         }),
+        ask,
       }),
     )
     expect(error.code).toBe(5760)
+    expect(asked).toHaveLength(0)
 
     const id = await sendBatch(sendCallsRequest(never, [transfer, transfer]))
     const record = getRecord(records, rpcUrl, id)
@@ -346,6 +385,56 @@ describe('wallet_sendCalls', () => {
     expect(record?.transactionHashes).toHaveLength(2)
     expect((await callsStatus(id)).status).toBe(200)
     expect(await node.getCode(never)).toBe('0x')
+  })
+
+  test('concurrent sends go out one at a time, each a sponsored user op', async () => {
+    const ids = await Promise.all(
+      [1, 2, 3].map(() => sendBatch(sendCallsRequest(smart, [transfer]))),
+    )
+    for (const id of ids) {
+      expect(getRecord(records, rpcUrl, id)?.path).toBe('userop')
+      expect((await callsStatus(id)).status).toBe(200)
+    }
+    expect(await node.getBalance(X)).toBe(3n)
+  })
+
+  test('an impersonated smart account pays its own gas with a self-call', async () => {
+    const I = getAddress('0x00000000000000000000000000000000000b0b0b')
+    await node.setBalance(I, 10n ** 18n)
+    accountState.accounts.push({
+      address: I,
+      key: `${rpcUrl}.${I}`,
+      rpcUrl,
+      impersonate: true,
+    })
+    modes.set(modeKey(rpcUrl, I), 'smart')
+    const batch = { rpcUrl, from: I, calls: [transfer, transfer] }
+
+    const preview = await handlers.get('previewSend')?.({
+      ...batch,
+      atomicRequired: true,
+      method: 'wallet_sendCalls',
+    })
+    expect(preview).toMatchObject({
+      path: 'self-call',
+      payer: I,
+      sponsored: false,
+      fallbackReason:
+        "Impersonated accounts can't sign, so they pay their own gas.",
+    })
+
+    const id = await sendBatch(
+      sendCallsRequest(I, batch.calls, { atomicRequired: true }),
+    )
+    const record = getRecord(records, rpcUrl, id)
+    expect(record?.path).toBe('self-call')
+    expect((await callsStatus(id)).status).toBe(200)
+    const tx = await transaction(record?.transactionHashes[0] as Hex)
+    expect([tx.from, tx.to]).toEqual([
+      I.toLowerCase() as Address,
+      I.toLowerCase() as Address,
+    ])
+    expect(await node.getBalance(X)).toBe(2n)
   })
 
   describe('plain-upgradable', () => {
@@ -387,6 +476,46 @@ describe('wallet_sendCalls', () => {
         'notice',
         { message: `Upgraded ${upgradable} to a Kernel smart account.` },
       ])
+    })
+
+    test('with bypass, a predicted revert is code 3 and leaves the account alone', async () => {
+      const error = await codeOf(
+        handleSend({
+          rpcUrl,
+          request: sendCallsRequest(upgradable, [transfer, { to: R }]),
+        }),
+      )
+      expect(error.code).toBe(3)
+      expect(error.data).toBe('0xdeadbeef')
+      expect(await node.getCode(upgradable)).toBe('0x')
+      expect(modes.get(modeKey(rpcUrl, upgradable))).toBe('plain-upgradable')
+      expect(sent.some(([topic]) => topic === 'notice')).toBe(false)
+      expect(records.records[rpcUrl]).toBeUndefined()
+    })
+
+    test('"Sign anyway" upgrades, then sends the reverting batch as a self-call', async () => {
+      const { ask } = approve(true)
+      const id = await sendBatch(
+        sendCallsRequest(upgradable, [transfer, { to: R }]),
+        ask,
+      )
+      expect(await node.getCode(upgradable)).toBe(delegationCode(KERNEL_V3_3))
+      expect(getRecord(records, rpcUrl, id)?.path).toBe('self-call')
+      expect((await callsStatus(id)).status).toBe(500)
+    })
+
+    test('a mode changed to plain-never during the approval is not upgraded', async () => {
+      const { ask } = answering((request) => {
+        modes.set(modeKey(rpcUrl, upgradable), 'plain-never')
+        return { status: 'approved', request }
+      })
+      const id = await sendBatch(
+        sendCallsRequest(upgradable, [transfer, transfer]),
+        ask,
+      )
+      expect(await node.getCode(upgradable)).toBe('0x')
+      expect(modes.get(modeKey(rpcUrl, upgradable))).toBe('plain-never')
+      expect(getRecord(records, rpcUrl, id)?.path).toBe('sequential')
     })
   })
 })
@@ -502,8 +631,18 @@ describe('wallet UI messages', () => {
     return handler(payload)
   }
 
-  test('smartStatus is the AA status of the last reconcile', async () => {
+  test('smartStatus reconciles a network it has not seen yet', async () => {
     expect(await call('smartStatus', { rpcUrl })).toMatchObject({ ok: true })
+    expect(await node.getCode(smart)).toBe(delegationCode(KERNEL_V3_3))
+  })
+
+  test('smartStatus is the AA status of the last reconcile, without another', async () => {
+    await reconcileForRpc(rpcUrl)
+    await node.setCode(smart, '0x')
+    await Bun.sleep(1050)
+    expect(await call('smartStatus', { rpcUrl })).toMatchObject({ ok: true })
+    // Past the memo, so a reconcile would have delegated it again.
+    expect(await node.getCode(smart)).toBe('0x')
   })
 
   test('previewSend previews a plain-upgradable batch as smart, but not a transaction', async () => {
@@ -512,6 +651,7 @@ describe('wallet UI messages', () => {
       from: upgradable,
       calls: [transfer, transfer],
       atomicRequired: true,
+      method: 'wallet_sendCalls',
     })
     expect(preview).toMatchObject({
       mode: 'plain-upgradable',
@@ -570,6 +710,15 @@ describe('wallet UI messages', () => {
       call('setAccountMode', { rpcUrl, address: never, action: 'switch-to-kernel' }),
     ).rejects.toThrow(/contract code/)
     expect(await node.getCode(never)).toBe('0x6000')
+  })
+
+  test('setAccountMode: an unknown action is -32602 and changes nothing', async () => {
+    expect(
+      await codeOf(
+        call('setAccountMode', { rpcUrl, address: smart, action: 'delete' }),
+      ),
+    ).toMatchObject({ code: -32602 })
+    expect(modes.get(modeKey(rpcUrl, smart))).toBeUndefined()
   })
 
   test('setAccountMode: a mode is stored and applied at once', async () => {

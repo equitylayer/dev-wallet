@@ -41,8 +41,14 @@ export type SendPreview = {
   mode: AccountMode
   onchain: OnchainKind
   atomicStatus: AtomicStatus
-  /** `null` when the calls can't be sent (see `error`). */
+  /**
+   * How the calls would go out. When `simulation.ok` is `false` (a predicted
+   * revert), this is what "Sign anyway" would do: the approval UI keys that
+   * button on `simulation.ok === false`. `null` when `error` says the calls
+   * can't be sent at all.
+   */
   path: ExecutionPath | null
+  /** Who would pay the gas; read it like `path`. */
   payer: Address | null
   sponsored: boolean
   fallbackReason?: string

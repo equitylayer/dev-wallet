@@ -30,6 +30,16 @@ export function unknownBundleId(id: string): WalletRpcError {
   return new WalletRpcError(UNKNOWN_BUNDLE_ID, `Unknown batch id ${id}`)
 }
 
+/** EIP-5792: `atomicRequired` was set, but the account can't batch atomically. */
+export const ATOMICITY_NOT_SUPPORTED = 5760
+
+export function atomicityUnsupported(): WalletRpcError {
+  return new WalletRpcError(
+    ATOMICITY_NOT_SUPPORTED,
+    "This account can't execute calls atomically",
+  )
+}
+
 /**
  * Any thrown error with a numeric `code` keeps `{ code, message, data }`:
  * wallet errors, and node errors viem throws over HTTP (`RpcRequestError`, when

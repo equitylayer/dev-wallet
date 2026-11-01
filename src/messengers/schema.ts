@@ -2,8 +2,9 @@ import type { Address } from 'viem'
 
 import type { ReconcileResult } from '~/smart/modes'
 import type { SendPreview } from '~/smart/preview'
+import type { AccountModeAction } from '~/smart/resolve'
 import type { AaStatus } from '~/smart/setup'
-import type { AccountMode, RpcCall } from '~/smart/types'
+import type { RpcCall } from '~/smart/types'
 import type { RpcRequest, RpcResponse } from '~/types/rpc'
 import type { SessionsState } from '~/zustand'
 
@@ -38,10 +39,10 @@ export type Schema = {
       calls: RpcCall[]
       atomicRequired: boolean
       /**
-       * The request being previewed. Only a `wallet_sendCalls` (the default)
-       * upgrades a plain-upgradable account, so only it previews as smart.
+       * The request being previewed. Only a `wallet_sendCalls` upgrades a
+       * plain-upgradable account, so only it previews as smart.
        */
-      method?: 'eth_sendTransaction' | 'wallet_sendCalls'
+      method: 'eth_sendTransaction' | 'wallet_sendCalls'
     },
     response: SendPreview,
   ]
@@ -54,7 +55,7 @@ export type Schema = {
     payload: {
       rpcUrl: string
       address: Address
-      action: AccountMode | 'switch-to-kernel' | 'revoke'
+      action: AccountModeAction
     },
     response: ReconcileResult,
   ]

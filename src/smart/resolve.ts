@@ -60,6 +60,23 @@ export function upgradesBeforeSend(args: {
   )
 }
 
+/** What the account screen can ask for: a mode, or a change of code. */
+export type AccountModeAction = AccountMode | 'switch-to-kernel' | 'revoke'
+
+const ACCOUNT_MODE_ACTIONS: readonly AccountModeAction[] = [
+  'smart',
+  'plain-upgradable',
+  'plain-never',
+  'switch-to-kernel',
+  'revoke',
+]
+
+export function isAccountModeAction(
+  action: unknown,
+): action is AccountModeAction {
+  return (ACCOUNT_MODE_ACTIONS as readonly unknown[]).includes(action)
+}
+
 function invalid(message: string): WalletRpcError {
   return new WalletRpcError(INVALID_PARAMS, message)
 }

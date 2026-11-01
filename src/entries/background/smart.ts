@@ -1,26 +1,25 @@
 // The background's glue to the chrome-free smart-account core (`~/smart`): it
-// reads the stores, keeps the node in step with the accounts' modes, and runs
-// sends, previews and mode changes. `rpc.ts` routes requests here.
-import { type Address, zeroAddress } from 'viem'
+// reads the stores, keeps the node in step with the accounts' modes, and
+// answers the EIP-5792 reads, previews and mode changes. Sends are in
+// `smart-sends.ts`; `rpc.ts` routes requests to both.
+import { zeroAddress } from 'viem'
 
 import { getMessenger } from '~/messengers'
 import type { Schema } from '~/messengers/schema'
 import { KERNEL_V3_3 } from '~/smart/constants'
-import { parseSendCalls } from '~/smart/eip5792'
 import {
   INVALID_PARAMS,
   WalletRpcError,
   unauthorizedAccount,
   unknownBundleId,
 } from '~/smart/errors'
-import { executeCalls } from '~/smart/execute'
 import { classifyCode, setDelegation } from '~/smart/kernel'
 import type { ReconcileResult } from '~/smart/modes'
 import { connectNode } from '~/smart/node'
 import { type SendPreview, previewCalls } from '~/smart/preview'
 import {
+  isAccountModeAction,
   reconcileNetwork,
-  sendTransactionCall,
   upgradesBeforeSend,
 } from '~/smart/resolve'
 import type { AaStatus } from '~/smart/setup'
@@ -29,8 +28,8 @@ import {
   findAccount,
   handleWalletRequest,
 } from '~/smart/wallet-core'
-import type { RpcRequest } from '~/types/rpc'
 import { filterAccounts } from '~/utils/accounts'
+import { serialPerKey } from '~/utils/serial'
 import {
   accountModesStore,
   accountStore,
@@ -38,16 +37,13 @@ import {
   settingsStore,
 } from '~/zustand'
 
-import { declinedError } from './methods'
-import type { Decision } from './pending-requests'
-
 export { detectReset, resolveAccount } from '~/smart/resolve'
 
 const walletMessenger = getMessenger('background:wallet')
 
 const RECONCILE_TTL_MS = 1000
 
-type Snapshot = {
+export type Snapshot = {
   deps: WalletCoreDeps
   aa: AaStatus
   results: ReconcileResult[]
@@ -55,19 +51,14 @@ type Snapshot = {
 
 const snapshots = new Map<string, { at: number; snapshot: Promise<Snapshot> }>()
 const lastBlock = new Map<string, bigint>()
-const queues = new Map<string, Promise<unknown>>()
+/** Each network's AA status as of its last reconcile, for `smartStatus`. */
+const lastAa = new Map<string, AaStatus>()
 
 /**
- * Runs `task` once every earlier one for `rpcUrl` has settled, so reconciles
+ * Runs a task for an rpcUrl once every earlier one has settled, so reconciles
  * and mode changes never interleave their reads and writes on the node.
  */
-function exclusive<T>(rpcUrl: string, task: () => Promise<T>): Promise<T> {
-  const run = (queues.get(rpcUrl) ?? Promise.resolve())
-    .catch(() => {})
-    .then(task)
-  queues.set(rpcUrl, run)
-  return run
-}
+export const exclusive = serialPerKey()
 
 type Persisted = {
   persist: {
@@ -122,6 +113,7 @@ async function computeSnapshot(rpcUrl: string): Promise<Snapshot> {
   // A reset node has none of the batches recorded before.
   if (state.reset) batchCallsStore.getState().clearRecords(rpcUrl)
   lastBlock.set(rpcUrl, state.blockNumber)
+  lastAa.set(rpcUrl, state.aa)
 
   return {
     aa: state.aa,
@@ -164,185 +156,59 @@ function snapshotFor(rpcUrl: string): Promise<Snapshot> {
   return entry.snapshot
 }
 
-function invalidate(rpcUrl: string): void {
+/** Drops the memo, so the next reconcile of `rpcUrl` reads the node again. */
+export function invalidate(rpcUrl: string): void {
   snapshots.delete(rpcUrl)
 }
 
 /**
  * Reconciles the network's accounts with the node (installing the AA
- * contracts, delegating smart accounts, clearing records after a reset) and
- * returns what the execution core needs. Memoized per rpcUrl for 1 s; sends
- * and mode changes start over.
+ * contracts, delegating smart accounts, clearing records after a reset).
+ * Memoized per rpcUrl for 1 s; `fresh` starts over. The sponsor is read live.
  *
  * @throws The node's error when the reconcile fails; nothing is memoized.
  */
-export async function reconcileForRpc(rpcUrl: string): Promise<WalletCoreDeps> {
-  const { deps } = await snapshotFor(rpcUrl)
-  return { ...deps, sponsor: settingsStore.getState().sponsor }
+export async function reconcileSnapshot(
+  rpcUrl: string,
+  { fresh = false }: { fresh?: boolean } = {},
+): Promise<Snapshot> {
+  if (fresh) invalidate(rpcUrl)
+  const snapshot = await snapshotFor(rpcUrl)
+  return {
+    ...snapshot,
+    deps: { ...snapshot.deps, sponsor: settingsStore.getState().sponsor },
+  }
 }
 
-async function freshDeps(rpcUrl: string): Promise<WalletCoreDeps> {
-  invalidate(rpcUrl)
-  return reconcileForRpc(rpcUrl)
+/** What the execution core needs, after a reconcile (see `reconcileSnapshot`). */
+export async function reconcileForRpc(rpcUrl: string): Promise<WalletCoreDeps> {
+  return (await reconcileSnapshot(rpcUrl)).deps
 }
 
 /**
  * Reconciles before a dApp is told its accounts, so their code matches their
  * modes when it reads it. A failure is only logged: the addresses don't
- * depend on it, and the next request retries.
+ * depend on it, and the next request retries. With `timeoutMs`, a slow node
+ * is waited for that long only; the reconcile carries on in the background.
  */
-export async function reconcileBeforeAnswering(rpcUrl: string): Promise<void> {
-  try {
-    await snapshotFor(rpcUrl)
-  } catch (error) {
-    console.warn('DevWallet could not reconcile accounts with the node', error)
-  }
-}
-
-function notify(message: string): void {
-  // The side panel may be closed, so never wait for an answer.
-  walletMessenger.send('notice', { message }).catch(() => {})
-}
-
-////////////////////////////////////////////////////////////////////////
-// Sends
-
-/** Asks the user; absent when bypass is on and nobody is asked. */
-type Ask = (request: RpcRequest) => Promise<Decision>
-
-/** The send's result, or a plain request for `rpc.ts` to pass to the node. */
-export type SendOutcome = { result: unknown } | { passThrough: RpcRequest }
-
-async function approve(
-  request: RpcRequest,
-  ask: Ask | undefined,
-  options: { upgrade?: boolean } = {},
-): Promise<{ request: RpcRequest; force: boolean }> {
-  // Nobody is asked, so nobody can say "Sign anyway": a predicted revert is
-  // refused with code 3 (spec §4).
-  if (!ask) return { request, force: false }
-  const decision = await ask(request)
-  if (decision.status !== 'approved') {
-    throw declinedError(request, decision.status, options)
-  }
-  const { id, method, params } = decision.request
-  return {
-    request: { id, method, params } as RpcRequest,
-    force: decision.force === true,
-  }
-}
-
-async function upgradeAccount(rpcUrl: string, address: Address) {
-  const node = await connectNode({ rpcUrl })
-  await exclusive(rpcUrl, async () => {
-    await setDelegation(node, address, KERNEL_V3_3)
-    accountModesStore.getState().setMode({ rpcUrl, address, mode: 'smart' })
-  })
-  invalidate(rpcUrl)
-}
-
-function firstParam(request: RpcRequest): Record<string, unknown> {
-  const [param] = (request.params ?? []) as unknown[]
-  return typeof param === 'object' && param !== null
-    ? (param as Record<string, unknown>)
-    : {}
-}
-
-async function sendTransaction(
+export async function reconcileBeforeAnswering(
   rpcUrl: string,
-  request: RpcRequest,
-  ask: Ask | undefined,
-): Promise<SendOutcome> {
-  const approved = await approve(request, ask)
-  // The approval screen sends back the transaction it showed, maybe edited;
-  // anything it left out keeps the dApp's value.
-  const tx = { ...firstParam(request), ...firstParam(approved.request) }
-  const deps = typeof tx.from === 'string' ? await freshDeps(rpcUrl) : null
-  const account = deps && findAccount(deps.accounts, tx.from as string)
-  // Plain accounts, and addresses the wallet doesn't hold, send as before.
-  if (!deps || account?.mode !== 'smart') {
-    return { passThrough: approved.request }
-  }
+  { timeoutMs }: { timeoutMs?: number } = {},
+): Promise<void> {
+  const reconcile = snapshotFor(rpcUrl).then(
+    () => {},
+    (error) => {
+      console.warn('DevWallet could not reconcile accounts with the node', error)
+    },
+  )
+  if (timeoutMs === undefined) return reconcile
 
-  try {
-    // One call through the execution core, like a one-call batch. The dApp's
-    // `gas`, `nonce` and fee fields are ignored: the path picks its own (a
-    // user op is sent by the sponsor).
-    const { transactionHashes } = await executeCalls({
-      node: deps.node,
-      chainId: deps.chainId,
-      account,
-      calls: [sendTransactionCall(tx)],
-      atomicRequired: false,
-      sponsor: deps.sponsor,
-      force: approved.force,
-    })
-    // For a user op, the `handleOps` transaction that carried it.
-    return { result: transactionHashes[0] }
-  } finally {
-    invalidate(rpcUrl)
-  }
-}
-
-async function sendCalls(
-  rpcUrl: string,
-  request: RpcRequest,
-  ask: Ask | undefined,
-): Promise<unknown> {
-  // Check the batch before asking anyone: malformed params, another chain or
-  // an unknown sender fail at once.
-  const { deps, aa } = await snapshotFor(rpcUrl)
-  const { from } = parseSendCalls(request.params, {
-    chainId: deps.chainId,
-    activeAccount: deps.activeAccount,
-    knownAccounts: deps.accounts.map((a) => a.address),
-    records: deps.records,
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, timeoutMs)
   })
-  const account = findAccount(deps.accounts, from)
-  if (!account) throw unauthorizedAccount(from)
-  const upgrade = upgradesBeforeSend({
-    method: request.method,
-    mode: account.mode,
-    onchain: account.onchain,
-    aaReady: aa.ok,
-  })
-
-  const approved = await approve(request, ask, { upgrade })
-  if (upgrade) {
-    await upgradeAccount(rpcUrl, account.address)
-    if (!ask) notify(`Upgraded ${account.address} to a Kernel smart account.`)
-  }
-
-  try {
-    const fresh = await freshDeps(rpcUrl)
-    return await handleWalletRequest(
-      { ...fresh, force: approved.force },
-      {
-        method: 'wallet_sendCalls',
-        params: approved.request.params as unknown[],
-      },
-    )
-  } finally {
-    invalidate(rpcUrl)
-  }
-}
-
-/**
- * `eth_sendTransaction` and `wallet_sendCalls`, after the approval gate (`ask`)
- * when there is one. Every `wallet_sendCalls`, and an `eth_sendTransaction`
- * from a smart account, runs through the execution core; an
- * `eth_sendTransaction` from any other account is handed back to pass through.
- */
-export async function handleSend(args: {
-  rpcUrl: string
-  request: RpcRequest
-  ask?: Ask
-}): Promise<SendOutcome> {
-  const { rpcUrl, request, ask } = args
-  if (request.method === 'wallet_sendCalls') {
-    return { result: await sendCalls(rpcUrl, request, ask) }
-  }
-  return sendTransaction(rpcUrl, request, ask)
+  await Promise.race([reconcile, timeout])
+  clearTimeout(timer)
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -385,13 +251,13 @@ async function previewSend({
   from,
   calls,
   atomicRequired,
-  method = 'wallet_sendCalls',
+  method,
 }: Schema['previewSend'][0]): Promise<SendPreview> {
-  const { deps, aa } = await snapshotFor(rpcUrl)
+  const { deps, aa } = await reconcileSnapshot(rpcUrl)
   const account = findAccount(deps.accounts, from)
   if (!account) throw unauthorizedAccount(from)
   return previewCalls(
-    { ...deps, sponsor: settingsStore.getState().sponsor },
+    deps,
     {
       account,
       calls,
@@ -411,7 +277,13 @@ async function setAccountMode({
   address: requested,
   action,
 }: Schema['setAccountMode'][0]): Promise<ReconcileResult> {
-  const { deps, aa } = await snapshotFor(rpcUrl)
+  if (!isAccountModeAction(action)) {
+    throw new WalletRpcError(
+      INVALID_PARAMS,
+      `Unknown account mode action ${JSON.stringify(action)}`,
+    )
+  }
+  const { deps, aa } = await reconcileSnapshot(rpcUrl)
   const address = findAccount(deps.accounts, requested)?.address
   if (!address) throw unauthorizedAccount(requested)
   const { node } = deps
@@ -446,8 +318,7 @@ async function setAccountMode({
     return false
   })
 
-  invalidate(rpcUrl)
-  const { results } = await snapshotFor(rpcUrl)
+  const { results } = await reconcileSnapshot(rpcUrl, { fresh: true })
   const result = results.find(
     (r) => r.address.toLowerCase() === address.toLowerCase(),
   )
@@ -458,8 +329,11 @@ async function setAccountMode({
 export function setupSmartHandlers() {
   walletMessenger.reply('previewSend', previewSend)
   walletMessenger.reply('setAccountMode', setAccountMode)
+  // The status of the last reconcile; only a network never reconciled is
+  // reconciled now.
   walletMessenger.reply(
     'smartStatus',
-    async ({ rpcUrl }) => (await snapshotFor(rpcUrl)).aa,
+    async ({ rpcUrl }) =>
+      lastAa.get(rpcUrl) ?? (await reconcileSnapshot(rpcUrl)).aa,
   )
 }

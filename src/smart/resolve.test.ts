@@ -7,6 +7,7 @@ import { delegationCode } from './kernel'
 import { type Node, connectNode } from './node'
 import {
   detectReset,
+  isAccountModeAction,
   reconcileNetwork,
   resolveAccount,
   sendTransactionCall,
@@ -24,6 +25,25 @@ const DELEGATED: OnchainKind = {
 }
 const CONTRACT: OnchainKind = { kind: 'contract' }
 const address: Address = DEV_ACCOUNTS[1]
+
+describe('isAccountModeAction', () => {
+  test.each([
+    'smart',
+    'plain-upgradable',
+    'plain-never',
+    'switch-to-kernel',
+    'revoke',
+  ])('%p is an action', (action) => {
+    expect(isAccountModeAction(action)).toBe(true)
+  })
+
+  test.each(['', 'Smart', 'delete', undefined, null, 1, {}])(
+    '%p is not',
+    (action) => {
+      expect(isAccountModeAction(action)).toBe(false)
+    },
+  )
+})
 
 describe('detectReset', () => {
   test('nothing to compare against is not a reset', () => {

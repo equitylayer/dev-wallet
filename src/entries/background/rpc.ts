@@ -26,14 +26,17 @@ import {
 } from './methods'
 import { type Decision, requestUserDecision } from './pending-requests'
 import {
-  handleSend,
   reconcileBeforeAnswering,
   showCallsStatus,
   walletRequest,
 } from './smart'
+import { handleSend } from './smart-sends'
 
 const inpageMessenger = getMessenger('background:inpage')
 const walletMessenger = getMessenger('background:wallet')
+
+/** How long `eth_accounts` waits for a reconcile before answering anyway. */
+const ETH_ACCOUNTS_RECONCILE_MS = 1500
 
 export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
   messenger.reply('request', withSerializedErrors(async (payload, meta) => {
@@ -212,7 +215,11 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
       }
 
       if (request.method === 'eth_accounts') {
-        if (session) await reconcileBeforeAnswering(rpcUrl)
+        // dApps poll this, so a slow node only holds the answer so long.
+        if (session)
+          await reconcileBeforeAnswering(rpcUrl, {
+            timeoutMs: ETH_ACCOUNTS_RECONCILE_MS,
+          })
         const { getAccounts } = accountStore.getState()
         const { network } = networkStore.getState()
 
