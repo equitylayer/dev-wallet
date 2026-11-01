@@ -29,6 +29,13 @@ DevWallet is aimed to be **contributor first & friendly**. If you would like to 
 
 **3.0.0** is the smart-accounts and redesign release. The node's dev accounts are now EIP-7702 smart accounts by default, with sponsored user operations, EIP-5792 v2 batches and a batch queue, all in a redesigned side panel. See [Smart accounts](#smart-accounts).
 
+Coming from 2.x: your existing dev accounts become smart the first time DevWallet checks a network, which delegates them to Kernel with `setCode` (see [What DevWallet writes to your chain](#what-devwallet-writes-to-your-chain)). A send from a smart account (a deployment excepted) then goes out through Kernel, so the transaction a dApp gets back no longer goes from the account to the dApp's contract:
+
+- With the default gas sponsor, it is a `handleOps` transaction from the sponsor, so its `to` is the EntryPoint. The account's own nonce doesn't move.
+- With sponsoring off, it is a transaction from the account to itself, so its `to` is the account.
+
+To keep an account sending plain transactions as in 2.x, switch it to **Plain** (under **Advanced** on the Account home). The mode is set per account and per network. See [Modes](#modes).
+
 ## Why was it forked?
 
 Development had slowed down and many issues were left open.
@@ -260,7 +267,7 @@ An `eth_sendTransaction` from a smart account returns the hash of the transactio
 DevWallet answers `wallet_*` batch requests itself, per [EIP-5792](https://eips.ethereum.org/EIPS/eip-5792) v2:
 
 - `wallet_getCapabilities` reports only `atomic`, for the wallet's chain (`0x7a69` on a default node). Its status is `supported` for a Kernel account, `ready` for a Plain (upgradable) EOA, and `unsupported` otherwise.
-- `wallet_sendCalls` takes `version: "2.0.0"`, `chainId` (hex), `calls`, `atomicRequired`, and optionally `from` (the active account by default), `id` and `capabilities`. A smart account runs the calls as one atomic batch. A Plain (upgradable) account is upgraded first. Other accounts send one transaction per call, or fail with `5760` when `atomicRequired` is `true`. `wallet_sendCalls` can't deploy a contract: a call without `to` gets `-32602`, even alone. Send a deployment with `eth_sendTransaction`, which goes out as a normal transaction from the account in every mode. DevWallet supports no `wallet_sendCalls` capability. One marked `optional: true`, at the top level or on a call, is accepted and ignored. Any other gets `5700`.
+- `wallet_sendCalls` takes `version: "2.0.0"`, `chainId` (hex), `calls`, `atomicRequired`, and optionally `from` (by default the first account `eth_accounts` returns: the active one, when it is on this network), `id` and `capabilities`. A smart account runs the calls as one atomic batch. A Plain (upgradable) account is upgraded first. Other accounts send one transaction per call, or fail with `5760` when `atomicRequired` is `true`. `wallet_sendCalls` can't deploy a contract: a call without `to` gets `-32602`, even alone. Send a deployment with `eth_sendTransaction`, which goes out as a normal transaction from the account in every mode. DevWallet supports no `wallet_sendCalls` capability. One marked `optional: true`, at the top level or on a call, is accepted and ignored. Any other gets `5700`.
 - `wallet_getCallsStatus` returns `100` (pending), `200` (success), `500` (reverted) or `600` (partially reverted), with one receipt per transaction. For a user operation, that is the `handleOps` receipt, with the operation's own outcome and logs.
 - `wallet_showCallsStatus` opens the batch's transaction in the side panel.
 
