@@ -8,6 +8,7 @@
     "description": "DevWallet enhances your Solidity development workflow. Works both with Anvil and Hardhat 3."
   },
   "scripts": {
+    "aa:generate": "forge build --root contracts && bun scripts/generate-aa-code.ts",
     "anvil": "anvil --fork-url https://cloudflare-eth.com",
     "icons": "bun scripts/generate-icons.ts",
     "build": "tsc && bun run build:ds && bun run icons && vite build && bun run build:inpage",
