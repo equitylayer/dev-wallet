@@ -3,9 +3,14 @@ import { useCallback, useMemo } from 'react'
 import { queryOptions, useQuery } from '@tanstack/react-query'
 import { createQueryKey } from '~/react-query'
 import type { Client } from '~/viem'
-import { useContractsStore, useNetworkStore } from '~/zustand'
+import {
+  contractsStore as contractsStoreApi,
+  networkStore,
+  useContractsStore,
+  useNetworkStore,
+} from '~/zustand'
 import { type ContractsActions, getContractsKey } from '~/zustand/contracts'
-import { getContracts } from '../actions/getContracts'
+import { getContracts, runCoalesced } from '../actions/getContracts'
 import { useBlock } from './useBlock'
 import { useClient } from './useClient'
 
@@ -22,7 +27,6 @@ export function useContractsQueryOptions({
   enabled = true,
 }: UseContractsParameters = {}) {
   const { data: block } = useBlock()
-  const { syncContracts } = useContractsStore()
   const { network } = useNetworkStore()
   const client = useClient()
 
@@ -36,14 +40,26 @@ export function useContractsQueryOptions({
     ),
     queryKey: getContractsQueryKey([client.key]),
     async queryFn() {
-      if (typeof network.forkBlockNumber !== 'bigint') throw new Error()
+      // One scan at a time per network. A scan that is already running is not
+      // restarted by the next block: a single follow-up scan is queued, and it
+      // reads the network and the scan cursor only once it starts.
+      return runCoalesced(client.key, async () => {
+        const { network: current } = networkStore.getState()
+        if (current.rpcUrl !== client.key) return []
+        if (typeof current.forkBlockNumber !== 'bigint') throw new Error()
 
-      const contracts = await getContracts(client, {
-        fromBlock: network.forkBlockNumber + 1n,
-        toBlock: 'latest',
+        const key = { rpcUrl: current.rpcUrl }
+        const { scanCursors, syncContracts } = contractsStoreApi.getState()
+        const { contracts } = await getContracts(client, {
+          fromBlock: current.forkBlockNumber + 1n,
+          toBlock: 'latest',
+          cursor: scanCursors[getContractsKey(key)],
+          // Keep what was found even if the scan is interrupted before the end.
+          onProgress: ({ contracts, cursor }) =>
+            syncContracts(key, { contracts, cursor }),
+        })
+        return contracts
       })
-      syncContracts({ rpcUrl: network.rpcUrl }, { contracts })
-      return contracts
     },
   })
 }

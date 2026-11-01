@@ -3,6 +3,7 @@ import type { Abi, Address } from 'viem'
 import type { Hex, TransactionReceipt } from 'viem'
 import { useStore } from 'zustand'
 
+import type { ContractsScanCursor } from '~/actions/getContracts'
 import type { RequiredBy } from '~/types/utils'
 
 import { createStore, getKey } from './utils'
@@ -25,6 +26,8 @@ type SerializedContractsKey = string
 
 export type ContractsState = {
   contracts: Record<string, Contract[] | undefined>
+  /** How far `syncContracts` has scanned the chain, per `ContractsKey`. */
+  scanCursors: Record<string, ContractsScanCursor | undefined>
 }
 export type ContractsActions = {
   addContract: (
@@ -57,6 +60,8 @@ export type ContractsActions = {
     key: ContractsKey,
     parameters: {
       contracts: RequiredBy<Partial<Contract>, 'address'>[]
+      /** Where the scan that found `contracts` got to. */
+      cursor?: ContractsScanCursor | null
     },
   ) => void
 }
@@ -69,6 +74,7 @@ export function getContractsKey(key: ContractsKey): SerializedContractsKey {
 export const contractsStore = createStore<ContractsStore>(
   (set) => ({
     contracts: {},
+    scanCursors: {},
     addContract(key, contract) {
       const serializedKey = getContractsKey(key)
 
@@ -162,7 +168,7 @@ export const contractsStore = createStore<ContractsStore>(
       })
     },
     syncContracts(key, args) {
-      const { contracts: contracts_ } = args
+      const { contracts: contracts_, cursor } = args
       const serializedKey = getContractsKey(key)
 
       set((state) => {
@@ -198,6 +204,9 @@ export const contractsStore = createStore<ContractsStore>(
         return {
           ...state,
           contracts,
+          scanCursors: cursor
+            ? { ...state.scanCursors, [serializedKey]: cursor }
+            : state.scanCursors,
         }
       })
     },
