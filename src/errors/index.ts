@@ -10,4 +10,5 @@ export {
   UnknownRpcError,
   UnsupportedProviderMethodError,
   UserRejectedRequestError,
+  toProviderError,
 } from './rpc'

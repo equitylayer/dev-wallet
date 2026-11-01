@@ -14,6 +14,8 @@ import {
   UserRejectedRequestError,
 } from '~/errors'
 import { type Messenger, getMessenger } from '~/messengers'
+import type { CallbackFunction } from '~/messengers/transports/types'
+import { serializeError } from '~/smart/errors'
 import { connectNode, nodeMethod } from '~/smart/node'
 import type { RpcRequest, RpcResponse } from '~/types/rpc'
 import {
@@ -24,13 +26,43 @@ import {
   settingsStore,
 } from '~/zustand'
 
+import {
+  assertEthAccountsRequest,
+  permissionsFor,
+  requiresApproval,
+} from './methods'
 import { type Decision, requestUserDecision } from './pending-requests'
 
 const inpageMessenger = getMessenger('background:inpage')
 const walletMessenger = getMessenger('background:wallet')
 
+type RequestHandler = CallbackFunction<
+  { request: RpcRequest; rpcUrl?: string },
+  RpcResponse
+>
+
+/**
+ * Anything thrown while handling a request goes back as a JSON-RPC error
+ * object. The messenger would otherwise reduce it to its message and lose the
+ * code and data that dApps read (3, 4001, 5700-5760, ...).
+ */
+function withSerializedErrors(handler: RequestHandler): RequestHandler {
+  return async (payload, meta) => {
+    try {
+      return await handler(payload, meta)
+    } catch (error) {
+      return {
+        id: payload.request.id,
+        jsonrpc: '2.0',
+        error: serializeError(error),
+      } as RpcResponse
+    }
+  }
+}
+
 export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
-  messenger.reply('request', async ({ request, rpcUrl: rpcUrl_ }, meta) => {
+  messenger.reply('request', withSerializedErrors(async (payload, meta) => {
+    const { request, rpcUrl: rpcUrl_ } = payload
     const isInpage =
         meta.sender.tab &&
         !meta.sender.tab?.url?.includes('extension://') &&
@@ -54,16 +86,8 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
         },
       } as RpcResponse
 
-    const { bypassSignatureAuth, bypassTransactionAuth } =
-        settingsStore.getState()
     // If the method is a "signable" method, request approval from the user.
-    if (
-        (request.method === 'eth_sendTransaction' && !bypassTransactionAuth) ||
-        (request.method === 'eth_sign' && !bypassSignatureAuth) ||
-        (request.method === 'eth_signTypedData_v4' && !bypassSignatureAuth) ||
-        (request.method === 'personal_sign' && !bypassSignatureAuth) ||
-        (request.method === 'wallet_sendCalls' && !bypassTransactionAuth)
-    ) {
+    if (requiresApproval(request.method, settingsStore.getState())) {
       if (isInpage && !session)
         return {
           id: request.id,
@@ -89,7 +113,9 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
     }
 
     if (isInpage) {
-      if (request.method === 'eth_requestAccounts') {
+      // Connecting the site: shared by `eth_requestAccounts` and
+      // `wallet_requestPermissions`, which differ only in what they return.
+      const connect = async () => {
         const authorize = () => {
           const { getAccounts } = accountStore.getState()
           const { network } = networkStore.getState()
@@ -108,24 +134,59 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
             chainId: numberToHex(network.chainId),
           })
 
-          return {
-            id: request.id,
-            jsonrpc: '2.0',
-            result: addresses,
-          } as RpcResponse
+          return { addresses }
         }
 
         const { bypassConnectAuth } = settingsStore.getState()
         if (bypassConnectAuth) return authorize()
 
+        // The approval screen renders connection requests by method, so a
+        // permissions request is shown as the connection it amounts to.
         const decision = await requestUserDecision({
           ...request,
+          method: 'eth_requestAccounts',
+          params: undefined,
           sender: meta.sender,
         })
         if (decision.status !== 'approved')
-          return declinedResponse(request, decision.status)
+          return { declined: declinedResponse(request, decision.status) }
 
         return authorize()
+      }
+
+      if (request.method === 'eth_requestAccounts') {
+        const connection = await connect()
+        if ('declined' in connection) return connection.declined
+
+        return {
+          id: request.id,
+          jsonrpc: '2.0',
+          result: connection.addresses,
+        } as RpcResponse
+      }
+
+      if (request.method === 'wallet_requestPermissions') {
+        assertEthAccountsRequest(request.params)
+
+        const connection = await connect()
+        if ('declined' in connection) return connection.declined
+
+        return {
+          id: request.id,
+          jsonrpc: '2.0',
+          result: permissionsFor(new URL(meta.sender.url || '').origin, true),
+        } as RpcResponse
+      }
+
+      if (request.method === 'wallet_getPermissions') {
+        return {
+          id: request.id,
+          jsonrpc: '2.0',
+          result: permissionsFor(
+            new URL(meta.sender.url || '').origin,
+            !!session,
+          ),
+        } as RpcResponse
       }
 
       if (request.method === 'eth_accounts') {
@@ -230,7 +291,7 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
     }
 
     return execute(rpcUrl, rpcClient, request)
-  })
+  }))
 }
 
 function declinedResponse(
@@ -285,13 +346,6 @@ async function execute(
       request.method === 'wallet_sendCalls'
   )
     walletMessenger.send('transactionExecuted', undefined)
-
-  if ((response as { success?: boolean }).success === false)
-    return {
-      id: request.id,
-      jsonrpc: '2.0',
-      error: 'An unknown error occurred.',
-    } as RpcResponse
 
   return response
 }
