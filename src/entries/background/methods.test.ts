@@ -287,17 +287,36 @@ describe('needsSession', () => {
 })
 
 describe('refusedFromPage', () => {
+  const settings = [
+    {},
+    { bypassSignatureAuth: true },
+    { bypassTransactionAuth: true },
+    { bypassSignatureAuth: true, bypassTransactionAuth: true },
+  ]
+
   test.each(['eth_signTransaction', 'eth_sendTransactionSync'])(
     '%s skips the approval and the smart core: refused unless transactions are bypassed',
     (method) => {
-      expect(refusedFromPage(method, {})).toBe(true)
-      expect(refusedFromPage(method, { bypassSignatureAuth: true })).toBe(true)
-      expect(refusedFromPage(method, { bypassTransactionAuth: false })).toBe(
+      expect(settings.map((s) => refusedFromPage(method, s))).toEqual([
         true,
-      )
-      expect(refusedFromPage(method, { bypassTransactionAuth: true })).toBe(
+        true,
         false,
-      )
+        false,
+      ])
+    },
+  )
+
+  // The approval renders v4 only; these the node would sign unasked, and v3
+  // covers an EIP-2612 permit (R52).
+  test.each(['eth_signTypedData', 'eth_signTypedData_v3'])(
+    '%s skips the approval: refused unless signatures are bypassed',
+    (method) => {
+      expect(settings.map((s) => refusedFromPage(method, s))).toEqual([
+        true,
+        false,
+        true,
+        false,
+      ])
     },
   )
 
@@ -305,14 +324,14 @@ describe('refusedFromPage', () => {
     'eth_sendTransaction',
     'wallet_sendCalls',
     'personal_sign',
+    'eth_sign',
     'eth_signTypedData_v4',
     'eth_sendRawTransaction',
     'eth_chainId',
     'toString',
     '',
   ])('%p is not refused', (method) => {
-    expect(refusedFromPage(method, {})).toBe(false)
-    expect(refusedFromPage(method, { bypassTransactionAuth: true })).toBe(false)
+    for (const s of settings) expect(refusedFromPage(method, s)).toBe(false)
   })
 })
 

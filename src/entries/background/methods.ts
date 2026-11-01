@@ -40,6 +40,16 @@ const NODE_SIGNED_METHODS = [
 ] as const
 
 /**
+ * Typed data the node signs with an account's key, past the approval (which
+ * renders v4 only): a page may ask for them only while signatures are
+ * bypassed (R52). v3 covers an EIP-2612 permit.
+ */
+const NODE_SIGNED_TYPED_DATA = [
+  'eth_signTypedData',
+  'eth_signTypedData_v3',
+] as const
+
+/**
  * Methods whose first param is a transaction from an account: a page's that
  * names none goes from the active account, never the node's default (R50).
  */
@@ -87,11 +97,15 @@ export function needsSession(method: string): boolean {
 
 /**
  * Whether a page's request for this method is refused (4200): the node would
- * sign or send it unasked and past the smart core, so only with transactions
- * bypassed (`NODE_SIGNED_METHODS`). Asked only of a connected page.
+ * sign it unasked. A transaction (`NODE_SIGNED_METHODS`, past the smart core
+ * too) only with transactions bypassed; typed data the approval can't show
+ * (`NODE_SIGNED_TYPED_DATA`) only with signatures bypassed. Asked only of a
+ * connected page.
  */
 export function refusedFromPage(method: string, s: ApprovalSettings): boolean {
-  return isOneOf(NODE_SIGNED_METHODS, method) && !s.bypassTransactionAuth
+  if (isOneOf(NODE_SIGNED_METHODS, method)) return !s.bypassTransactionAuth
+  if (isOneOf(NODE_SIGNED_TYPED_DATA, method)) return !s.bypassSignatureAuth
+  return false
 }
 
 /** Whether a page's request names the account it sends from (`FROM_METHODS`). */

@@ -1501,6 +1501,25 @@ describe('page requests', () => {
       const signed = await ask('eth_signTransaction', [tx], top('dapp.test'))
       expect(signed.result).toMatch(/^0x[0-9a-f]+$/)
 
+      // Signatures bypassed: typed data the approval can't show reaches the
+      // node too (Anvil 1.7.1 answers it "Not implemented").
+      const fetches = spyOn(globalThis, 'fetch')
+      try {
+        const typed = await ask(
+          'eth_signTypedData_v3',
+          [smart, typedData],
+          top('dapp.test'),
+        )
+        expect(typed).not.toMatchObject({ error: { code: 4200 } })
+        expect(
+          fetches.mock.calls.some(([, init]) =>
+            String(init?.body ?? '').includes('"eth_signTypedData_v3"'),
+          ),
+        ).toBe(true)
+      } finally {
+        fetches.mockRestore()
+      }
+
       const sent = await ask('eth_sendTransaction', [tx], top('dapp.test'))
       const hash = sent.result as Hex
       expect(hash).toMatch(/^0x[0-9a-f]{64}$/)
@@ -1621,8 +1640,36 @@ describe('page requests', () => {
       expect(pendingRequests).toHaveLength(0)
     })
 
+    test('a connected site may not have the node sign typed data unasked: 4200, and the node never hears of it (R52)', async () => {
+      const typedData = {
+        types: {
+          EIP712Domain: [{ name: 'name', type: 'string' }],
+          Mail: [{ name: 'note', type: 'string' }],
+        },
+        domain: { name: 'x' },
+        primaryType: 'Mail',
+        message: { note: 'hi' },
+      }
+      const fetches = spyOn(globalThis, 'fetch')
+      try {
+        for (const method of ['eth_signTypedData', 'eth_signTypedData_v3'])
+          expect(
+            await ask(method, [smart, typedData], top('dapp.test')),
+          ).toMatchObject({ id: 1, error: { code: 4200 } })
+        expect(fetches).not.toHaveBeenCalled()
+      } finally {
+        fetches.mockRestore()
+      }
+      expect(pendingRequests).toHaveLength(0)
+    })
+
     test('a site that is not connected gets 4100 first: it learns nothing of the setting', async () => {
-      for (const method of ['eth_signTransaction', 'eth_sendTransactionSync'])
+      for (const method of [
+        'eth_signTransaction',
+        'eth_sendTransactionSync',
+        'eth_signTypedData',
+        'eth_signTypedData_v3',
+      ])
         expect(await ask(method, [tx], top('evil.test'))).toMatchObject({
           error: { code: 4100 },
         })
