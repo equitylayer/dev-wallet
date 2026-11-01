@@ -29,6 +29,7 @@ import {
   isTransactionMethod,
   needsSession,
   permissionsFor,
+  refusedFromPage,
   requestRpcUrl,
   requiresApproval,
   withSerializedErrors,
@@ -119,6 +120,19 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
     // or not: the bypass skips asking the user, not authorizing the site.
     if (isInpage && !session && needsSession(request.method))
       return unauthorized(request)
+
+    // The node would sign these unasked and past the smart core, so a page
+    // gets them only with transactions bypassed (R49). Checked after the
+    // session, so a site that isn't connected learns nothing of the setting.
+    if (isInpage && refusedFromPage(request.method, settingsStore.getState()))
+      return {
+        id: request.id,
+        jsonrpc: '2.0',
+        error: {
+          code: UnsupportedProviderMethodError.code,
+          message: `DevWallet doesn't let a page call ${request.method} unless transactions are bypassed.`,
+        },
+      } as RpcResponse
 
     // Sends go through the smart-account execution core, which asks for the
     // approval itself; plain `eth_sendTransaction`s come back to pass through.

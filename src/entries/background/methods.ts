@@ -26,6 +26,17 @@ const SESSION_METHODS = [
   'eth_signTypedData',
   'eth_signTypedData_v3',
   'eth_signTransaction',
+  'eth_sendTransactionSync',
+] as const
+
+/**
+ * Methods the node signs or sends with an account's key, past both the
+ * approval and the smart-account core: a page may call them only while
+ * transactions are bypassed (R49).
+ */
+const NODE_SIGNED_METHODS = [
+  'eth_signTransaction',
+  'eth_sendTransactionSync',
 ] as const
 
 /** Methods that open the side panel without needing a decision to execute. */
@@ -63,6 +74,15 @@ export function requiresApproval(
 /** Whether only a connected site may call this method (`SESSION_METHODS`). */
 export function needsSession(method: string): boolean {
   return isOneOf(SESSION_METHODS, method)
+}
+
+/**
+ * Whether a page's request for this method is refused (4200): the node would
+ * sign or send it unasked and past the smart core, so only with transactions
+ * bypassed (`NODE_SIGNED_METHODS`). Asked only of a connected page.
+ */
+export function refusedFromPage(method: string, s: ApprovalSettings): boolean {
+  return isOneOf(NODE_SIGNED_METHODS, method) && !s.bypassTransactionAuth
 }
 
 /** Whether a request for this method should open the side panel. */

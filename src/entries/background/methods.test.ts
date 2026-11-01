@@ -10,6 +10,7 @@ import {
   isTransactionMethod,
   needsSession,
   opensSidebar,
+  refusedFromPage,
   permissionsFor,
   requestRpcUrl,
   requiresApproval,
@@ -252,6 +253,7 @@ describe('needsSession', () => {
     'eth_signTypedData_v4',
     'eth_signTransaction',
     'eth_sendTransaction',
+    'eth_sendTransactionSync',
     'wallet_sendCalls',
   ])('%s signs or sends with an account key: a site must be connected', (method) => {
     expect(needsSession(method)).toBe(true)
@@ -273,9 +275,42 @@ describe('needsSession', () => {
     'wallet_showCallsStatus',
     'eth_call',
     'eth_sendRawTransaction',
+    // Parked (R46): the node's, with no key of ours.
+    'eth_sendRawTransactionSync',
+    'eth_sendUnsignedTransaction',
     'toString',
     '',
   ])('%p does not', (method) => {
     expect(needsSession(method)).toBe(false)
+  })
+})
+
+describe('refusedFromPage', () => {
+  test.each(['eth_signTransaction', 'eth_sendTransactionSync'])(
+    '%s skips the approval and the smart core: refused unless transactions are bypassed',
+    (method) => {
+      expect(refusedFromPage(method, {})).toBe(true)
+      expect(refusedFromPage(method, { bypassSignatureAuth: true })).toBe(true)
+      expect(refusedFromPage(method, { bypassTransactionAuth: false })).toBe(
+        true,
+      )
+      expect(refusedFromPage(method, { bypassTransactionAuth: true })).toBe(
+        false,
+      )
+    },
+  )
+
+  test.each([
+    'eth_sendTransaction',
+    'wallet_sendCalls',
+    'personal_sign',
+    'eth_signTypedData_v4',
+    'eth_sendRawTransaction',
+    'eth_chainId',
+    'toString',
+    '',
+  ])('%p is not refused', (method) => {
+    expect(refusedFromPage(method, {})).toBe(false)
+    expect(refusedFromPage(method, { bypassTransactionAuth: true })).toBe(false)
   })
 })

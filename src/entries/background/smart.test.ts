@@ -1421,6 +1421,7 @@ describe('page requests', () => {
       ['eth_signTypedData_v3', [smart, typedData]],
       ['eth_signTypedData_v4', [smart, typedData]],
       ['eth_signTransaction', [tx]],
+      ['eth_sendTransactionSync', [tx]],
     ]
 
     test('a site that is not connected gets 4100, and the node never hears of it', async () => {
@@ -1496,7 +1497,53 @@ describe('page requests', () => {
       expect(hash).toMatch(/^0x[0-9a-f]{64}$/)
       await waitForReceipt(node, hash)
       expect(await node.getBalance(X)).toBe(1n)
+
+      // Transactions bypassed: the node's own signing sends are allowed too.
+      const synced = await ask(
+        'eth_sendTransactionSync',
+        [tx],
+        top('dapp.test'),
+      )
+      expect(synced.result).toMatchObject({ status: '0x1' })
+      expect(await node.getBalance(X)).toBe(2n)
       expect(pendingRequests).toHaveLength(0)
+    })
+  })
+
+  describe('with bypass off', () => {
+    const tx = { from: smart, ...transfer }
+    /** One of DevWallet's own pages. */
+    const walletPage = (): Sender => {
+      const id = (globalThis as { chrome?: { runtime: { id: string } } })
+        .chrome!.runtime.id
+      return { id, url: `chrome-extension://${id}/src/index.html` }
+    }
+
+    test('a connected site may not have the node sign or send unasked: 4200, and the node never hears of it (R49)', async () => {
+      const fetches = spyOn(globalThis, 'fetch')
+      try {
+        for (const method of ['eth_signTransaction', 'eth_sendTransactionSync'])
+          expect(await ask(method, [tx], top('dapp.test'))).toMatchObject({
+            id: 1,
+            error: { code: 4200 },
+          })
+        expect(fetches).not.toHaveBeenCalled()
+      } finally {
+        fetches.mockRestore()
+      }
+      expect(pendingRequests).toHaveLength(0)
+    })
+
+    test('a site that is not connected gets 4100 first: it learns nothing of the setting', async () => {
+      for (const method of ['eth_signTransaction', 'eth_sendTransactionSync'])
+        expect(await ask(method, [tx], top('evil.test'))).toMatchObject({
+          error: { code: 4100 },
+        })
+    })
+
+    test('a wallet page still has the node sign', async () => {
+      const signed = await ask('eth_signTransaction', [tx], walletPage())
+      expect(signed.result).toMatch(/^0x[0-9a-f]+$/)
     })
   })
 })
