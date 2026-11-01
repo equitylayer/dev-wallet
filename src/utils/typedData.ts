@@ -2,12 +2,14 @@
 // fields instead of raw JSON, and Kernel's ERC-1271 wrapper named for what it
 // is (spec §8). It shows only what gets signed. Pure, so it is unit-tested.
 //
-// Signers disagree on the domain. Anvil (alloy's `TypedData`) signs every
-// standard field the domain carries, whatever `types.EIP712Domain` declares;
-// viem's `hashTypedData` and MetaMask's eth-sig-util sign only the declared
-// fields. Without `EIP712Domain`, viem derives it from the fields the domain
-// carries (`getTypesForEIP712Domain`), and so does this, reading a chain id
-// in any numeric form, as anvil does.
+// Signers disagree on the domain. Anvil (alloy's `TypedData`), which signs
+// here, signs every standard field the domain carries, whatever
+// `types.EIP712Domain` declares. viem's `hashTypedData` signs only the
+// declared fields; without `EIP712Domain`, it derives one from the fields the
+// domain carries (`getTypesForEIP712Domain`), and so does this, reading a
+// chain id in any numeric form, as anvil does. Other implementations differ
+// again (eth-sig-util signs an empty domain when `EIP712Domain` is absent),
+// so the flag is about agreement with the declared type, not any wallet.
 import { type Address, type Hex, isAddress, isHex, size } from 'viem'
 
 export type TypedDataInput = {

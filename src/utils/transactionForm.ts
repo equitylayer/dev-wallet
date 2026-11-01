@@ -56,7 +56,8 @@ export const TX_LABELS: Record<TxField, string> = {
 const QUANTITY = /^0x[0-9a-f]+$/i
 const WHOLE = /^\d+$/
 const DECIMAL = /^(\d+\.?\d*|\.\d+)$/
-const BYTES = /^0x([0-9a-f]{2})*$/i
+// A lowercase `0x`, as the background's hex check takes it.
+const BYTES = /^0x(?:[0-9a-fA-F]{2})*$/
 
 /** A hex quantity (or a safe integer) as a bigint; anything else is null. */
 export function quantity(value: unknown): bigint | null {

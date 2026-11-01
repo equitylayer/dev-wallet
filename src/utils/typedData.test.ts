@@ -199,7 +199,7 @@ describe('describeTypedData', () => {
 })
 
 // Anvil signs every standard field the domain carries, whatever EIP712Domain
-// declares; viem and MetaMask sign only the declared ones.
+// declares; viem signs only the declared ones.
 describe('the domain that gets signed', () => {
   const declaring = (...names: string[]) => {
     const td = kernelWrapper()

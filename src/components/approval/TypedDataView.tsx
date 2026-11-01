@@ -75,7 +75,7 @@ export function TypedDataView({ data }: { data: unknown }) {
           <Box paddingHorizontal="12px" paddingBottom="12px">
             <Notice tone="yellow" title="Signers disagree on this domain">
               <Text size="12px">
-                {`EIP712Domain doesn't match the domain on ${disputed.join(', ')}. Anvil signs the standard fields the domain carries; viem and MetaMask sign the declared ones. A contract may check a different domain than the one signed.`}
+                {`EIP712Domain doesn't match the domain on ${disputed.join(', ')}. The node signs every standard field the domain carries. Other wallets may sign only the declared fields, so a signature from them won't match this one, and a contract may check a different domain than the one signed.`}
               </Text>
             </Notice>
           </Box>

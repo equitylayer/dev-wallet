@@ -109,6 +109,13 @@ describe('applyTxForm', () => {
     })
   })
 
+  test('hex digits in either case', () => {
+    const tx = dappTx()
+    expect(applyTxForm(tx, { ...txForm(tx), data: '0xABCD' })).toEqual({
+      tx: { ...tx, data: '0xABCD' },
+    })
+  })
+
   test('data edits follow the key the dApp used', () => {
     const tx = { from: FROM, to: TO, input: '0x01' }
     expect(applyTxForm(tx, { ...txForm(tx), data: '0x02' })).toEqual({
@@ -131,6 +138,8 @@ describe('applyTxForm', () => {
       [{ from: '0x1234' }, 'from', 'From must be an address.'],
       [{ value: '-1' }, 'value', 'Value must be an amount of ETH, like 1 or 0.5.'],
       [{ data: '0xabc' }, 'data', 'Data must be hex bytes, like 0x or 0xa9059cbb.'],
+      // The background's hex check takes only a lowercase 0x.
+      [{ data: '0XABCD' }, 'data', 'Data must be hex bytes, like 0x or 0xa9059cbb.'],
       [{ gas: '1.5' }, 'gas', 'Gas limit must be a whole number.'],
       [{ nonce: '-2' }, 'nonce', 'Nonce must be a whole number.'],
       [{ maxFeePerGas: 'x' }, 'maxFeePerGas', 'Max fee per gas must be an amount of gwei, like 1.5.'],
