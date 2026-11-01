@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { isNoReceiverError } from './utils'
+import { isNoReceiverError, isValidSend } from './utils'
 
 describe('isNoReceiverError', () => {
   test.each([
@@ -24,4 +24,33 @@ describe('isNoReceiverError', () => {
   ])('%p is a real failure', (error) => {
     expect(isNoReceiverError(error)).toBe(false)
   })
+})
+
+describe('isValidSend', () => {
+  const send = (topic: string) => ({
+    connection: 'wallet:inpage',
+    topic,
+    payload: undefined,
+  })
+
+  test('a relay (`*`) takes a request, never an answer', () => {
+    expect(isValidSend({ message: send('> request'), topic: '*' })).toBe(true)
+    expect(isValidSend({ message: send('< request'), topic: '*' })).toBe(false)
+  })
+
+  test.each(['accountsChanged', 'chainChanged', 'connect', 'disconnect'])(
+    'a relay never takes a page event (%s): it is the provider\'s alone',
+    (event) => {
+      expect(isValidSend({ message: send(`> ${event}`), topic: '*' })).toBe(
+        false,
+      )
+      expect(
+        isValidSend({
+          message: send(`> ${event}`),
+          options: { connection: 'wallet:inpage' },
+          topic: event,
+        }),
+      ).toBe(true)
+    },
+  )
 })

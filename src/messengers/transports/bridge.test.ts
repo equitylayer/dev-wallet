@@ -133,6 +133,21 @@ test("the frame's own post, and its provider's answer, never reach the extension
   expect(toExtension).toEqual([])
 })
 
+test('nothing in the frame answers its own event post', async () => {
+  frame('https://dapp.test/')
+  await deliver(forDapp())
+  await dispatch(posted[0])
+
+  // Only the post itself: no `< accountsChanged` from the relay.
+  expect(posted).toEqual([
+    {
+      connection: 'wallet:inpage',
+      topic: '> accountsChanged',
+      payload: { accounts },
+    },
+  ])
+})
+
 test("another site's frame hears nothing", async () => {
   frame('https://evil.test/')
   await deliver(forDapp())

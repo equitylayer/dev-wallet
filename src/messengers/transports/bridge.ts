@@ -1,11 +1,6 @@
 import { senderHost } from '~/utils/host'
 
-import {
-  eventIn,
-  isPageEventTopic,
-  pageEventFor,
-  providerPost,
-} from '../page-events'
+import { eventIn, pageEventFor, providerPost } from '../page-events'
 import { isRelayedConnection } from './guards'
 import { createTabTransport } from './tab'
 import type { Transport } from './types'
@@ -43,9 +38,6 @@ export function setupBridgeTransportRelay() {
     if (!isRelayedConnection(connection)) return
 
     const topic_ = topic.replace('> ', '')
-    // An event is the extension's to tell the page (below), never the page's
-    // to ask: this frame's own post of one stays here.
-    if (isPageEventTopic(topic_)) return
     const response = await tabTransport.send(topic_, payload, {
       id,
       connection,

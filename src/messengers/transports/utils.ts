@@ -1,3 +1,4 @@
+import { isPageEventTopic } from '../page-events'
 import type { ReplyMessage, SendMessage } from './types'
 
 export function isValidReply<TResponse>({
@@ -33,6 +34,10 @@ export function isValidSend({
     return false
   if (topic !== '*' && message.topic !== `> ${topic}`) return false
   if (topic === '*' && message.topic.startsWith('<')) return false
+  // A page event is the provider's alone: no relay takes one, so none passes
+  // it on or answers it (the content script posts it to the provider).
+  if (topic === '*' && isPageEventTopic(message.topic.replace('> ', '')))
+    return false
   return true
 }
 
