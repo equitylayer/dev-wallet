@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 
 import { WalletRpcError } from './errors'
-import { dropsExtras, withFrom } from './transaction-call'
+import {
+  assertSmartSendable,
+  dropsExtras,
+  refusedOnSmartPath,
+  withFrom,
+} from './transaction-call'
 
 const from = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
 
@@ -64,4 +69,78 @@ describe('withFrom', () => {
       )
     },
   )
+})
+
+describe('refusedOnSmartPath (R54)', () => {
+  const to = '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC'
+  const authorization = {
+    chainId: '0x7a69',
+    address: to,
+    nonce: '0x0',
+    yParity: '0x0',
+    r: '0x01',
+    s: '0x01',
+  }
+  const hash = `0x01${'00'.repeat(31)}`
+
+  test('what a smart account drops is no reason to refuse', () => {
+    expect(
+      refusedOnSmartPath({
+        from,
+        to,
+        value: '0x1',
+        data: '0x',
+        type: '0x2',
+        chainId: '0x7a69',
+        accessList: [{ address: to, storageKeys: [] }],
+        gas: '0x5208',
+        gasPrice: '0x1',
+        maxFeePerGas: '0x2',
+        maxPriorityFeePerGas: '0x1',
+        nonce: '0x7',
+      }),
+    ).toBeUndefined()
+  })
+
+  test('an empty or absent list carries nothing', () => {
+    for (const empty of [undefined, null, []]) {
+      expect(
+        refusedOnSmartPath({ from, to, authorizationList: empty }),
+      ).toBeUndefined()
+      expect(
+        refusedOnSmartPath({ from, to, blobVersionedHashes: empty }),
+      ).toBeUndefined()
+      expect(refusedOnSmartPath({ from, to, blobs: empty })).toBeUndefined()
+    }
+  })
+
+  test('an authorization list or any blob field is named', () => {
+    expect(
+      refusedOnSmartPath({ from, to, authorizationList: [authorization] }),
+    ).toBe('authorizationList')
+    expect(
+      refusedOnSmartPath({ from, to, blobVersionedHashes: [hash] }),
+    ).toBe('blobVersionedHashes')
+    expect(refusedOnSmartPath({ from, to, maxFeePerBlobGas: '0x0' })).toBe(
+      'maxFeePerBlobGas',
+    )
+    expect(refusedOnSmartPath({ from, to, blobs: ['0x00'] })).toBe('blobs')
+    // Malformed, it is still not dropped quietly.
+    expect(refusedOnSmartPath({ from, to, authorizationList: '0x' })).toBe(
+      'authorizationList',
+    )
+  })
+
+  test('assertSmartSendable is -32602 naming the field', () => {
+    expect(() => assertSmartSendable({ from, to })).not.toThrow()
+    let error: unknown
+    try {
+      assertSmartSendable({ from, to, authorizationList: [authorization] })
+    } catch (e) {
+      error = e
+    }
+    expect(error).toBeInstanceOf(WalletRpcError)
+    expect((error as WalletRpcError).code).toBe(-32602)
+    expect((error as WalletRpcError).message).toContain('`authorizationList`')
+  })
 })

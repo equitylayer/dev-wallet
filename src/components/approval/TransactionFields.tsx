@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { Box, Button, Input, Text } from '~/design-system'
+import { refusedOnSmartPath } from '~/smart/transaction-call'
 import {
   type ExtraTxField,
   GAS_FIELDS,
@@ -76,6 +77,8 @@ export function TransactionFields({
   const extras = extraTxFields(tx)
   // A transaction the node gets whole takes its authorization list along.
   const setsCode = carriesAuthorizations(tx) && !dropped
+  // One a smart account sends can't carry it, nor blobs: refused (R54).
+  const refused = dropped ? refusedOnSmartPath(tx) : undefined
   return (
     <Section
       title="Transaction"
@@ -131,7 +134,12 @@ export function TransactionFields({
           />
         )}
         {extras.length > 0 && (
-          <ExtraFields fields={extras} setsCode={setsCode} dropped={dropped} />
+          <ExtraFields
+            fields={extras}
+            setsCode={setsCode}
+            dropped={dropped}
+            refused={refused}
+          />
         )}
       </Box>
     </Section>
@@ -143,15 +151,35 @@ export function TransactionFields({
  * authorization list, chain id, blob fields, …), as sent. A transaction the
  * node gets whole takes every one to it, so an EIP-7702 authorization list is
  * flagged in red (`setsCode`): it sets account code. One that goes through a
- * smart account's core drops them (`dropped`).
+ * smart account's core drops them (`dropped`), except an authorization list
+ * or blobs, for which it is refused (`refused`, R54).
  */
 function ExtraFields({
   fields,
   setsCode,
   dropped,
-}: { fields: ExtraTxField[]; setsCode: boolean; dropped: boolean }) {
+  refused,
+}: {
+  fields: ExtraTxField[]
+  setsCode: boolean
+  dropped: boolean
+  refused: string | undefined
+}) {
   return (
     <>
+      {refused && (
+        <Notice tone="red" title="A smart account can't send this">
+          <Text size="12px">
+            It carries{' '}
+            <Text family="mono" size="12px">
+              {refused}
+            </Text>
+            , which a smart account can't send: it sends only to, value and
+            data. Approving fails, and nothing is sent. To send it, switch the
+            account to Plain.
+          </Text>
+        </Notice>
+      )}
       {setsCode && (
         <Notice tone="red" title="This sets account code">
           <Text size="12px">
@@ -174,11 +202,13 @@ function ExtraFields({
           </Box>
         </Box>
       ))}
-      <Box paddingTop="12px">
-        <Text color="text/tertiary" size="12px">
-          {dropped ? EXTRAS_DROPPED_NOTE : EXTRAS_SENT_NOTE}
-        </Text>
-      </Box>
+      {!refused && (
+        <Box paddingTop="12px">
+          <Text color="text/tertiary" size="12px">
+            {dropped ? EXTRAS_DROPPED_NOTE : EXTRAS_SENT_NOTE}
+          </Text>
+        </Box>
+      )}
     </>
   )
 }

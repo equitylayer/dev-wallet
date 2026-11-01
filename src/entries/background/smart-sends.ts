@@ -9,7 +9,9 @@ import { executeCalls, planExecution } from '~/smart/execute'
 import { setDelegation } from '~/smart/kernel'
 import { atomicStatus } from '~/smart/modes'
 import {
+  assertSmartSendable,
   dropsExtras,
+  refusedOnSmartPath,
   sendTransactionCall,
   upgradesBeforeSend,
 } from '~/smart/resolve'
@@ -83,11 +85,27 @@ async function answered(sent: SendOutcome | Joined): Promise<SendOutcome> {
   return 'queued' in sent ? { response: await sent.queued } : sent
 }
 
+/**
+ * Refuses, before anyone is asked, a smart account's transaction that carries
+ * what the core can't send (R54). Only such a transaction costs a reconcile
+ * here; the send checks again with the account's mode then (`sendTransaction`).
+ */
+async function refuseUnsendable(
+  rpcUrl: string,
+  tx: Record<string, unknown>,
+): Promise<void> {
+  if (typeof tx.from !== 'string' || !refusedOnSmartPath(tx)) return
+  const { deps } = await reconcileSnapshot(rpcUrl)
+  const account = findAccount(deps.accounts, tx.from)
+  if (account && dropsExtras(tx, account.mode)) assertSmartSendable(tx)
+}
+
 async function sendTransaction(
   send: IncomingSend,
   ask: Ask | undefined,
 ): Promise<SendOutcome> {
   const { rpcUrl, request } = send
+  await refuseUnsendable(rpcUrl, firstParam(request))
   const approved = await approve(send, ask)
   if ('queued' in approved) return answered(approved)
   // The approval screen sends back the transaction it showed, maybe edited;
@@ -108,11 +126,15 @@ async function sendTransaction(
     // The approval shows the extra fields as dropped by this same rule.
     if (!account || !dropsExtras(tx, account.mode))
       return { passThrough: approved.request }
+    // It drops the type, access list, gas, fees and nonce, but never an
+    // authorization list or blobs (R54): the mode may have changed since.
+    assertSmartSendable(tx)
 
     try {
       // One call through the execution core, like a one-call batch. The
       // dApp's `gas`, `nonce` and fee fields are ignored: the path picks its
-      // own (a user op is sent by the sponsor).
+      // own (a user op is sent by the sponsor). So are its type and access
+      // list.
       const { transactionHashes } = await executeCalls({
         node: deps.node,
         chainId: deps.chainId,

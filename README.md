@@ -253,7 +253,7 @@ Sponsored sends also write to the chain (see below).
 
 When sponsoring isn't possible (an impersonated account, a sponsor account short of ETH), the account sends to itself instead, and the approval shows who pays and why. A batch the wallet expects to revert is never sponsored: a `handleOps` receipt succeeds even when its operation fails, so it would hide the failure.
 
-An `eth_sendTransaction` from a smart account returns the hash of the transaction that carried it. For a sponsored call that is the `handleOps` transaction, sent from the sponsor. The dApp's `gas`, fee and `nonce` fields are ignored. Plain accounts send as they always did.
+An `eth_sendTransaction` from a smart account returns the hash of the transaction that carried it. For a sponsored call that is the `handleOps` transaction, sent from the sponsor. The dApp's `type`, `accessList`, `gas`, fee and `nonce` fields are ignored. One that carries a non-empty EIP-7702 `authorizationList` or blob fields (`blobVersionedHashes`, `maxFeePerBlobGas`, `blobs`) gets `-32602` naming the field, before you are asked: a smart account can't send them. Switch the account to Plain to send such a transaction. Plain accounts send as they always did.
 
 ### EIP-5792 v2
 

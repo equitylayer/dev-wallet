@@ -55,6 +55,46 @@ export function dropsExtras(
 }
 
 /**
+ * What a smart account's transaction can't carry (R54): the core sends only
+ * to, value and data, and dropping these would send something else than the
+ * dApp asked for (no code set, no blobs). Its type, access list, gas, fees
+ * and nonce it drops (`dropsExtras`).
+ */
+const SMART_PATH_REFUSES = [
+  'authorizationList',
+  'blobVersionedHashes',
+  'maxFeePerBlobGas',
+  'blobs',
+] as const
+
+/**
+ * The first field of `tx` a smart account can't send (`SMART_PATH_REFUSES`),
+ * or `undefined`. An absent, null or empty list carries nothing.
+ */
+export function refusedOnSmartPath(
+  tx: Record<string, unknown>,
+): (typeof SMART_PATH_REFUSES)[number] | undefined {
+  return SMART_PATH_REFUSES.find((field) => {
+    const value = tx[field]
+    if (value === undefined || value === null) return false
+    return !(Array.isArray(value) && value.length === 0)
+  })
+}
+
+/**
+ * Checks that a smart account can send `tx` (`refusedOnSmartPath`).
+ *
+ * @throws WalletRpcError `-32602` naming the first field it can't.
+ */
+export function assertSmartSendable(tx: Record<string, unknown>): void {
+  const field = refusedOnSmartPath(tx)
+  if (field === undefined) return
+  throw invalid(
+    `A smart account can't send \`${field}\`: it sends only to, value and data. Switch the account to Plain to send it.`,
+  )
+}
+
+/**
  * `tx` sent from `address` when it names no account (`from` absent or null),
  * as `eth_accounts` would have the page pick; a string `from` is kept, `tx`
  * itself.

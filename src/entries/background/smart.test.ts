@@ -696,6 +696,112 @@ describe('eth_sendTransaction', () => {
     expect(await node.getCode(upgradable)).toBe('0x')
   })
 
+  describe('what a smart account cannot send (R54)', () => {
+    const authorizationList = [
+      {
+        chainId: '0x7a69',
+        address: X,
+        nonce: '0x0',
+        yParity: '0x0',
+        r: '0x01',
+        s: '0x01',
+      },
+    ]
+    const hash = `0x01${'00'.repeat(31)}`
+    const refused: [string, object][] = [
+      ['authorizationList', { type: '0x4', authorizationList }],
+      ['blobVersionedHashes', { blobVersionedHashes: [hash] }],
+      ['maxFeePerBlobGas', { maxFeePerBlobGas: '0x1' }],
+      ['blobs', { blobs: ['0x00'] }],
+    ]
+
+    test.each(refused)(
+      '%s is -32602 naming it, before anyone is asked, and nothing is sent',
+      async (field, extra) => {
+        const { ask, asked } = approve()
+        const before = await node.blockNumber()
+        const error = await codeOf(
+          handleSend({
+            rpcUrl,
+            request: sendTransactionRequest({ from: smart, ...transfer, ...extra }),
+            ask,
+          }),
+        )
+        expect(error.code).toBe(-32602)
+        expect(error.message).toContain(`\`${field}\``)
+        expect(asked).toHaveLength(0)
+        expect(await node.blockNumber()).toBe(before)
+        expect(await node.getBalance(X)).toBe(0n)
+      },
+    )
+
+    test('unasked (bypass on), too', async () => {
+      const error = await codeOf(
+        handleSend({
+          rpcUrl,
+          request: sendTransactionRequest({
+            from: smart,
+            ...transfer,
+            authorizationList,
+          }),
+        }),
+      )
+      expect(error).toMatchObject({ code: -32602 })
+      expect(await node.getBalance(X)).toBe(0n)
+    })
+
+    test('an account that became smart during the approval is refused when it would send', async () => {
+      const { ask, asked } = answering((request) => {
+        modes.set(modeKey(rpcUrl, never), 'smart')
+        return { status: 'approved', request }
+      })
+      const error = await codeOf(
+        handleSend({
+          rpcUrl,
+          request: sendTransactionRequest({
+            from: never,
+            ...transfer,
+            authorizationList,
+          }),
+          ask,
+        }),
+      )
+      expect(asked).toHaveLength(1)
+      expect(error).toMatchObject({ code: -32602 })
+      expect(await node.getBalance(X)).toBe(0n)
+    })
+
+    test('an empty authorization list, the type and the access list are still dropped', async () => {
+      const outcome = await handleSend({
+        rpcUrl,
+        request: sendTransactionRequest({
+          from: smart,
+          ...transfer,
+          type: '0x4',
+          chainId: '0x7a69',
+          accessList: [],
+          authorizationList: [],
+        }),
+      })
+      const { result: hash } = outcome as { result: Hex }
+      expect((await transaction(hash)).to).toBe(
+        ENTRY_POINT_07.toLowerCase() as Address,
+      )
+      expect(await node.getBalance(X)).toBe(1n)
+    })
+
+    test('a plain account sends them to the node, as before', async () => {
+      const request = sendTransactionRequest({
+        from: never,
+        ...transfer,
+        authorizationList,
+      })
+      expect(await handleSend({ rpcUrl, request })).toEqual({
+        passThrough: request,
+      })
+    })
+  })
+
   test('a rejected one is 4001, even for a plain-upgradable account', async () => {
     const { ask } = answering(() => ({ status: 'rejected' }))
     const error = await codeOf(
@@ -814,6 +920,41 @@ describe('batch queue', () => {
     expect((await callsStatus('dapp-batch')).status).toBe(200)
     expect(await node.getBalance(X)).toBe(3n)
     expect(queueNow()).toBeNull()
+  })
+
+  describe('a send carrying an authorization list never joins (R54)', () => {
+    const authorizationList = [
+      { chainId: '0x7a69', address: X, nonce: '0x0', yParity: '0x0', r: '0x01', s: '0x01' },
+    ]
+
+    test('unasked, it is -32602 rather than joining', async () => {
+      await startBatch()
+      const request = sendTransactionRequest({
+        from: smart,
+        ...transfer,
+        authorizationList,
+      })
+      expect(await codeOf(handleSend({ rpcUrl, request }))).toMatchObject({
+        code: -32602,
+      })
+      expect(queuedIds()).toEqual([])
+      expect(await node.getBalance(X)).toBe(0n)
+    })
+
+    test('"Add to batch" for an account that became smart during the approval is refused with -32602', async () => {
+      const request = sendTransactionRequest({
+        from: never,
+        ...transfer,
+        authorizationList,
+      })
+      const outcome = startSend(request, async (pending, options) => {
+        modes.set(modeKey(rpcUrl, never), 'smart')
+        return addToBatch(pending, options)
+      })
+      expect(await codeOf(outcome)).toMatchObject({ code: -32602 })
+      expect(queueNow()).toBeNull()
+      expect(await node.getBalance(X)).toBe(0n)
+    })
   })
 
   test('with bypass, a send that cannot join goes out now', async () => {

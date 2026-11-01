@@ -18,7 +18,7 @@ import {
   notActiveNetwork,
   openQueue,
 } from '~/smart/queue'
-import { sendTransactionCall } from '~/smart/resolve'
+import { assertSmartSendable, sendTransactionCall } from '~/smart/resolve'
 import { type RpcCall, toRpcCall } from '~/smart/types'
 import {
   type WalletAccount,
@@ -73,6 +73,9 @@ function queueEntry(
   if (typeof tx.from !== 'string') {
     throw new WalletRpcError(INVALID_PARAMS, 'The transaction has no `from`')
   }
+  // Only a smart account's sends join, and they go out as calls: never one
+  // with an authorization list or blobs (R54).
+  assertSmartSendable(tx)
   return {
     method: 'eth_sendTransaction',
     from: tx.from,
