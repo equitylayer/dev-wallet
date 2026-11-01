@@ -813,8 +813,10 @@ function SendCalls() {
         <Button onClick={handleClickSign} width="fit">
           Send calls
         </Button>
-        <Toggle checked={atomicRequired} onChange={setAtomicRequired} />
-        <Text>atomicRequired</Text>
+        <Box as="label" display="flex" alignItems="center" gap="12px">
+          <Toggle checked={atomicRequired} onChange={setAtomicRequired} />
+          <Text>atomicRequired</Text>
+        </Box>
       </Inline>
       {id && <Text>ID: {id}</Text>}
       {error && <ErrorText error={error} />}
@@ -900,14 +902,20 @@ function ShowCallsStatus() {
   const { provider } = useContext(Context)
 
   const [id, setId] = useState('')
+  const [error, setError] = useState<ProviderError>()
 
   const handleShowCallsStatus = async () => {
     if (!id) return
 
-    await provider.request({
-      method: 'wallet_showCallsStatus',
-      params: [id],
-    })
+    setError(undefined)
+    try {
+      await provider.request({
+        method: 'wallet_showCallsStatus',
+        params: [id],
+      })
+    } catch (err) {
+      setError(err as ProviderError)
+    }
   }
 
   return (
@@ -927,6 +935,7 @@ function ShowCallsStatus() {
           Show
         </Button>
       </Inline>
+      {error && <ErrorText error={error} />}
     </Stack>
   )
 }

@@ -111,7 +111,7 @@ DevWallet is currently in active development. If you would like to try out the l
   - Approvals preview the outcome: simulation, balance changes, and who pays the gas
   - Signing views show what gets signed, and warn when a payload looks like a hash
   - Account authorization & "Instant Connect" mode*
-  - Edit a transaction request before approving it (gas, fees, nonce, etc)
+  - Edit a transaction request before approving it (gas, fees, nonce, etc). Smart accounts ignore gas, fee and nonce edits, which apply to plain accounts
 - **Other**
   - EIP-6963: Multiple Injected Provider Discovery
   - Light & Dark Mode
@@ -169,6 +169,13 @@ Unit tests run on [Bun's test runner](https://bun.sh/docs/cli/test). Type-checki
 bun run test       # unit tests
 bun run typecheck  # tsc --noEmit
 bun run lint       # eslint src/
+```
+
+The smart-account tests start their own Anvil, so they need [Foundry](https://book.getfoundry.sh/) installed. One test checks the Hardhat support in `src/smart/node.test.ts`. It is skipped unless `HARDHAT_RPC_URL` points at a running Hardhat 3 node:
+
+```bash
+npx hardhat node   # in a Hardhat 3 project, in another terminal
+HARDHAT_RPC_URL=http://127.0.0.1:8545 bun run test
 ```
 
 ## Multi-Wallet Support
@@ -243,11 +250,26 @@ An `eth_sendTransaction` from a smart account returns the hash of the transactio
 DevWallet answers `wallet_*` batch requests itself, per [EIP-5792](https://eips.ethereum.org/EIPS/eip-5792) v2:
 
 - `wallet_getCapabilities` reports only `atomic`, for the wallet's chain (`0x7a69` on a default node). Its status is `supported` for a Kernel account, `ready` for a Plain (upgradable) EOA, and `unsupported` otherwise.
-- `wallet_sendCalls` takes `version: "2.0.0"`, `chainId` (hex), `calls`, `atomicRequired`, and optionally `from` (the active account by default) and `id`. A smart account runs the calls as one atomic batch. A Plain (upgradable) account is upgraded first. Other accounts send one transaction per call, or fail with `5760` when `atomicRequired` is `true`. A contract deployment (a call without `to`) must be sent alone.
+- `wallet_sendCalls` takes `version: "2.0.0"`, `chainId` (hex), `calls`, `atomicRequired`, and optionally `from` (the active account by default), `id` and `capabilities`. A smart account runs the calls as one atomic batch. A Plain (upgradable) account is upgraded first. Other accounts send one transaction per call, or fail with `5760` when `atomicRequired` is `true`. A contract deployment (a call without `to`) must be sent alone. DevWallet supports no `wallet_sendCalls` capability. One marked `optional: true`, at the top level or on a call, is accepted and ignored. Any other gets `5700`.
 - `wallet_getCallsStatus` returns `100` (pending), `200` (success), `500` (reverted) or `600` (partially reverted), with one receipt per transaction. For a user operation, that is the `handleOps` receipt, with the operation's own outcome and logs.
 - `wallet_showCallsStatus` opens the batch's transaction in the side panel.
 
 When the wallet expects a batch to revert, its approval says so, and **Sign anyway** sends it to revert on chain. With **Bypass Transaction Authorization** on, nobody is asked, so it is refused with code `3` and the revert data. The test dApp that `bun run dev` serves has buttons for all four methods.
+
+These are the errors a dApp can get:
+
+| Code | When |
+|---|---|
+| `4001` | You rejected the request, or it waited 5 minutes for approval. A request waiting in the batch queue also gets it when the batch is discarded, the request is removed, or the network changes. |
+| `4100` | `from`, or the account `wallet_getCapabilities` is asked about, isn't one of the wallet's accounts. |
+| `5700` | A required capability, which the wallet doesn't support. |
+| `5710` | `chainId` is not the wallet's chain. |
+| `5720` | `id` is already used by a batch on this network, or by one waiting in the batch queue. |
+| `5730` | `wallet_getCallsStatus` or `wallet_showCallsStatus` got an id with no batch on this network. |
+| `5750` | You rejected the approval of a `wallet_sendCalls` that would upgrade a Plain (upgradable) account. |
+| `5760` | `atomicRequired` is `true`, but the account can't batch atomically. |
+| `3` | The wallet expects the batch to revert, and nobody chose to send it anyway. `data` holds the revert data when it is known. |
+| `-32602` | Malformed params: for example a wrong `version`, no `calls`, or a deployment in a batch with other calls. |
 
 ### The batch queue
 
@@ -262,17 +284,19 @@ The batch queue collects a dApp's separate sends and signs them as one transacti
 ### Known limitations
 
 - If the extension's service worker restarts while requests wait in a batch, the batch closes, but those requests are never answered: the dApp waits until you reload it. DevWallet keeps the worker alive while anything waits, so this only happens on a crash, an extension reload or a browser restart.
-- DevWallet notices that the node was reset only while its service worker runs, when the block number goes down. After a reset it missed, `wallet_getCallsStatus` still knows the old chain's batch ids and reports them as pending. The contracts and delegations are set up again on the next check either way.
+- DevWallet notices that the node was reset only while its service worker runs, when the block number goes down. After a reset it missed, `wallet_getCallsStatus` still knows the old chain's batch ids and reports them as pending, and a custom `id` you reuse gets `5720`. The contracts and delegations are set up again on the next check either way.
 
 ### Hardhat
 
 Smart accounts, user operations and EIP-5792 batches work on a Hardhat 3 node (`npx hardhat node`) too. DevWallet uses Hardhat's `hardhat_*` cheat methods. There are two differences from Anvil:
 
 - **Previews are thinner.** Hardhat has no `eth_simulateV1`, so previews fall back to `eth_call`. They show no gas cost and no balance changes, only whether the batch reverts. In a non-atomic batch, only a revert of the first call is caught. For a Plain (upgradable) account, the preview can't predict a revert before the upgrade: the batch is still refused, but only after the account is upgraded.
-- **Sign anyway reports an error.** By default Hardhat answers a reverted transaction with an error, though it mines it. The dApp then gets code `3` instead of a hash or a batch id, and a batch you signed stays open. To get Anvil's behaviour, set `throwOnTransactionFailures: false` on the network `npx hardhat node` uses:
+- **Sign anyway reports an error.** By default Hardhat answers a reverted transaction with an error, though it mines it. The transaction was mined, but a single approval's dApp gets code `3` instead of a hash or a batch id. In the batch queue, the review shows the error and the batch stays open with its requests still waiting: **Discard** it rather than signing again, which would send a second reverting transaction. To get Anvil's behaviour, set `throwOnTransactionFailures: false` on the `node` network, which `npx hardhat node` uses:
 
   ```ts
   // hardhat.config.ts
+  import { defineConfig } from 'hardhat/config'
+
   export default defineConfig({
     networks: {
       node: { type: 'edr-simulated', throwOnTransactionFailures: false },
