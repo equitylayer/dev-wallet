@@ -23,7 +23,7 @@ import { usePrevious } from '~/hooks/usePrevious'
 import { getTxpoolQueryKey } from '~/hooks/useTxpool'
 import { getMessenger } from '~/messengers'
 import { QueryClientProvider, queryClient } from '~/react-query'
-import { deepEqual } from '~/utils'
+import { sameAddresses } from '~/utils/accounts'
 import { getClient } from '~/viem'
 import {
     type AccountState,
@@ -197,7 +197,10 @@ function AccountsChangedEmitter() {
             ...accounts_.filter((x) => x.address !== account.address),
         ]
 
-        if (prevAccounts.current && !deepEqual(prevAccounts.current, accounts_))
+        if (
+            prevAccounts.current &&
+            !sameAddresses(prevAccounts.current, accounts_)
+        )
             inpageMessenger.send('accountsChanged', {
                 accounts: accounts_.map((x) => x.address),
                 sessions,

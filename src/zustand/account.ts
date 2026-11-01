@@ -6,6 +6,7 @@ import type {
 } from 'viem'
 import { useSyncExternalStoreWithTracked } from '~/hooks/useSyncExternalStoreWithTracked'
 import type { OneOf } from '~/types/utils'
+import { filterAccounts } from '~/utils/accounts'
 
 import { createStore } from './utils'
 
@@ -47,15 +48,7 @@ export const accountStore = createStore<AccountStore>(
 
     getAccounts({ activeFirst = false, rpcUrl }) {
       const { account, accounts } = get()
-      let accounts_ = accounts.filter((x) => !x.rpcUrl || x.rpcUrl === rpcUrl)
-      if (activeFirst)
-        accounts_ = [
-          ...(account ? [account] : []),
-          ...accounts.filter((x) =>
-            account ? x.address !== account.address : true,
-          ),
-        ]
-      return accounts_
+      return filterAccounts({ account, accounts, activeFirst, rpcUrl })
     },
     removeAccount({ account }) {
       set((state) => {
