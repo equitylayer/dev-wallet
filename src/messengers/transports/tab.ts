@@ -1,6 +1,6 @@
 import { type ReplyTarget, replyTarget } from './guards'
 import type { ReplyMessage, SendMessage, Transport } from './types'
-import { isValidReply, isValidSend } from './utils'
+import { isNoReceiverError, isValidReply, isValidSend } from './utils'
 
 /**
  * Creates a "tab transport" that can be used to communicate between
@@ -111,7 +111,10 @@ function sendMessage<TPayload>(
               : { frameId: target.frameId },
           )
     // The frame may be gone (navigated, closed): nobody is left to answer.
-    Promise.resolve(sent).catch(() => {})
+    Promise.resolve(sent).catch((error: unknown) => {
+      if (!isNoReceiverError(error))
+        console.warn('Failed to send message:', error)
+    })
   } catch (error) {
     // Silently catch extension context invalidated errors
     // This happens when extension is reloaded/disabled

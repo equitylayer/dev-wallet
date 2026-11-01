@@ -1,6 +1,6 @@
 // The tab transport against a fake `chrome`, installed for each test and
 // removed after it. Tab 1 is the active tab; pages ask from others.
-import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
 
 import { createTabTransport } from './tab'
 
@@ -167,4 +167,33 @@ test('send goes on the runtime, never to the active tab', async () => {
       id: 1,
     },
   ])
+})
+
+test('an answer to a frame that is gone is dropped quietly; any other failure is warned', async () => {
+  const warn = spyOn(console, 'warn').mockImplementation(() => {})
+  const tabs = (globalThis as { chrome?: { tabs: Record<string, unknown> } })
+    .chrome!.tabs
+  const page = (tab: number) =>
+    ({ id, url: 'https://dapp.test/', tab: { id: tab }, frameId: 0 }) as Sender
+  try {
+    answering()
+    tabs.sendMessage = async () => {
+      throw new Error(
+        'Could not establish connection. Receiving end does not exist.',
+      )
+    }
+    deliver(request('a', 1), page(2))
+    await Bun.sleep(0)
+    expect(warn).not.toHaveBeenCalled()
+
+    tabs.sendMessage = async () => {
+      throw new Error('Message length exceeded maximum allowed length.')
+    }
+    deliver(request('b', 2), page(2))
+    await Bun.sleep(0)
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(String(warn.mock.calls[0])).toContain('Message length exceeded')
+  } finally {
+    warn.mockRestore()
+  }
 })
