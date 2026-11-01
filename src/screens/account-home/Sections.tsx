@@ -27,6 +27,7 @@ import {
   knownName,
 } from '~/utils/activity'
 import { useSessionsStore } from '~/zustand'
+import { sameHost } from '~/zustand/sessions-logic'
 
 import { EmptyTokensToggle } from '../account-details/EmptyTokensToggle'
 import { ImportToken } from '../account-details/ImportToken'
@@ -159,7 +160,7 @@ export function ConnectedSection() {
   const { data: host } = useHost()
   const { sessions } = useSessionsStore()
   const hostConnected = Boolean(
-    host && sessions.some((session) => session.host === host),
+    host && sessions.some((session) => sameHost(session.host, host)),
   )
 
   return (
@@ -204,7 +205,7 @@ export function ConnectedSection() {
                   {session.host}
                 </Text>
               </Box>
-              {session.host === host && (
+              {host && sameHost(session.host, host) && (
                 <Box className={styles.pill}>
                   <Text size="11px" weight="medium" wrap={false}>
                     This tab

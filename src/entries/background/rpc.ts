@@ -348,7 +348,9 @@ async function execute(
   rpcClient: HttpRpcClient,
   request: RpcRequest,
 ) {
-  // Anvil doesn't support `personal_sign` – use `eth_sign` instead.
+  // Sent to the node as `eth_sign` (params swapped), which signs the same
+  // EIP-191 personal message. Anvil 1.7.1 answers `personal_sign` too; one
+  // method keeps every node on the same path.
   if (request.method === 'personal_sign') {
     request.method = 'eth_sign' as any
     request.params = [request.params[1], request.params[0]]
