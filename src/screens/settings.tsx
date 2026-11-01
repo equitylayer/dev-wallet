@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { Address } from 'viem'
 import { Container } from '~/components'
 import {
     Box,
@@ -6,12 +7,16 @@ import {
     Inline,
     Input,
     Inset,
+    Select,
     Stack,
     Text,
     Toggle,
 } from '~/design-system'
 import { getTheme, setTheme } from '~/design-system/utils/theme'
+import { useAccounts } from '~/hooks/useAccounts'
+import type { SponsorSetting } from '~/smart/types'
 import { webextStorage } from '~/storage'
+import { truncate } from '~/utils'
 import { useSettingsStore } from '~/zustand'
 
 export default function Settings() {
@@ -24,6 +29,8 @@ export default function Settings() {
         setBypassSignatureAuth,
         setBypassTransactionAuth,
         setEtherscanApiKey,
+        setSponsor,
+        sponsor,
     } = useSettingsStore()
 
     const [etherscanApiKeyDraft, setEtherscanApiKeyDraft] = useState(
@@ -163,6 +170,10 @@ export default function Settings() {
                         />
                     </Stack>
                 </Inset>
+                <Text color="text/tertiary">Smart accounts</Text>
+                <Inset right="4px">
+                    <GasSponsor sponsor={sponsor} onChange={setSponsor} />
+                </Inset>
                 <Text color="text/tertiary">Cheats</Text>
                 <Inset right="4px">
                     <Stack gap="8px">
@@ -243,5 +254,82 @@ export default function Settings() {
                 </Inset>
             </Stack>
         </Container>
+    )
+}
+
+////////////////////////////////////////////////////////////////////////
+// Gas sponsor
+
+const sponsorNotes: Record<SponsorSetting['kind'], string> = {
+    devwallet:
+        "DevWallet's own sponsor pays smart accounts' gas. It is funded on the node as needed.",
+    account:
+        "This account pays smart accounts' gas from its ETH, and funds the paymaster when its deposit runs low.",
+    off: 'Smart accounts pay their own gas, in a transaction to themselves.',
+}
+
+/**
+ * Who pays smart accounts' gas: the DevWallet sponsor, one of this network's
+ * accounts, or nobody. One setting for every network; a sponsor account from
+ * another network still shows, so the choice is never hidden.
+ */
+function GasSponsor({
+    sponsor,
+    onChange,
+}: {
+    sponsor: SponsorSetting
+    onChange: (sponsor: SponsorSetting) => void
+}) {
+    const accounts = useAccounts().filter((a) => a.state === 'loaded')
+    const chosen =
+        sponsor.kind === 'account'
+            ? accounts.find(
+                  (a) =>
+                      a.address.toLowerCase() === sponsor.address.toLowerCase(),
+              )
+            : undefined
+    const value =
+        sponsor.kind === 'account'
+            ? (chosen?.address ?? sponsor.address)
+            : sponsor.kind
+    const elsewhere = sponsor.kind === 'account' && !chosen
+
+    return (
+        <Stack gap="6px">
+            <Text size="12px">Gas sponsor</Text>
+            <Select
+                aria-label="Gas sponsor"
+                height="24px"
+                value={value}
+                onChange={(e) => {
+                    const next = e.target.value
+                    onChange(
+                        next === 'devwallet' || next === 'off'
+                            ? { kind: next }
+                            : { kind: 'account', address: next as Address },
+                    )
+                }}
+            >
+                <option value="devwallet">DevWallet sponsor</option>
+                <optgroup label="Accounts">
+                    {elsewhere && (
+                        <option value={sponsor.address}>
+                            {`${truncate(sponsor.address, { start: 6, end: 4 })} (not on this network)`}
+                        </option>
+                    )}
+                    {accounts.map((a) => (
+                        <option key={a.key} value={a.address}>
+                            {a.displayName
+                                ? `${a.displayName} · ${truncate(a.address, { start: 6, end: 4 })}`
+                                : truncate(a.address, { start: 6, end: 4 })}
+                        </option>
+                    ))}
+                </optgroup>
+                <option value="off">Off</option>
+            </Select>
+            <Text color="text/tertiary" size="11px">
+                {sponsorNotes[sponsor.kind]}
+            </Text>
+        </Stack>
     )
 }

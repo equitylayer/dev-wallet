@@ -49,14 +49,17 @@ const noticeIcons = {
   blue: Info,
 }
 
-/** A signal-tinted panel: an icon, a title in the tint's ink, a sentence. */
+/**
+ * A signal-tinted panel: an icon, a title in the tint's ink, a sentence. A
+ * notice that is one sentence leaves out the title.
+ */
 export function Notice({
   tone,
   title,
   children,
 }: {
   tone: 'red' | 'yellow' | 'blue'
-  title: string
+  title?: string
   children?: ReactNode
 }) {
   const Icon = noticeIcons[tone]
@@ -67,12 +70,14 @@ export function Notice({
     >
       <Icon className={styles.noticeIcon[tone]} size={14} strokeWidth={1.75} />
       <Box className={styles.grow}>
-        <Box className={styles.noticeTitle[tone]}>
-          <Text size="13px" weight="semibold">
-            {title}
-          </Text>
-        </Box>
-        {children && <Box paddingTop="6px">{children}</Box>}
+        {title && (
+          <Box className={styles.noticeTitle[tone]}>
+            <Text size="13px" weight="semibold">
+              {title}
+            </Text>
+          </Box>
+        )}
+        {title && children ? <Box paddingTop="6px">{children}</Box> : children}
       </Box>
     </div>
   )

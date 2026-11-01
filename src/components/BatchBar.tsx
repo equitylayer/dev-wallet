@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 
 import { batchQueue } from '~/actions'
 import { Box, Button, Text } from '~/design-system'
-import { useResolvedMode } from '~/hooks/useResolvedMode'
+import { useAccountMode } from '~/hooks/useAccountMode'
 import { flattenQueue, waitingSites } from '~/smart/queue'
 import { truncate } from '~/utils'
 import type { BatchQueue } from '~/smart/queue'
@@ -105,7 +105,7 @@ function OpenBatch({ queue }: { queue: BatchQueue }) {
 export function StartBatch({ account }: { account: Account }) {
   const queue = useBatchQueue()
   const { network } = useNetworkStore()
-  const mode = useResolvedMode(account.address)
+  const { mode } = useAccountMode(account.address)
   const [busy, setBusy] = useState(false)
 
   if (queue || mode !== 'smart') return null

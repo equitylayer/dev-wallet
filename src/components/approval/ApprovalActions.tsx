@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import type { Address } from 'viem'
 
 import { Box, Button, Text } from '~/design-system'
-import { useResolvedMode } from '~/hooks/useResolvedMode'
+import { useAccountMode } from '~/hooks/useAccountMode'
 import { getMessenger } from '~/messengers'
 import type { SendPreview } from '~/smart/preview'
 import { flattenQueue } from '~/smart/queue'
@@ -118,7 +118,7 @@ export function SendActions({
 }) {
   const queue = useBatchQueue()
   const { network } = useNetworkStore()
-  const mode = useResolvedMode(from)
+  const { mode } = useAccountMode(from)
   const { busy, decide } = useDecision(request)
 
   // Decide on the preview of these calls, never one left from others. One

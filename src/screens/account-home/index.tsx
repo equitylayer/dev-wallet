@@ -1,6 +1,10 @@
 import { StartBatch } from '~/components/BatchBar'
-import { Text } from '~/design-system'
+import { TextWithAddresses } from '~/components/TextWithAddresses'
+import { Notice } from '~/components/approval'
+import { Box, Text } from '~/design-system'
 import { useNetworkStatus } from '~/hooks/useNetworkStatus'
+import { useSmartStatus } from '~/hooks/useSmartStatus'
+import { aaConflictWarning } from '~/utils/accountMode'
 import { useAccountStore } from '~/zustand'
 
 import { AccountPlate } from './AccountPlate'
@@ -18,6 +22,7 @@ import * as styles from './account-home.css'
 export function AccountHome() {
   const { account } = useAccountStore()
   const { data: online } = useNetworkStatus()
+  const { data: smart } = useSmartStatus()
 
   if (!account || account.state !== 'loaded')
     return (
@@ -32,6 +37,16 @@ export function AccountHome() {
   return (
     <div className={styles.scroll}>
       <AccountPlate account={account} online={Boolean(online)} />
+      {/* Why the plate can't switch to smart or Kernel here. */}
+      {smart?.ok === false && (
+        <Box paddingHorizontal="12px">
+          <Notice tone="yellow">
+            <Text size="12px" wrap="anywhere">
+              <TextWithAddresses text={aaConflictWarning(smart.conflicts)} />
+            </Text>
+          </Notice>
+        </Box>
+      )}
       {/* The batch bar's empty state; an open batch shows in the footer. */}
       <StartBatch account={account} />
       <TokensSection address={account.address} />

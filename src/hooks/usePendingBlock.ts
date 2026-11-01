@@ -12,8 +12,10 @@ import { useNetworkStore } from '~/zustand'
 import { getAccountTokensQueryKey } from './useAccountTokens'
 import { getBalanceQueryKey } from './useBalance'
 import { getBlockQueryKey } from './useBlock'
+import { getBytecodeQueryKey } from './useBytecode'
 import { useClient } from './useClient'
 import { getContractsQueryKey } from './useContracts'
+import { getEntryPointNonceQueryKey } from './useEntryPointNonce'
 import { getErc20BalanceQueryKey } from './useErc20Balance'
 import { getInfiniteBlockTransactionsQueryKey } from './useInfiniteBlockTransactions'
 import { getInfiniteBlocksQueryKey } from './useInfiniteBlocks'
@@ -72,6 +74,13 @@ export function usePendingBlockQueryOptions({
         })
         queryClient.invalidateQueries({
           queryKey: getBlockQueryKey([client.key, 'latest']),
+        })
+        // A send can upgrade an account first (EIP-7702 delegation).
+        queryClient.invalidateQueries({
+          queryKey: getBytecodeQueryKey([client.key]),
+        })
+        queryClient.invalidateQueries({
+          queryKey: getEntryPointNonceQueryKey([client.key]),
         })
         queryClient.invalidateQueries({
           queryKey: getNonceQueryKey([client.key]),
