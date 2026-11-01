@@ -1,0 +1,938 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-01T02:41:36+00:00",
+  "title": "Design System: DevWallet",
+  "extensions": {
+    "colorMeta": {
+      "warm-paper": {
+        "role": "neutral",
+        "displayName": "Warm Paper",
+        "canonical": "#f9f7f4",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#262524",
+          "#434240",
+          "#62615e",
+          "#84827f",
+          "#a6a5a2",
+          "#cac9c7",
+          "#efeeed"
+        ]
+      },
+      "warm-paper-raised": {
+        "role": "neutral",
+        "displayName": "Raised Paper",
+        "canonical": "#fdfcfb",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424241",
+          "#626160",
+          "#838281",
+          "#a6a5a4",
+          "#cac9c8",
+          "#efeeee"
+        ]
+      },
+      "warm-paper-recess": {
+        "role": "neutral",
+        "displayName": "Paper Recess",
+        "canonical": "#f3f2ee",
+        "tonalRamp": [
+          "#0b0b0a",
+          "#252524",
+          "#434240",
+          "#62615e",
+          "#83827f",
+          "#a6a5a1",
+          "#cac9c6",
+          "#efeeed"
+        ]
+      },
+      "paper-fill": {
+        "role": "neutral",
+        "displayName": "Paper Fill",
+        "canonical": "#e8e5e0",
+        "tonalRamp": [
+          "#0c0b0a",
+          "#262523",
+          "#43423f",
+          "#63615d",
+          "#85827d",
+          "#a7a5a0",
+          "#cbc9c5",
+          "#efeeec"
+        ]
+      },
+      "paper-fill-soft": {
+        "role": "neutral",
+        "displayName": "Paper Fill Soft",
+        "canonical": "#ede9e4",
+        "tonalRamp": [
+          "#0c0b0a",
+          "#262523",
+          "#44423e",
+          "#64615d",
+          "#85827d",
+          "#a8a4a0",
+          "#cbc9c5",
+          "#f0eeec"
+        ]
+      },
+      "paper-fill-faint": {
+        "role": "neutral",
+        "displayName": "Paper Fill Faint",
+        "canonical": "#f5f3f0",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#262524",
+          "#434240",
+          "#62615e",
+          "#84827f",
+          "#a6a5a2",
+          "#cac9c7",
+          "#efeeed"
+        ]
+      },
+      "paper-fill-whisper": {
+        "role": "neutral",
+        "displayName": "Paper Fill Whisper",
+        "canonical": "#faf9f7",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252524",
+          "#424241",
+          "#62615f",
+          "#838280",
+          "#a6a5a3",
+          "#cac9c7",
+          "#efeeed"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#2a2520",
+        "tonalRamp": [
+          "#0c0b0a",
+          "#272522",
+          "#45413d",
+          "#66605b",
+          "#87817b",
+          "#aaa49e",
+          "#cdc8c3",
+          "#f1eeeb"
+        ]
+      },
+      "ink-secondary": {
+        "role": "neutral",
+        "displayName": "Ink Secondary",
+        "canonical": "#5a5550",
+        "tonalRamp": [
+          "#0c0b0a",
+          "#272523",
+          "#45413e",
+          "#65605b",
+          "#87817c",
+          "#a9a49f",
+          "#ccc8c4",
+          "#f0eeec"
+        ]
+      },
+      "ink-tertiary": {
+        "role": "neutral",
+        "displayName": "Ink Tertiary",
+        "canonical": "#7a7570",
+        "tonalRamp": [
+          "#0c0b0a",
+          "#262523",
+          "#45413e",
+          "#65605c",
+          "#86817c",
+          "#a9a49f",
+          "#ccc8c4",
+          "#f0eeec"
+        ]
+      },
+      "ink-quaternary": {
+        "role": "neutral",
+        "displayName": "Ink Quaternary",
+        "canonical": "#9a9590",
+        "tonalRamp": [
+          "#0c0b0a",
+          "#262523",
+          "#45413e",
+          "#65605c",
+          "#86817c",
+          "#a9a49f",
+          "#ccc8c4",
+          "#f0eeec"
+        ]
+      },
+      "paper-rule": {
+        "role": "neutral",
+        "displayName": "Paper Rule",
+        "canonical": "#dcd9d4",
+        "tonalRamp": [
+          "#0c0b0a",
+          "#262523",
+          "#44423f",
+          "#63615d",
+          "#85827d",
+          "#a7a5a0",
+          "#cbc9c5",
+          "#efeeec"
+        ]
+      },
+      "paper-rule-faint": {
+        "role": "neutral",
+        "displayName": "Paper Rule Faint",
+        "canonical": "#ebe8e3",
+        "tonalRamp": [
+          "#0c0b0a",
+          "#262523",
+          "#43423f",
+          "#63615d",
+          "#85827d",
+          "#a7a5a0",
+          "#cbc9c5",
+          "#efeeec"
+        ]
+      },
+      "terminal-black": {
+        "role": "neutral",
+        "displayName": "Terminal Black",
+        "canonical": "#000000",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "terminal-raised": {
+        "role": "neutral",
+        "displayName": "Terminal Raised",
+        "canonical": "#191a1c",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#252526",
+          "#414244",
+          "#606163",
+          "#818285",
+          "#a4a5a7",
+          "#c8c9cb",
+          "#eeeeef"
+        ]
+      },
+      "terminal-recess": {
+        "role": "neutral",
+        "displayName": "Terminal Recess",
+        "canonical": "#1b1c1e",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#252526",
+          "#414244",
+          "#606163",
+          "#818285",
+          "#a4a5a7",
+          "#c8c9cb",
+          "#eeeeef"
+        ]
+      },
+      "terminal-recess-raised": {
+        "role": "neutral",
+        "displayName": "Terminal Recess Raised",
+        "canonical": "#222324",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#414243",
+          "#606162",
+          "#818284",
+          "#a4a5a6",
+          "#c8c9ca",
+          "#eeeeef"
+        ]
+      },
+      "terminal-fill": {
+        "role": "neutral",
+        "displayName": "Terminal Fill",
+        "canonical": "#44474b",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#242527",
+          "#404245",
+          "#5e6165",
+          "#7f8387",
+          "#a2a5aa",
+          "#c7c9cd",
+          "#edeef0"
+        ]
+      },
+      "terminal-fill-soft": {
+        "role": "neutral",
+        "displayName": "Terminal Fill Soft",
+        "canonical": "#3e3f43",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#242527",
+          "#414245",
+          "#606165",
+          "#818287",
+          "#a4a5a9",
+          "#c8c9cc",
+          "#eeeef0"
+        ]
+      },
+      "terminal-fill-faint": {
+        "role": "neutral",
+        "displayName": "Terminal Fill Faint",
+        "canonical": "#2e2f30",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#414243",
+          "#606162",
+          "#818284",
+          "#a4a5a6",
+          "#c8c9ca",
+          "#eeeeef"
+        ]
+      },
+      "terminal-fill-whisper": {
+        "role": "neutral",
+        "displayName": "Terminal Fill Whisper",
+        "canonical": "#212224",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#252526",
+          "#414244",
+          "#606163",
+          "#818285",
+          "#a4a5a7",
+          "#c8c9cb",
+          "#eeeeef"
+        ]
+      },
+      "glyph": {
+        "role": "neutral",
+        "displayName": "Glyph",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "glyph-secondary": {
+        "role": "neutral",
+        "displayName": "Glyph Secondary",
+        "canonical": "#c2c5cb",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#242527",
+          "#404246",
+          "#5f6166",
+          "#808288",
+          "#a2a5aa",
+          "#c7c9cd",
+          "#edeef1"
+        ]
+      },
+      "glyph-tertiary": {
+        "role": "neutral",
+        "displayName": "Glyph Tertiary",
+        "canonical": "#9a9ba1",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#242527",
+          "#414246",
+          "#606166",
+          "#818288",
+          "#a4a5aa",
+          "#c8c9cd",
+          "#eeeef1"
+        ]
+      },
+      "glyph-quaternary": {
+        "role": "neutral",
+        "displayName": "Glyph Quaternary",
+        "canonical": "#78797e",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#252527",
+          "#414245",
+          "#606165",
+          "#818287",
+          "#a4a5aa",
+          "#c8c9cd",
+          "#eeeef0"
+        ]
+      },
+      "terminal-rule": {
+        "role": "neutral",
+        "displayName": "Terminal Rule",
+        "canonical": "#3c3f43",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#242527",
+          "#404245",
+          "#5e6166",
+          "#7f8387",
+          "#a2a5aa",
+          "#c7c9cd",
+          "#edeef0"
+        ]
+      },
+      "terminal-rule-faint": {
+        "role": "neutral",
+        "displayName": "Terminal Rule Faint",
+        "canonical": "#2b2c2f",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#252526",
+          "#414244",
+          "#606164",
+          "#818286",
+          "#a4a5a8",
+          "#c8c9cc",
+          "#eeeef0"
+        ]
+      },
+      "prompt-teal": {
+        "role": "primary",
+        "displayName": "Prompt Teal (light accent)",
+        "canonical": "#00717f",
+        "tonalRamp": [
+          "#020e10",
+          "#092a2f",
+          "#004b55",
+          "#0e6e7b",
+          "#35909f",
+          "#64b3c1",
+          "#99d5e0",
+          "#d5f5fb"
+        ]
+      },
+      "phosphor-amber": {
+        "role": "primary",
+        "displayName": "Phosphor Amber (dark accent)",
+        "canonical": "#f9b64f",
+        "tonalRamp": [
+          "#140900",
+          "#362000",
+          "#623700",
+          "#8c5300",
+          "#b27300",
+          "#d49838",
+          "#f0c07c",
+          "#ffeac6"
+        ]
+      },
+      "signal-blue": {
+        "role": "secondary",
+        "displayName": "Signal Blue",
+        "canonical": "#3374f4",
+        "tonalRamp": [
+          "#020a20",
+          "#0a2250",
+          "#0c3992",
+          "#1b56cc",
+          "#3879fa",
+          "#60a0ff",
+          "#94c8ff",
+          "#d1f0ff"
+        ]
+      },
+      "signal-blue-dark": {
+        "role": "secondary",
+        "displayName": "Signal Blue (dark)",
+        "canonical": "#3898fe",
+        "tonalRamp": [
+          "#000b1d",
+          "#022549",
+          "#004185",
+          "#0060bb",
+          "#1d83e7",
+          "#52a8ff",
+          "#8ccdff",
+          "#cef2ff"
+        ]
+      },
+      "signal-blue-tint": {
+        "role": "secondary",
+        "displayName": "Signal Blue Tint",
+        "canonical": "#d6e4f1",
+        "tonalRamp": [
+          "#090b0d",
+          "#21262a",
+          "#3b434b",
+          "#57636d",
+          "#778490",
+          "#9aa7b2",
+          "#c1cbd4",
+          "#eaeff4"
+        ]
+      },
+      "signal-blue-tint-dark": {
+        "role": "secondary",
+        "displayName": "Signal Blue Tint (dark)",
+        "canonical": "#0f3058",
+        "tonalRamp": [
+          "#060b14",
+          "#192636",
+          "#2b4362",
+          "#43638c",
+          "#6185b3",
+          "#85a8d4",
+          "#b0ccf0",
+          "#e1f0ff"
+        ]
+      },
+      "signal-green": {
+        "role": "secondary",
+        "displayName": "Signal Green",
+        "canonical": "#2a9764",
+        "tonalRamp": [
+          "#010f06",
+          "#062d1b",
+          "#00502e",
+          "#007547",
+          "#2c9865",
+          "#5ebb89",
+          "#96dcb3",
+          "#d4f9e2"
+        ]
+      },
+      "signal-green-dark": {
+        "role": "secondary",
+        "displayName": "Signal Green (dark)",
+        "canonical": "#30a46c",
+        "tonalRamp": [
+          "#010f06",
+          "#032d19",
+          "#00512c",
+          "#007644",
+          "#219a62",
+          "#58bc87",
+          "#92ddb1",
+          "#d2fae1"
+        ]
+      },
+      "signal-green-tint": {
+        "role": "secondary",
+        "displayName": "Signal Green Tint",
+        "canonical": "#ddf3e4",
+        "tonalRamp": [
+          "#090c0a",
+          "#202722",
+          "#38463d",
+          "#54665a",
+          "#74887b",
+          "#98ab9e",
+          "#becec3",
+          "#e8f1eb"
+        ]
+      },
+      "signal-green-tint-dark": {
+        "role": "secondary",
+        "displayName": "Signal Green Tint (dark)",
+        "canonical": "#123929",
+        "tonalRamp": [
+          "#060d0a",
+          "#1a2922",
+          "#2d493c",
+          "#466a59",
+          "#658d79",
+          "#89af9c",
+          "#b3d1c2",
+          "#e3f3ea"
+        ]
+      },
+      "signal-red": {
+        "role": "secondary",
+        "displayName": "Signal Red",
+        "canonical": "#dc3d43",
+        "tonalRamp": [
+          "#1b0203",
+          "#460d0f",
+          "#7e0717",
+          "#b21a29",
+          "#df4046",
+          "#ff6e6c",
+          "#ffa29d",
+          "#ffdbd6"
+        ]
+      },
+      "signal-red-dark": {
+        "role": "secondary",
+        "displayName": "Signal Red (dark)",
+        "canonical": "#f2555a",
+        "tonalRamp": [
+          "#1b0303",
+          "#460d11",
+          "#7e091a",
+          "#b11c2d",
+          "#de424a",
+          "#ff6f70",
+          "#ffa39f",
+          "#ffdbd7"
+        ]
+      },
+      "signal-red-tint": {
+        "role": "secondary",
+        "displayName": "Signal Red Tint",
+        "canonical": "#ffe5e4",
+        "tonalRamp": [
+          "#0e0a0a",
+          "#2b2322",
+          "#4d3e3d",
+          "#705b5b",
+          "#937c7b",
+          "#b59f9e",
+          "#d6c4c3",
+          "#f6eceb"
+        ]
+      },
+      "signal-red-tint-dark": {
+        "role": "secondary",
+        "displayName": "Signal Red Tint (dark)",
+        "canonical": "#541b1e",
+        "tonalRamp": [
+          "#130808",
+          "#351d1d",
+          "#603333",
+          "#894e4e",
+          "#b06d6d",
+          "#d29190",
+          "#efbab8",
+          "#ffe6e5"
+        ]
+      },
+      "signal-yellow": {
+        "role": "secondary",
+        "displayName": "Signal Yellow",
+        "canonical": "#f9d24a",
+        "tonalRamp": [
+          "#110a00",
+          "#312300",
+          "#583e00",
+          "#7e5c00",
+          "#a37d00",
+          "#c4a117",
+          "#e3c770",
+          "#fdeec1"
+        ]
+      },
+      "signal-yellow-dark": {
+        "role": "secondary",
+        "displayName": "Signal Yellow (dark)",
+        "canonical": "#ffdf3c",
+        "tonalRamp": [
+          "#100b00",
+          "#2f2400",
+          "#563f00",
+          "#7b5e00",
+          "#9f8000",
+          "#c1a400",
+          "#dfca64",
+          "#fbf0bc"
+        ]
+      },
+      "signal-yellow-tint": {
+        "role": "secondary",
+        "displayName": "Signal Yellow Tint",
+        "canonical": "#fff8bb",
+        "tonalRamp": [
+          "#0d0b03",
+          "#282611",
+          "#48431b",
+          "#69632e",
+          "#8b844b",
+          "#aea772",
+          "#d0cba1",
+          "#f2f0d8"
+        ]
+      },
+      "signal-yellow-tint-dark": {
+        "role": "secondary",
+        "displayName": "Signal Yellow Tint (dark)",
+        "canonical": "#3e3000",
+        "tonalRamp": [
+          "#0e0b04",
+          "#2a2515",
+          "#4c4122",
+          "#6e6037",
+          "#918155",
+          "#b3a47a",
+          "#d4c9a7",
+          "#f5eedc"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The DevWallet wordmark on the onboarding start screen only."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Rare section headings in onboarding and playgrounds."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Screen titles in the container header."
+      },
+      "body-large": {
+        "displayName": "Body Large",
+        "purpose": "36px button labels, 36px input text; the Text default."
+      },
+      "body-prose": {
+        "displayName": "Body Prose",
+        "purpose": "Onboarding instructions and explanatory sentences."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Workhorse: row titles, aliases, header values, toast titles."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Compact button labels (18–24px) and secondary metadata."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "9px uppercase readout labels and unit labels; always tertiary ink."
+      },
+      "data": {
+        "displayName": "Data",
+        "purpose": "Addresses, hashes, balances, block numbers, chain ids, RPC URLs (IBM Plex Mono, tabular)."
+      },
+      "data-small": {
+        "displayName": "Data Small",
+        "purpose": "Truncated addresses, decoded ABI values, compact hex inputs."
+      }
+    },
+    "shadows": [
+      {
+        "name": "toggle-knob",
+        "value": "0 1px 3px rgba(0, 0, 0, 0.3)",
+        "purpose": "Physical cue on the toggle knob only; the system is otherwise flat."
+      },
+      {
+        "name": "tab-active-rule",
+        "value": "inset 0 -1.5px 0 <theme accent>",
+        "purpose": "Structural underline on the active tab; not elevation."
+      },
+      {
+        "name": "account-active-rule",
+        "value": "inset 2px 0 0 <theme accent>",
+        "purpose": "Left rule marking the selected account row."
+      },
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 2px <theme accent at 18–22% alpha>",
+        "purpose": "Decided focus treatment for inputs and controls (paired with a 1px accent border)."
+      }
+    ],
+    "motion": [
+      {
+        "name": "press-shrink",
+        "value": "transform: scale(0.98)",
+        "purpose": "Buttons on hover+active press; no colour transition."
+      },
+      {
+        "name": "hover-filter",
+        "value": "filter: brightness(var) contrast(var)",
+        "purpose": "Per-surface hover: ~0.98 brightness on paper, ~0.85–0.95 contrast on black."
+      },
+      {
+        "name": "field-border",
+        "value": "border-color 100ms ease",
+        "purpose": "Input border deepening on hover/focus."
+      },
+      {
+        "name": "toggle-slide",
+        "value": "200ms ease",
+        "purpose": "Toggle track colour and knob position."
+      },
+      {
+        "name": "mine-rock",
+        "value": "rotate 0→45°→0 over 0.3s linear",
+        "purpose": "Pickaxe glyph when a block is mined."
+      },
+      {
+        "name": "balance-flash",
+        "value": "background-color pulse to --flash-color, ease-out",
+        "purpose": "Account cell flashes when its balance changes."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "panel-wide",
+        "value": "480px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single forward action on a screen (Send, Continue). Ink on paper, square, shrinks 2% on press.",
+      "html": "<button class=\"ds-btn-primary\">Send</button>",
+      "css": ".ds-btn-primary { background: #2a2520; color: #fdfcfb; height: 36px; padding: 0 12px; min-width: 120px; border: none; border-radius: 0; font: 400 15px/21px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.35px; cursor: pointer; } .ds-btn-primary:hover { filter: brightness(0.92); } .ds-btn-primary:active { transform: scale(0.98); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px #fdfcfb, 0 0 0 4px rgb(0 113 127 / 0.55); }"
+    },
+    {
+      "name": "Compact Ghost Button",
+      "kind": "button",
+      "refersTo": "button-compact-ghost",
+      "description": "The most common button: 24px, text-only row and header actions with a faint ink wash on hover.",
+      "html": "<button class=\"ds-btn-ghost\">Impersonate</button>",
+      "css": ".ds-btn-ghost { background: transparent; color: #2a2520; height: 24px; padding: 0 6px; border: none; border-radius: 0; font: 400 11px/15px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.56px; cursor: pointer; } .ds-btn-ghost:hover { background: rgb(0 0 0 / 0.05); } .ds-btn-ghost:active { transform: scale(0.98); } .ds-btn-ghost:focus-visible { outline: none; box-shadow: inset 0 0 0 1px #00717f, 0 0 0 2px rgb(0 113 127 / 0.18); }"
+    },
+    {
+      "name": "Compact Stroked Button",
+      "kind": "button",
+      "refersTo": "button-compact-stroked",
+      "description": "Secondary action beside a value: transparent with a 1px fill-coloured border.",
+      "html": "<button class=\"ds-btn-stroked\">Set balance</button>",
+      "css": ".ds-btn-stroked { background: transparent; color: #2a2520; height: 24px; padding: 0 6px; border: 1px solid #e8e5e0; border-radius: 0; font: 400 11px/15px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.56px; cursor: pointer; } .ds-btn-stroked:hover { background: rgb(0 0 0 / 0.05); } .ds-btn-stroked:active { transform: scale(0.98); } .ds-btn-stroked:focus-visible { outline: none; border-color: #00717f; box-shadow: 0 0 0 2px rgb(0 113 127 / 0.18); }"
+    },
+    {
+      "name": "Destructive Ghost Button",
+      "kind": "button",
+      "refersTo": "button-destructive-ghost",
+      "description": "Remove, reset and other destructive row actions in signal red.",
+      "html": "<button class=\"ds-btn-danger\">Remove</button>",
+      "css": ".ds-btn-danger { background: transparent; color: #dc3d43; height: 24px; padding: 0 6px; border: none; border-radius: 0; font: 400 11px/15px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.56px; cursor: pointer; } .ds-btn-danger:hover { background: rgb(255 229 228 / 0.5); } .ds-btn-danger:active { transform: scale(0.98); } .ds-btn-danger:focus-visible { outline: none; box-shadow: inset 0 0 0 1px #dc3d43; }"
+    },
+    {
+      "name": "Input",
+      "kind": "input",
+      "refersTo": "input-compact",
+      "description": "Square field on the raised canvas; hex values in IBM Plex Mono. Focus is an accent border plus a soft accent ring.",
+      "html": "<input class=\"ds-input\" placeholder=\"0x… address\" value=\"0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC\">",
+      "css": ".ds-input { width: 280px; height: 24px; padding: 0 6px; background: #fdfcfb; color: #2a2520; border: 1px solid rgb(0 0 0 / 0.2); border-radius: 0; font: 400 11px/15px 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; transition: border-color 100ms ease; caret-color: #00717f; } .ds-input::placeholder { color: rgb(42 37 32 / 0.4); } .ds-input:hover { border-color: rgb(0 0 0 / 0.3); } .ds-input:focus, .ds-input:focus-visible { outline: none; border-color: #00717f; box-shadow: 0 0 0 2px rgb(0 113 127 / 0.18); } .ds-input[aria-invalid=\"true\"] { border-color: #dc3d43; }"
+    },
+    {
+      "name": "Tabs",
+      "kind": "nav",
+      "refersTo": "tab-active",
+      "description": "Equal-width text tabs; the active tab is primary ink with a 1.5px inset accent rule. No transition.",
+      "html": "<nav class=\"ds-tabs\"><a class=\"ds-tab is-active\" href=\"#\">Accounts</a><a class=\"ds-tab\" href=\"#\">Contracts</a><a class=\"ds-tab\" href=\"#\">TXs</a><a class=\"ds-tab\" href=\"#\">Blocks</a></nav>",
+      "css": ".ds-tabs { display: flex; width: 340px; background: #fdfcfb; border-bottom: 1px solid #dcd9d4; } .ds-tab { flex: 1; text-align: center; padding: 9px 0 8px; color: #7a7570; text-decoration: none; font: 400 12px/15px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.52px; } .ds-tab:hover { color: #5a5550; } .ds-tab.is-active { color: #2a2520; box-shadow: inset 0 -1.5px 0 #00717f; } .ds-tab:focus-visible { outline: none; box-shadow: inset 0 0 0 1px #00717f; }"
+    },
+    {
+      "name": "Instrument Readout",
+      "kind": "custom",
+      "refersTo": "header-label",
+      "description": "Header strip cells: 9px uppercase tertiary label over a value, hairline-divided; machine values in mono.",
+      "html": "<div class=\"ds-strip\"><div class=\"ds-cell\"><div class=\"ds-lbl\">RPC URL</div><div class=\"ds-val ds-mono\"><span class=\"ds-dot\"></span>127.0.0.1:8545</div></div><div class=\"ds-cell\"><div class=\"ds-lbl\">Chain</div><div class=\"ds-val ds-mono\">31337</div></div><div class=\"ds-cell\"><div class=\"ds-lbl\">Block</div><div class=\"ds-val ds-mono\">1,204</div></div></div>",
+      "css": ".ds-strip { display: flex; width: 340px; background: #fdfcfb; border-top: 1px solid #dcd9d4; border-bottom: 1px solid #dcd9d4; } .ds-cell { flex: 1; padding: 8px 10px; } .ds-cell + .ds-cell { border-left: 1px solid #dcd9d4; } .ds-cell:hover { background: #faf9f7; } .ds-lbl { font: 400 9px/11px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.56px; text-transform: uppercase; color: #7a7570; margin-bottom: 6px; } .ds-val { font: 400 12px/15px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; color: #2a2520; white-space: nowrap; } .ds-mono { font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; letter-spacing: 0; } .ds-dot { display: inline-block; width: 8px; height: 8px; border-radius: 9999px; background: #2a9764; margin-right: 5px; vertical-align: 0; }"
+    },
+    {
+      "name": "Account Row",
+      "kind": "custom",
+      "description": "Signature list row: alias over truncated address, mono balance with unit label, 44px drawer pull; the selected row carries a 2px accent rule and faint wash.",
+      "html": "<div class=\"ds-accts\"><div class=\"ds-acct is-active\"><div class=\"ds-acct-main\"><div class=\"ds-acct-name\">Alice</div><div class=\"ds-acct-addr\">0x70997970…dc79C8</div></div><div class=\"ds-acct-bal\">10,000.00<small>ETH</small></div><button class=\"ds-pull\" aria-label=\"Edit\">›</button></div><div class=\"ds-acct\"><div class=\"ds-acct-main\"><div class=\"ds-acct-name\">deployer</div><div class=\"ds-acct-addr\">0xf39Fd6e5…b92266</div></div><div class=\"ds-acct-bal\">9,998.41<small>ETH</small></div><button class=\"ds-pull\" aria-label=\"Edit\">›</button></div></div>",
+      "css": ".ds-accts { width: 340px; background: #fdfcfb; border-top: 1px solid #ebe8e3; } .ds-acct { display: flex; align-items: stretch; border-bottom: 1px solid #ebe8e3; cursor: pointer; } .ds-acct:hover { background: #faf9f7; } .ds-acct.is-active { box-shadow: inset 2px 0 0 #00717f; background: rgb(0 113 127 / 0.06); cursor: default; } .ds-acct-main { flex: 1; min-width: 0; padding: 9px 10px 9px 12px; } .ds-acct-name { font: 500 12px/15px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.52px; color: #2a2520; } .ds-acct-addr { font: 400 11px/15px 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; color: #5a5550; margin-top: 3px; } .ds-acct.is-active .ds-acct-addr { color: #00717f; } .ds-acct-bal { align-self: center; padding: 0 10px; text-align: right; font: 400 12px/15px 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; color: #2a2520; } .ds-acct-bal small { display: block; font: 400 9px/11px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.56px; color: #7a7570; } .ds-pull { width: 44px; border: none; border-radius: 0; background: #faf9f7; color: #2a2520; font: 400 18px/1 Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; cursor: pointer; } .ds-pull:hover { background: #f5f3f0; } .ds-pull:focus-visible { outline: none; box-shadow: inset 0 0 0 1px #00717f; }"
+    },
+    {
+      "name": "Toggle",
+      "kind": "custom",
+      "description": "Softly squared switch (4px track, 2px knob); the only shadowed element. On state uses the theme accent.",
+      "html": "<button class=\"ds-toggle\" role=\"switch\" aria-checked=\"true\" aria-label=\"Auto-mine\"></button> <button class=\"ds-toggle\" role=\"switch\" aria-checked=\"false\" aria-label=\"Interval mining\"></button>",
+      "css": ".ds-toggle { position: relative; width: 37px; height: 20px; border: none; border-radius: 4px; background: #e8e5e0; cursor: pointer; transition: background-color 200ms ease; vertical-align: middle; } .ds-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 2px; background: #ffffff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); transition: left 200ms ease; } .ds-toggle[aria-checked=\"true\"] { background: #00717f; } .ds-toggle[aria-checked=\"true\"]::after { left: 19px; } .ds-toggle:focus-visible { outline: none; box-shadow: 0 0 0 2px rgb(0 113 127 / 0.25); } @media (prefers-reduced-motion: reduce) { .ds-toggle, .ds-toggle::after { transition: none; } }"
+    },
+    {
+      "name": "Toast",
+      "kind": "custom",
+      "refersTo": "toast",
+      "description": "Square, 8px padding, 12px regular title, icons hidden; success and error use the signal tints.",
+      "html": "<div class=\"ds-toasts\"><div class=\"ds-toast\" role=\"status\">Contract imported from broadcast/</div><div class=\"ds-toast is-success\" role=\"status\">Balance set to 10,000 ETH</div><div class=\"ds-toast is-error\" role=\"alert\">Node unreachable at 127.0.0.1:8545</div></div>",
+      "css": ".ds-toasts { display: grid; gap: 6px; width: 300px; } .ds-toast { padding: 8px; border: 1px solid #e8e5e0; border-radius: 0; background: #fdfcfb; color: #2a2520; font: 400 12px/15px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.52px; } .ds-toast.is-success { background: #ddf3e4; border-color: #ddf3e4; color: #2a9764; } .ds-toast.is-error { background: #ffe5e4; border-color: #ffe5e4; color: #dc3d43; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Terminal Sidecar",
+    "overview": "DevWallet is a terminal pane docked beside the browser. It sits in Chrome's side panel next to the dApp being built and reads like an instrument the developer glances at between keystrokes. Readouts are dense, every edge is hard, and color appears only when the chain has something to say. The interface is a narrow column of hairline-ruled cells: an instrument strip of account, network and block readouts across the top, equal-width tabs below it, then lists of rows. Hierarchy comes from type size, ink weight and tonal steps between surfaces. It never comes from cards, shadows or ornament.\n\nThere are two grounds and they are not mirror images. **Warm Paper** (light) is an unbleached off-white with warm grey-brown ink, a lab notebook on the bench. **Terminal Black** (dark) is pure black under a near-black working canvas with cool grey glyphs, the classic terminal. Each theme has exactly one accent: **Prompt Teal** on paper, taken from the cyan end of the logo's prompt glyph, and **Phosphor Amber** on black, after amber-phosphor CRTs. The accent marks what is active, selected or focused, and nothing else.\n\nType is split by who wrote the words. Humans get Inter: labels, headings, buttons, prose. Machines get IBM Plex Mono with tabular numerals: addresses, hashes, balances, block numbers, RPC URLs, calldata, ABI signatures. This pairing matches the obolos dApp's sans-serif faces. DevWallet does not use obolos's serif or script faces.\n\nConfirmed anti-references: DevWallet never looks like a **consumer crypto wallet** (rounded balance cards, gradients, glassy surfaces, hero coin numbers), a **generic SaaS dashboard** (card grids, soft drop shadows, pill badges, big rounded buttons), or **sci-fi HUD kitsch** (neon glow, scanlines, glitch effects, display fonts like Orbitron).",
+    "keyCharacteristics": [
+      "Narrow, dense, column-first. It is designed for the side panel, not the page.",
+      "Square corners everywhere. Circles appear only on status dots.",
+      "1px hairlines and tonal steps instead of shadows.",
+      "Inter for people, IBM Plex Mono for the machine.",
+      "Monochrome base. Hue means state (signal) or focus (accent), never decoration.",
+      "One accent per theme: Prompt Teal on Warm Paper, Phosphor Amber on Terminal Black."
+    ],
+    "rules": [
+      {
+        "name": "The Signal-Only Rule",
+        "body": "Hue means state. Green is online or success, red is offline, error or destructive, yellow is warning, blue is information. Everything else is ink on paper or glyph on black.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Inks Rule",
+        "body": "Each theme has exactly one accent: Prompt Teal on Warm Paper, Phosphor Amber on Terminal Black. Never use one theme's accent in the other theme. The accent marks active, selected and focused things only. It is never a button fill for a call to action, and never a status color.",
+        "section": "colors"
+      },
+      {
+        "name": "The Amber Is Not a Warning Rule",
+        "body": "Phosphor Amber sits near Signal Yellow on Terminal Black. Never use amber for a warning. A warning always pairs the yellow tint with an icon or a text label, so it never relies on hue alone.",
+        "section": "colors"
+      },
+      {
+        "name": "The Data Wears Mono Rule",
+        "body": "If the chain produced it (an address, hash, number, calldata, ABI type, RPC URL or block), it is set in IBM Plex Mono with tabular numerals. If a person wrote it (a label, alias, button or sentence), it is set in Inter.",
+        "section": "typography"
+      },
+      {
+        "name": "The Nine-Pixel Label Rule",
+        "body": "Readout labels are 9px uppercase Inter in tertiary ink, placed above their value. A label never competes with the reading under it.",
+        "section": "typography"
+      },
+      {
+        "name": "The Panel Width Rule",
+        "body": "Design at side-panel width first. Nothing scrolls horizontally except code and calldata. Long values truncate in the middle (`0x7099…79C8`) and never wrap mid-address.",
+        "section": "layout"
+      },
+      {
+        "name": "The Hairline Rule",
+        "body": "Separate with a 1px rule or a step in tone, never a shadow. If something seems to need a shadow, it is in the wrong layer.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Square Corner Rule",
+        "body": "If it is a surface or a control, its corners are square. A circle means a status. The logo is the only rounded rectangle.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "**Do** set every chain-produced value (address, hash, balance, block, chain id, RPC URL, calldata) in IBM Plex Mono with tabular numerals, and every human label in Inter.",
+      "**Do** keep corners square (0px) on every surface and control. Use circles only for status dots.",
+      "**Do** separate content with 1px hairlines (#dcd9d4 on paper, #3c3f43 on black) and tonal steps instead of gaps, cards or shadows.",
+      "**Do** use Prompt Teal (#00717f) on Warm Paper and Phosphor Amber (#f9b64f) on Terminal Black, and only for active, selected and focused states.",
+      "**Do** label readouts with 9px uppercase tertiary Inter above the value.",
+      "**Do** truncate long hex in the middle and give the full value through a copy button or tooltip.",
+      "**Do** design at side-panel width first (about 320–480px) and keep the instrument strip readable at that width."
+    ],
+    "donts": [
+      "**Don't** drift toward a consumer crypto wallet: no rounded balance cards, gradients, glassy surfaces or oversized hero balances.",
+      "**Don't** drift toward a generic SaaS dashboard: no card grids, soft drop shadows, pill badges or big rounded buttons.",
+      "**Don't** add sci-fi HUD kitsch: no neon glow, scanlines, glitch effects, the old #39ff14 neon green, or display fonts like Orbitron.",
+      "**Don't** use the accent as a status color or a CTA fill. Primary actions stay ink-on-paper or white-on-black.",
+      "**Don't** use Phosphor Amber for a warning. Warnings use the yellow tint plus an icon or label.",
+      "**Don't** use serif or script faces. The obolos dApp's Gentium Plus, Newsreader and Allura do not belong in DevWallet.",
+      "**Don't** signal state with hue alone. Every colored dot, border or tint has a text label or icon beside it."
+    ]
+  }
+}
