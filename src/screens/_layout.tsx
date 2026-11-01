@@ -17,7 +17,6 @@ import { footer } from '~/components/shell/shell.css'
 import * as styles from './_layout.css'
 
 const backgroundMessenger = getMessenger('background:wallet')
-const contentMessenger = getMessenger('wallet:contentScript')
 
 export default function Layout() {
   const { network, onboarded } = useNetworkStore()
@@ -34,7 +33,8 @@ export default function Layout() {
     isNetworkOffline && !location.pathname.startsWith('/networks')
 
   useEffect(() => {
-    contentMessenger.reply('pushRoute', async (route) => {
+    // On the extension channel, so only extension pages can drive navigation.
+    return backgroundMessenger.reply('pushRoute', async (route) => {
       navigate(route)
       return
     })

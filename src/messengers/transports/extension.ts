@@ -1,3 +1,4 @@
+import { isExtensionPageSender } from './guards'
 import type {
   CallbackFunction,
   ReplyMessage,
@@ -5,6 +6,19 @@ import type {
   Transport,
 } from './types'
 import { isValidReply, isValidSend } from './utils'
+
+/**
+ * `chrome.runtime.onMessage` also delivers what content scripts send, and the
+ * content-script relay forwards whatever a web page posts. Only our own
+ * extension pages (and the background worker) may use this channel.
+ */
+function fromExtensionPage(sender: chrome.runtime.MessageSender) {
+  return isExtensionPageSender(
+    sender,
+    chrome.runtime.id,
+    chrome.runtime.getURL(''),
+  )
+}
 
 /**
  * Creates an "extension transport" that can be used to communicate between
@@ -24,7 +38,11 @@ export const createExtensionTransport = <TConnection extends string>(
     }: { connection?: string; id?: number | string } = {},
   ) {
     return new Promise<TResponse>((resolve, reject) => {
-      const listener = (message: ReplyMessage<TResponse>) => {
+      const listener = (
+        message: ReplyMessage<TResponse>,
+        sender: chrome.runtime.MessageSender,
+      ) => {
+        if (!fromExtensionPage(sender)) return
         if (!isValidReply<TResponse>({ id, message, topic })) return
 
         chrome.runtime.onMessage.removeListener(listener)
@@ -62,6 +80,7 @@ export const createExtensionTransport = <TConnection extends string>(
       message: SendMessage<TPayload>,
       sender: chrome.runtime.MessageSender,
     ) => {
+      if (!fromExtensionPage(sender)) return
       if (topic !== '*' && message.connection !== connection) return
       if (!isValidSend({ message, topic })) return
 

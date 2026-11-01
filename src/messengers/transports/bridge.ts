@@ -1,3 +1,4 @@
+import { isRelayedConnection } from './guards'
 import { createTabTransport } from './tab'
 import type { Transport } from './types'
 import { createWindowTransport } from './window'
@@ -28,6 +29,10 @@ export function setupBridgeTransportRelay() {
   // inpage -> content script -> background
   windowTransport.reply('*', async (payload, { connection, topic, id }) => {
     if (!topic) return
+    // The page controls everything it posts, so it may only speak on the
+    // inpage connections. Anything else (`background:wallet`, …) would reach
+    // listeners meant for the extension's own pages.
+    if (!isRelayedConnection(connection)) return
 
     const topic_ = topic.replace('> ', '')
     const response = await tabTransport.send(topic_, payload, {
@@ -38,6 +43,8 @@ export function setupBridgeTransportRelay() {
   })
 
   // background -> content script -> inpage
+  // Only extension contexts can reach a content script (`chrome.tabs`), so
+  // this direction needs no allowlist.
   tabTransport.reply('*', async (payload, { connection, topic, id }) => {
     if (!topic) return
 
