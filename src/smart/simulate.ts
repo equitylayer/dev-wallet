@@ -6,6 +6,7 @@ import {
   hexToBigInt,
   isAddressEqual,
   isHex,
+  size,
   slice,
   toEventSelector,
 } from 'viem'
@@ -53,16 +54,28 @@ const PANIC_REASONS: Record<number, string> = {
   0x32: 'array index out of bounds',
 }
 
-// Nodes without `eth_simulateV1`, by rpc url, so we ask them only once.
-const withoutSimulateV1 = new Set<string>()
+/** How long a node stays marked as lacking `eth_simulateV1` before we retry. */
+export const UNSUPPORTED_RETRY_MS = 60_000
 
-const MISSING_METHOD =
-  /method.*(not found|not supported|unsupported|not available|does not exist)/i
+// When each rpc url was last found to lack `eth_simulateV1`.
+const unsupportedSince = new Map<string, number>()
 
-function isMissingMethod(e: unknown): e is WalletRpcError {
+function knownUnsupported(rpcUrl: string): boolean {
+  const since = unsupportedSince.get(rpcUrl)
+  return since !== undefined && Date.now() - since < UNSUPPORTED_RETRY_MS
+}
+
+const MISSING_METHOD = /not found|not supported|unsupported|does not exist/i
+
+/**
+ * Only a "method not found" code, or a message that names `eth_simulateV1`
+ * itself, counts: any other error must not switch the method off for the url.
+ */
+function isMissingMethod(e: unknown): boolean {
   return (
     e instanceof WalletRpcError &&
-    (e.code === -32601 || MISSING_METHOD.test(e.message))
+    (e.code === -32601 ||
+      (e.message.includes('eth_simulateV1') && MISSING_METHOD.test(e.message)))
   )
 }
 
@@ -105,6 +118,29 @@ function failure(
   }
 }
 
+/** A node error that says nothing about the calls themselves. */
+function nodeError(e: WalletRpcError): SimulationResult {
+  const data = revertDataOf(e)
+  return {
+    ok: false,
+    failedIndex: null,
+    revertData: data === '0x' ? null : data,
+    message: e.message,
+  }
+}
+
+/** `eth_call` reports a revert with code 3 and/or the revert data. */
+function ethCallFailure(
+  subject: string,
+  failedIndex: number | null,
+  e: WalletRpcError,
+): SimulationResult {
+  const data = revertDataOf(e)
+  return e.code === 3 || (data !== null && data !== '0x')
+    ? failure(subject, failedIndex, data)
+    : nodeError(e)
+}
+
 /** Net change per token to `account`, from ERC-20 and native transfer logs. */
 function balanceChanges(
   account: Address,
@@ -115,9 +151,11 @@ function balanceChanges(
     for (const log of logs) {
       // ERC-721's `Transfer` shares the topic but indexes the id (4 topics).
       if (log.topics.length !== 3 || log.topics[0] !== TRANSFER_TOPIC) continue
+      // A malformed amount is skipped rather than guessed at.
+      if (size(log.data) !== 32) continue
+      const amount = hexToBigInt(log.data)
       const from = getAddress(slice(log.topics[1] as Hex, 12))
       const to = getAddress(slice(log.topics[2] as Hex, 12))
-      const amount = hexToBigInt(log.data)
       const token = isAddressEqual(log.address, NATIVE_TRANSFER_EMITTER)
         ? 'native'
         : getAddress(log.address)
@@ -143,20 +181,29 @@ async function simulateV1(
   const groups = atomic ? [calls] : calls.map((call) => [call])
   const simulated: SimulatedCall[] = []
   for (const group of groups) {
-    const blocks = await node.request<{ calls: SimulatedCall[] }[]>(
-      'eth_simulateV1',
-      [
-        {
-          blockStateCalls: [
-            { calls: group.map((call) => ({ from, ...toRpcCall(call) })) },
-          ],
-          traceTransfers: true,
-          validation: false,
-        },
-        'latest',
-      ],
-    )
-    simulated.push(...(blocks[0]?.calls ?? []))
+    const blocks = await node.request<
+      { calls?: SimulatedCall[] }[] | null
+    >('eth_simulateV1', [
+      {
+        blockStateCalls: [
+          { calls: group.map((call) => ({ from, ...toRpcCall(call) })) },
+        ],
+        traceTransfers: true,
+        validation: false,
+      },
+      'latest',
+    ])
+    const results = blocks?.[0]?.calls
+    // Never report success for results that don't line up with the calls.
+    if (!Array.isArray(results) || results.length !== group.length) {
+      return {
+        ok: false,
+        failedIndex: null,
+        revertData: null,
+        message: `eth_simulateV1 returned ${Array.isArray(results) ? results.length : 'no'} call results for ${group.length} calls`,
+      }
+    }
+    simulated.push(...results)
     if (simulated.some((call) => call.status === '0x0')) break
   }
 
@@ -202,10 +249,7 @@ async function simulateWithEthCall(
   if (atomic) {
     // The account runs its own batch, so it has to be Kernel-delegated. Kernel
     // doesn't say which call failed.
-    let data: Hex
-    try {
-      data = encodeKernelBatch(calls)
-    } catch {
+    if (calls.some((call) => call.to === undefined)) {
       return {
         ok: false,
         failedIndex: null,
@@ -214,13 +258,24 @@ async function simulateWithEthCall(
           'This node cannot simulate an atomic batch that includes a contract deployment',
       }
     }
+    let data: Hex
+    try {
+      data = encodeKernelBatch(calls)
+    } catch (e) {
+      return {
+        ok: false,
+        failedIndex: null,
+        revertData: null,
+        message: e instanceof Error ? e.message : String(e),
+      }
+    }
     const error = await ethCall(node, { from, to: from, data })
-    return error ? failure('Batch', null, revertDataOf(error)) : ok
+    return error ? ethCallFailure('Batch', null, error) : ok
   }
 
   for (const [index, call] of calls.entries()) {
     const error = await ethCall(node, { ...call, from })
-    if (error) return failure(`Call ${index + 1}`, index, revertDataOf(error))
+    if (error) return ethCallFailure(`Call ${index + 1}`, index, error)
   }
   return ok
 }
@@ -239,18 +294,12 @@ export async function simulateCalls(
   args: { from: Address; atomic: boolean; calls: readonly Call[] },
 ): Promise<SimulationResult> {
   const { from, atomic, calls } = args
-  if (!withoutSimulateV1.has(node.rpcUrl)) {
+  if (!knownUnsupported(node.rpcUrl)) {
     try {
       return await simulateV1(node, from, atomic, calls)
     } catch (e) {
-      if (isMissingMethod(e)) withoutSimulateV1.add(node.rpcUrl)
-      else if (e instanceof WalletRpcError)
-        return {
-          ok: false,
-          failedIndex: null,
-          revertData: revertDataOf(e),
-          message: e.message,
-        }
+      if (isMissingMethod(e)) unsupportedSince.set(node.rpcUrl, Date.now())
+      else if (e instanceof WalletRpcError) return nodeError(e)
       else throw e
     }
   }

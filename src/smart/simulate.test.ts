@@ -1,4 +1,11 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  setSystemTime,
+  test,
+} from 'bun:test'
 import {
   type Address,
   type Hex,
@@ -8,8 +15,10 @@ import {
   encodeFunctionData,
   getAddress,
   numberToHex,
+  pad,
   parseEther,
   size,
+  toEventSelector,
 } from 'viem'
 
 import { MockERC20 } from '../../test/contracts/generated'
@@ -17,7 +26,7 @@ import { KERNEL_V3_3 } from './constants'
 import { WalletRpcError } from './errors'
 import { setDelegation } from './kernel'
 import { type Node, connectNode } from './node'
-import { simulateCalls } from './simulate'
+import { UNSUPPORTED_RETRY_MS, simulateCalls } from './simulate'
 import { ensureAaContracts } from './setup'
 import { DEV_ACCOUNTS, startAnvil, waitForReceipt } from './testing/anvil'
 import type { Call } from './types'
@@ -93,21 +102,43 @@ beforeEach(async () => {
 })
 afterEach(() => anvil.stop())
 
-/** A node whose `eth_simulateV1` fails the way a node without it would. */
-function withoutSimulateV1(): { node: Node; simulateRequests: () => number } {
+/** `base`, but `method` always fails with `error`; counts those requests. */
+function failing(
+  base: Node,
+  method: string,
+  error: WalletRpcError,
+): { node: Node; requests: () => number } {
   let count = 0
   return {
     node: {
-      ...node,
-      request: (method, params) => {
-        if (method === 'eth_simulateV1') {
-          count++
-          return Promise.reject(new WalletRpcError(-32601, 'Method not found'))
-        }
-        return node.request(method, params)
+      ...base,
+      request: (m, params) => {
+        if (m !== method) return base.request(m, params)
+        count++
+        return Promise.reject(error)
       },
     },
-    simulateRequests: () => count,
+    requests: () => count,
+  }
+}
+
+/** A node whose `eth_simulateV1` fails the way a node without it would. */
+function withoutSimulateV1() {
+  return failing(
+    node,
+    'eth_simulateV1',
+    new WalletRpcError(-32601, 'Method not found'),
+  )
+}
+
+/** `base`, but `eth_simulateV1` answers with `response`. */
+function simulatingAs(response: unknown): Node {
+  return {
+    ...node,
+    request: ((method, params) =>
+      method === 'eth_simulateV1'
+        ? Promise.resolve(response)
+        : node.request(method, params)) as Node['request'],
   }
 }
 
@@ -255,23 +286,76 @@ describe('simulateCalls (eth_simulateV1)', () => {
   })
 
   test('a node error other than a missing method is a failure, not a fallback', async () => {
-    const failing: Node = {
-      ...node,
-      request: (method, params) =>
-        method === 'eth_simulateV1'
-          ? Promise.reject(new WalletRpcError(-32602, 'bad params', '0xabcd'))
-          : node.request(method, params),
-    }
-    const result = await simulateCalls(failing, {
-      from: account,
-      atomic: true,
-      calls: [{ to: X }],
-    })
-    expect(result).toEqual({
+    const { node: rejecting, requests } = failing(
+      node,
+      'eth_simulateV1',
+      new WalletRpcError(-32602, 'bad params', '0xabcd'),
+    )
+    const args = { from: account, atomic: true, calls: [{ to: X }] }
+    expect(await simulateCalls(rejecting, args)).toEqual({
       ok: false,
       failedIndex: null,
       revertData: '0xabcd',
       message: 'bad params',
+    })
+    // It didn't switch the method off: the next call asks the node again.
+    await simulateCalls(rejecting, args)
+    expect(requests()).toBe(2)
+  })
+
+  test('results that do not line up with the calls are a failure', async () => {
+    const args = { from: account, atomic: true, calls: [{ to: X }] }
+    for (const response of [[], [{ calls: [] }], [{}], null]) {
+      const result = await simulateCalls(simulatingAs(response), args)
+      expect(result).toMatchObject({ ok: false, failedIndex: null })
+    }
+    const result = await simulateCalls(
+      simulatingAs([
+        { calls: [{ status: '0x1', gasUsed: '0x5208', returnData: '0x' }] },
+      ]),
+      { ...args, calls: [{ to: X }, { to: Y }] },
+    )
+    expect(result).toEqual({
+      ok: false,
+      failedIndex: null,
+      revertData: null,
+      message: 'eth_simulateV1 returned 1 call results for 2 calls',
+    })
+  })
+
+  test('transfer logs without a 32-byte amount are skipped', async () => {
+    const transferLog = (data: Hex) => ({
+      address: token,
+      topics: [
+        toEventSelector('Transfer(address,address,uint256)'),
+        pad(account),
+        pad(Y),
+      ],
+      data,
+    })
+    const result = await simulateCalls(
+      simulatingAs([
+        {
+          calls: [
+            {
+              status: '0x1',
+              gasUsed: '0x5208',
+              returnData: '0x',
+              logs: [
+                transferLog('0x'),
+                transferLog(pad('0x05')),
+                transferLog(concat([pad('0x07'), '0x00'])),
+              ],
+            },
+          ],
+        },
+      ]),
+      { from: account, atomic: true, calls: [{ to: token }] },
+    )
+    expect(result).toEqual({
+      ok: true,
+      gasUsed: 0x5208n,
+      balanceChanges: [{ token, delta: -5n }],
     })
   })
 })
@@ -323,6 +407,60 @@ describe('simulateCalls (without eth_simulateV1)', () => {
     expect(result.message).toContain('deployment')
   })
 
+  test('a call that cannot be encoded keeps its own error message', async () => {
+    const result = await simulateCalls(withoutSimulateV1().node, {
+      from: account,
+      atomic: true,
+      calls: [{ to: '0x123' }],
+    })
+    expect(result).toMatchObject({ ok: false, failedIndex: null })
+    if (result.ok) return
+    expect(result.message).toContain('0x123')
+    expect(result.message).not.toContain('deployment')
+  })
+
+  test('a node error that is not a revert is not reported as one', async () => {
+    const limited = failing(
+      withoutSimulateV1().node,
+      'eth_call',
+      new WalletRpcError(-32005, 'rate limited'),
+    ).node
+    for (const atomic of [true, false]) {
+      expect(
+        await simulateCalls(limited, {
+          from: account,
+          atomic,
+          calls: [{ to: X }],
+        }),
+      ).toEqual({
+        ok: false,
+        failedIndex: null,
+        revertData: null,
+        message: 'rate limited',
+      })
+    }
+  })
+
+  test('a code 3 error is a revert even without revert data', async () => {
+    const reverting = failing(
+      withoutSimulateV1().node,
+      'eth_call',
+      new WalletRpcError(3, 'execution reverted'),
+    ).node
+    expect(
+      await simulateCalls(reverting, {
+        from: account,
+        atomic: false,
+        calls: [{ to: X }],
+      }),
+    ).toEqual({
+      ok: false,
+      failedIndex: 0,
+      revertData: null,
+      message: 'Call 1 reverted',
+    })
+  })
+
   test('non-atomic simulates each call and reports the failing one', async () => {
     const { node: bare } = withoutSimulateV1()
     expect(
@@ -341,32 +479,53 @@ describe('simulateCalls (without eth_simulateV1)', () => {
     ).toMatchObject({ ok: false, failedIndex: 1 })
   })
 
-  test('the missing method is remembered for the node url', async () => {
-    const { node: bare, simulateRequests } = withoutSimulateV1()
+  test('the missing method is remembered for the node url, for a while', async () => {
+    const { node: bare, requests } = withoutSimulateV1()
     const args = { from: account, atomic: true, calls: [{ to: X }] }
     await simulateCalls(bare, args)
     await simulateCalls(bare, args)
-    expect(simulateRequests()).toBe(1)
+    expect(requests()).toBe(1)
+
+    try {
+      setSystemTime(new Date(Date.now() + UNSUPPORTED_RETRY_MS + 1))
+      await simulateCalls(bare, args)
+    } finally {
+      setSystemTime()
+    }
+    expect(requests()).toBe(2)
   })
 
-  test('a differently worded missing-method error is also a fallback', async () => {
-    const hardhat: Node = {
-      ...node,
-      request: (method, params) =>
-        method === 'eth_simulateV1'
-          ? Promise.reject(
-              new WalletRpcError(
-                -32000,
-                'The method eth_simulateV1 does not exist/is not available',
-              ),
-            )
-          : node.request(method, params),
-    }
-    const result = await simulateCalls(hardhat, {
-      from: account,
-      atomic: true,
-      calls: [{ to: X }],
-    })
-    expect(result).toEqual({ ok: true, gasUsed: null, balanceChanges: null })
+  test('a message that names eth_simulateV1 as missing is also a fallback', async () => {
+    const { node: hardhat, requests } = failing(
+      node,
+      'eth_simulateV1',
+      new WalletRpcError(
+        -32000,
+        'The method eth_simulateV1 does not exist/is not available',
+      ),
+    )
+    const args = { from: account, atomic: true, calls: [{ to: X }] }
+    const expected = { ok: true, gasUsed: null, balanceChanges: null } as const
+    expect(await simulateCalls(hardhat, args)).toEqual(expected)
+    expect(await simulateCalls(hardhat, args)).toEqual(expected)
+    expect(requests()).toBe(1)
+  })
+
+  test('a "not supported" message about something else does not disable it', async () => {
+    const { node: picky, requests } = failing(
+      node,
+      'eth_simulateV1',
+      new WalletRpcError(-32000, 'method foo not supported'),
+    )
+    const args = { from: account, atomic: true, calls: [{ to: X }] }
+    const expected = {
+      ok: false,
+      failedIndex: null,
+      revertData: null,
+      message: 'method foo not supported',
+    } as const
+    expect(await simulateCalls(picky, args)).toEqual(expected)
+    expect(await simulateCalls(picky, args)).toEqual(expected)
+    expect(requests()).toBe(2)
   })
 })
