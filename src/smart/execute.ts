@@ -115,6 +115,7 @@ function refuseFailure(simulation: SimulationResult, force?: boolean): void {
  * Decides how `calls` would be executed, without sending anything: no
  * transaction, balance change or impersonation. The rules apply in order:
  *
+ * 0. There must be at least one call.
  * 1. A call without `to` is a deployment, and it can't join a batch.
  * 2. An account that can't batch atomically sends one transaction per call.
  * 3. A failing simulation is refused, unless `force` is set.
@@ -124,14 +125,19 @@ function refuseFailure(simulation: SimulationResult, force?: boolean): void {
  *    for off).
  * 6. Otherwise it is a user op paid by the sponsor.
  *
- * @throws WalletRpcError `-32602` for a deployment in a batch, `5760` when
- * atomicity is required but unavailable, `3` for a failing simulation.
+ * @throws WalletRpcError `-32602` for no calls or a deployment in a batch,
+ * `5760` when atomicity is required but unavailable, `3` for a failing
+ * simulation.
  */
 export async function planExecution(
   input: ExecuteInput,
 ): Promise<ExecutionPlan> {
   const { node, account, calls, atomicRequired, sponsor, force } = input
   const from = account.address
+
+  if (calls.length === 0) {
+    throw new WalletRpcError(INVALID_PARAMS, 'There are no calls to execute')
+  }
 
   if (calls.some((call) => call.to === undefined)) {
     if (calls.length > 1) {

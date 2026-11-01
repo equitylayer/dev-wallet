@@ -149,8 +149,9 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
 
       if (request.method === 'wallet_getCallsStatus') {
         const batchId = request.params![0]
-        const { batch } = batchCallsStore.getState()
-        const { transactionHashes } = batch[batchId]
+        const { transactionHashes } = batchCallsStore
+          .getState()
+          .getRecord(rpcUrl, batchId)!
 
         const responses = await Promise.allSettled(
             transactionHashes.map((hash) =>
@@ -213,8 +214,9 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
 
       if (request.method === 'wallet_showCallsStatus') {
         const batchId = request.params![0]
-        const { batch } = batchCallsStore.getState()
-        const { transactionHashes } = batch[batchId]
+        const { transactionHashes } = batchCallsStore
+          .getState()
+          .getRecord(rpcUrl, batchId)!
         walletMessenger.send(
             'pushRoute',
             `/transaction/${transactionHashes[0]}`,
@@ -266,6 +268,7 @@ async function execute(
         ...request.params![0],
         id: request.id,
         rpcClient,
+        rpcUrl,
       } as any)
     }
 
@@ -298,13 +301,15 @@ async function handleSendCalls({
                                  from,
                                  id,
                                  rpcClient,
+                                 rpcUrl,
                                }: {
   calls: RpcTransactionRequest[]
   from: Address
   id: number
   rpcClient: HttpRpcClient
+  rpcUrl: string
 }) {
-  const { setBatch } = batchCallsStore.getState()
+  const { putRecord } = batchCallsStore.getState()
 
   // Simulate calls for errors (to ensure atomicity).
   for (const call of calls) {
@@ -364,7 +369,20 @@ async function handleSendCalls({
       })
 
     const batchId = keccak256(stringToHex(JSON.stringify(transactionHashes)))
-    setBatch(batchId, { calls, transactionHashes })
+    putRecord({
+      id: batchId,
+      rpcUrl,
+      chainId: await connectNode({ rpcUrl }).then((node) => node.chainId()),
+      from,
+      calls: calls.map(({ to, value, data }) => ({
+        ...(to && { to }),
+        ...(value && { value }),
+        ...(data && { data }),
+      })),
+      path: 'sequential',
+      transactionHashes,
+      createdAt: Date.now(),
+    })
 
     return { id, jsonrpc: '2.0', result: batchId }
   } finally {

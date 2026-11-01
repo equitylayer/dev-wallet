@@ -30,6 +30,8 @@ import { useTransactionConfirmations } from '~/hooks/useTransactionConfirmations
 import { useTransactionReceipt } from '~/hooks/useTransactionReceipt'
 import { capitalize } from '~/utils'
 import { FormattedAbiFunctionName } from '../components/abi/FormattedAbiFunctionName'
+import { recordsForTransaction } from '~/smart/batch-records'
+import { useNetworkStore } from '~/zustand'
 import { useBatchCallsStore } from '../zustand/batch-calls'
 
 const numberIntl = new Intl.NumberFormat()
@@ -56,16 +58,24 @@ export default function TransactionDetails() {
   })
   const { data: block } = useBlock({ blockNumber: transaction?.blockNumber })
 
-  const { getBatchFromTransactionHash } = useBatchCallsStore()
+  const batchCalls = useBatchCallsStore()
+  const { network } = useNetworkStore()
   const calls = useMemo(() => {
     if (!receipt?.transactionHash) return null
-    const batch = getBatchFromTransactionHash(receipt.transactionHash)
-    if (!batch) return null
-    return batch.calls.map((call, i) => ({
+    const [record] = recordsForTransaction(
+      batchCalls,
+      network.rpcUrl,
+      receipt.transactionHash,
+    )
+    if (!record) return null
+    return record.calls.map((call, i) => ({
       ...call,
-      hash: batch.transactionHashes[i],
+      hash:
+        record.path === 'sequential'
+          ? record.transactionHashes[i]
+          : record.transactionHashes[0],
     }))
-  }, [getBatchFromTransactionHash, receipt?.transactionHash])
+  }, [batchCalls, network.rpcUrl, receipt?.transactionHash])
 
   if (!transaction) return null
   return (

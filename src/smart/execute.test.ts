@@ -135,6 +135,21 @@ async function rejection(promise: Promise<unknown>): Promise<WalletRpcError> {
   throw new Error('expected a WalletRpcError, but it resolved')
 }
 
+describe('rule 0: there must be something to execute', () => {
+  test('an empty batch is rejected with -32602, nothing mined', async () => {
+    const before = await node.blockNumber()
+
+    for (const run of [planExecution, executeCalls]) {
+      for (const overrides of [{}, { account: plainAccount() }, { sponsor: OFF }]) {
+        const error = await rejection(run(input({ calls: [], ...overrides })))
+        expect(error.code).toBe(-32602)
+        expect(error.message).toMatch(/no calls/i)
+      }
+    }
+    expect(await node.blockNumber()).toBe(before)
+  })
+})
+
 describe('rule 1: a call without `to` is a deployment', () => {
   const deployMock: Call = {
     data: encodeDeployData({
