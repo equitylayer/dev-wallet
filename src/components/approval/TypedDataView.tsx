@@ -8,7 +8,7 @@ import {
 } from '~/utils/typedData'
 
 import * as styles from './approval.css'
-import { Empty, Section } from './parts'
+import { Empty, Notice, Section } from './parts'
 
 /** Typed data comes as JSON, though some dApps send the object itself. */
 function parse(data: unknown): DescribedTypedData | null {
@@ -59,22 +59,37 @@ export function TypedDataView({ data }: { data: unknown }) {
           </Text>
           <Box paddingTop="12px">
             <Text color="text/tertiary" size="12px">
-              Chain {described.chainId}. DevWallet signs it with the account's
-              key, as a plain signature.
+              Kernel {described.version}, chain {described.chainId}. DevWallet
+              signs it with the account's key, as a plain signature.
             </Text>
           </Box>
         </Box>
       </Section>
     )
 
+  const { disputed } = described
   return (
     <>
       <Section title="Domain">
+        {disputed.length > 0 && (
+          <Box paddingHorizontal="12px" paddingBottom="12px">
+            <Notice tone="yellow" title="Signers disagree on this domain">
+              <Text size="12px">
+                {`EIP712Domain doesn't match the domain on ${disputed.join(', ')}. Anvil signs the standard fields the domain carries; viem and MetaMask sign the declared ones. A contract may check a different domain than the one signed.`}
+              </Text>
+            </Notice>
+          </Box>
+        )}
         {described.domain.length === 0 ? (
           <Empty>No domain.</Empty>
         ) : (
           described.domain.map(([key, value]) => (
-            <Field key={key} path={key} value={value} />
+            <Field
+              key={key}
+              path={key}
+              value={value}
+              disputed={disputed.includes(key)}
+            />
           ))
         )}
       </Section>
@@ -103,12 +118,16 @@ export function TypedDataView({ data }: { data: unknown }) {
   )
 }
 
-/** A field over its value: values run long, so they get the full width. */
+/**
+ * A field over its value: values run long, so they get the full width. A
+ * `disputed` domain field is signed by some signers only.
+ */
 function Field({
   path,
   type,
   value,
-}: { path: string; type?: string; value: string }) {
+  disputed = false,
+}: { path: string; type?: string; value: string; disputed?: boolean }) {
   return (
     <Box className={styles.row}>
       <Box className={styles.grow}>
@@ -122,6 +141,13 @@ function Field({
             <Box className={styles.fit}>
               <Text color="text/tertiary" family="mono" size="11px" wrap={false}>
                 {type}
+              </Text>
+            </Box>
+          )}
+          {disputed && (
+            <Box className={styles.tagYellow}>
+              <Text size="11px" weight="medium" wrap={false}>
+                Not signed by all
               </Text>
             </Box>
           )}

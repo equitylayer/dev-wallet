@@ -1,6 +1,13 @@
 // Typed data (`eth_signTypedData_v4`) for the approval screen: structured
 // fields instead of raw JSON, and Kernel's ERC-1271 wrapper named for what it
-// is (spec §8). Pure, so it is unit-tested.
+// is (spec §8). It shows only what gets signed. Pure, so it is unit-tested.
+//
+// Signers disagree on the domain. Anvil (alloy's `TypedData`) signs every
+// standard field the domain carries, whatever `types.EIP712Domain` declares;
+// viem's `hashTypedData` and MetaMask's eth-sig-util sign only the declared
+// fields. Without `EIP712Domain`, viem derives it from the fields the domain
+// carries (`getTypesForEIP712Domain`), and so does this, reading a chain id
+// in any numeric form, as anvil does.
 import { type Address, type Hex, isAddress, isHex, size } from 'viem'
 
 export type TypedDataInput = {
@@ -20,16 +27,24 @@ export type DescribedTypedData =
       account: Address
       innerHash: Hex
       chainId: number
+      version: string
     }
   | {
       kind: 'generic'
       primaryType: string
-      /** The domain's fields, in EIP-712 order, then any others. */
+      /**
+       * The domain's fields that a signer signs, in EIP-712 order, then any
+       * others.
+       */
       domain: [string, string][]
+      /** Domain fields that only some signers sign (see the top). */
+      disputed: string[]
       fields: TypedDataField[]
     }
 
+/** The fields of alloy's `Eip712Domain`, in EIP-712 order. */
 const DOMAIN_ORDER = ['name', 'version', 'chainId', 'verifyingContract', 'salt']
+const KERNEL_DOMAIN = ['name', 'version', 'chainId', 'verifyingContract']
 const INTEGER_TYPE = /^u?int\d*$/
 const ARRAY_TYPE = /^(.+)\[\d*\]$/
 const INTEGER_TEXT = /^(-?\d+|0x[0-9a-f]+)$/i
@@ -87,11 +102,58 @@ function walk(
   })
 }
 
+/**
+ * The domain fields that get signed, and those only some signers sign: anvil
+ * signs the standard fields the domain carries, viem the declared ones.
+ */
+function signedDomain(td: TypedDataInput): {
+  keys: string[]
+  disputed: string[]
+} {
+  const domain = td.domain ?? {}
+  const carried = Object.keys(domain).filter(
+    (key) => domain[key] !== undefined && domain[key] !== null,
+  )
+  const types = td.types.EIP712Domain
+  const declared = new Set(
+    Array.isArray(types)
+      ? types.map((field) => field.name)
+      : DOMAIN_ORDER.filter((key) =>
+          key === 'chainId'
+            ? toDecimal(domain.chainId) !== null
+            : key === 'name' || key === 'version'
+              ? typeof domain[key] === 'string'
+              : Boolean(domain[key]),
+        ),
+  )
+  const byAnvil = (key: string) => DOMAIN_ORDER.includes(key)
+  const byViem = (key: string) => declared.has(key)
+  const rank = (key: string) => {
+    const i = DOMAIN_ORDER.indexOf(key)
+    return i === -1 ? DOMAIN_ORDER.length : i
+  }
+  const keys = carried
+    .filter((key) => byAnvil(key) || byViem(key))
+    .sort((a, b) => rank(a) - rank(b))
+  return {
+    keys,
+    disputed: keys.filter((key) => byAnvil(key) !== byViem(key)),
+  }
+}
+
 function kernelWrapper(
   td: TypedDataInput,
+  signed: { keys: string[]; disputed: string[] },
 ): Extract<DescribedTypedData, { kind: 'kernel-1271' }> | null {
   const { domain, types, primaryType, message } = td
   if (primaryType !== 'Kernel' || domain?.name !== 'Kernel') return null
+  // Signed with exactly Kernel's domain, by every signer.
+  if (
+    signed.disputed.length > 0 ||
+    signed.keys.length !== KERNEL_DOMAIN.length ||
+    !KERNEL_DOMAIN.every((key) => signed.keys.includes(key))
+  )
+    return null
   const [field, ...rest] = types.Kernel ?? []
   if (rest.length > 0 || field?.name !== 'hash' || field.type !== 'bytes32')
     return null
@@ -111,36 +173,30 @@ function kernelWrapper(
     account,
     innerHash: hash,
     chainId: Number(chainId),
+    version: String(domain.version),
   }
-}
-
-function domainEntries(domain: Record<string, unknown> = {}): [string, string][] {
-  const rank = (key: string) => {
-    const i = DOMAIN_ORDER.indexOf(key)
-    return i === -1 ? DOMAIN_ORDER.length : i
-  }
-  return Object.keys(domain)
-    .filter((key) => domain[key] !== undefined)
-    .sort((a, b) => rank(a) - rank(b))
-    .map((key) => [
-      key,
-      render(key === 'chainId' ? 'uint256' : '', domain[key]),
-    ])
 }
 
 /**
  * What a typed-data request asks to sign: Kernel's ERC-1271 wrapper, or the
- * message's fields as dotted paths, with integers in decimal.
+ * domain fields that get signed (flagging those only some signers sign) and
+ * the message's fields as dotted paths, with integers in decimal.
  */
 export function describeTypedData(td: TypedDataInput): DescribedTypedData {
-  const kernel = kernelWrapper(td)
+  const signed = signedDomain(td)
+  const kernel = kernelWrapper(td, signed)
   if (kernel) return kernel
   const fields: TypedDataField[] = []
   walk(td.types, td.primaryType, td.message, '', fields)
+  const domain = td.domain ?? {}
   return {
     kind: 'generic',
     primaryType: td.primaryType,
-    domain: domainEntries(td.domain),
+    domain: signed.keys.map((key) => [
+      key,
+      render(key === 'chainId' ? 'uint256' : '', domain[key]),
+    ]),
+    disputed: signed.disputed,
     fields,
   }
 }

@@ -242,6 +242,14 @@ export const tagRed = style([
   },
 ])
 
+export const tagYellow = style([
+  tag,
+  {
+    borderColor: rgb(backgroundColorVars['surface/yellow'], 0.55),
+    color: rgb(foregroundColorVars['text/primary']),
+  },
+])
+
 export const tagGreen = style([
   tag,
   {

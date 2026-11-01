@@ -60,8 +60,19 @@ function RejectButton({
   )
 }
 
-/** Reject and Approve, for requests that only need a yes or no. */
-export function DecisionActions({ request }: { request: PendingRequest }) {
+/**
+ * Reject and Approve, for requests that only need a yes or no. A `risky`
+ * approval (a blind signature) is stroked red and says what it does.
+ */
+export function DecisionActions({
+  request,
+  approve = 'Approve',
+  risky = false,
+}: {
+  request: PendingRequest
+  approve?: string
+  risky?: boolean
+}) {
   const { busy, decide } = useDecision(request)
   return (
     <Box className={styles.actions}>
@@ -70,10 +81,10 @@ export function DecisionActions({ request }: { request: PendingRequest }) {
         <Button
           disabled={busy}
           height="28px"
-          variant="solid invert"
+          variant={risky ? 'stroked red' : 'solid invert'}
           onClick={() => decide('approved')}
         >
-          Approve
+          {approve}
         </Button>
       </Box>
     </Box>

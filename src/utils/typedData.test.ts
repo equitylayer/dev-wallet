@@ -65,6 +65,7 @@ describe('describeTypedData', () => {
       account: ACCOUNT,
       innerHash: HASH,
       chainId: 31337,
+      version: '0.3.3',
     })
   })
 
@@ -103,6 +104,7 @@ describe('describeTypedData', () => {
         ['chainId', '31337'],
         ['verifyingContract', PERMIT2],
       ],
+      disputed: [],
       fields: [
         { path: 'details.token', type: 'address', value: TOKEN },
         {
@@ -193,5 +195,94 @@ describe('describeTypedData', () => {
       { path: 'amount', type: 'uint256', value: 'lots' },
       { path: 'list', type: 'uint8[]', value: 'nope' },
     ])
+  })
+})
+
+// Anvil signs every standard field the domain carries, whatever EIP712Domain
+// declares; viem and MetaMask sign only the declared ones.
+describe('the domain that gets signed', () => {
+  const declaring = (...names: string[]) => {
+    const td = kernelWrapper()
+    return {
+      ...td,
+      types: {
+        ...td.types,
+        EIP712Domain: td.types.EIP712Domain.filter((f) => names.includes(f.name)),
+      },
+    }
+  }
+
+  test('an undeclared verifyingContract is no Kernel wrapper, and is flagged', () => {
+    const described = describeTypedData(declaring('name', 'version', 'chainId'))
+    expect(described).toMatchObject({
+      kind: 'generic',
+      primaryType: 'Kernel',
+      domain: [
+        ['name', 'Kernel'],
+        ['version', '0.3.3'],
+        ['chainId', '31337'],
+        ['verifyingContract', ACCOUNT],
+      ],
+      disputed: ['verifyingContract'],
+    })
+  })
+
+  test('without EIP712Domain, the fields the domain carries are declared, as viem derives them', () => {
+    const { EIP712Domain: _, ...types } = kernelWrapper().types
+    expect(describeTypedData({ ...kernelWrapper(), types })).toMatchObject({
+      kind: 'kernel-1271',
+      account: ACCOUNT,
+    })
+  })
+
+  test("Kernel's domain is exactly name, version, chainId and verifyingContract", () => {
+    const td = kernelWrapper()
+    // A salt Kernel doesn't sign with.
+    const salted = {
+      ...td,
+      domain: { ...td.domain, salt: `0x${'00'.repeat(32)}` },
+      types: {
+        ...td.types,
+        EIP712Domain: [...td.types.EIP712Domain, { name: 'salt', type: 'bytes32' }],
+      },
+    }
+    expect(describeTypedData(salted).kind).toBe('generic')
+    // A declared field the domain lacks: nobody signs it.
+    const { version: _, ...unversioned } = td.domain
+    expect(describeTypedData({ ...td, domain: unversioned })).toMatchObject({
+      kind: 'generic',
+      domain: [
+        ['name', 'Kernel'],
+        ['chainId', '31337'],
+        ['verifyingContract', ACCOUNT],
+      ],
+      disputed: [],
+    })
+  })
+
+  test('a declared extra field is flagged; an undeclared one is signed by nobody, so not shown', () => {
+    const td = permitSingle()
+    const described = describeTypedData({
+      ...td,
+      domain: { ...td.domain, purpose: 'swap', note: 'ignored' },
+      types: {
+        ...td.types,
+        EIP712Domain: [
+          { name: 'name', type: 'string' },
+          { name: 'chainId', type: 'uint256' },
+          { name: 'verifyingContract', type: 'address' },
+          { name: 'purpose', type: 'string' },
+        ],
+      },
+    })
+    expect(described).toMatchObject({
+      domain: [
+        ['name', 'Permit2'],
+        ['chainId', '31337'],
+        ['verifyingContract', PERMIT2],
+        ['purpose', 'swap'],
+      ],
+      disputed: ['purpose'],
+    })
   })
 })

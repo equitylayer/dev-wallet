@@ -5,6 +5,7 @@ import {
   AddressLine,
   ApprovalFrame,
   DecisionActions,
+  Notice,
   SendApproval,
   TypedDataView,
 } from '~/components/approval'
@@ -122,16 +123,38 @@ function SendTransactionRequest({
 ////////////////////////////////////////////////////////////////////////
 // Signatures: plain signatures by the account's key, in every mode
 
+/**
+ * `eth_sign`: bytes signed blind, with nothing to say what they are. The node
+ * signs them as a personal message (EIP-191), which is how this account's
+ * Kernel validator checks a user operation's hash: a 32-byte payload can be
+ * one. So it warns before the payload, and Approve says what it does.
+ */
 function SignRequest({ request }: { request: ExtractRequest<'eth_sign'> }) {
   const [address, data] = request.params
+  const hash = isHex(data) && size(data) === 32
   return (
     <ApprovalFrame
       title="Sign data"
       subtitle={originOf(request)}
-      footer={<DecisionActions request={request} />}
+      footer={
+        <DecisionActions
+          request={request}
+          approve={hash ? 'Sign hash' : 'Sign data'}
+          risky
+        />
+      }
     >
       <Box className={styles.block}>
         <AddressLine label="Account" address={address} />
+        <Notice tone="red" title="Blind signature">
+          <Text size="12px">
+            eth_sign signs these bytes without saying what they are. A 32-byte
+            hash signed this way can authorize anything that accepts a signed
+            hash, such as a user operation of this account's smart account:
+            it can move whatever the account holds. Sign only data you made
+            yourself.
+          </Text>
+        </Notice>
         <Box paddingTop="16px">
           <Text color="text/tertiary" size="11px">
             {isHex(data) ? `Data · ${size(data)} bytes` : 'Data'}
