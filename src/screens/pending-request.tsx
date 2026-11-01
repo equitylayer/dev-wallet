@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { type Address, hexToString, isHex, size, zeroAddress } from 'viem'
 
 import {
@@ -7,12 +7,14 @@ import {
   DecisionActions,
   Notice,
   SendApproval,
+  TransactionFields,
   TypedDataView,
 } from '~/components/approval'
 import * as styles from '~/components/approval/approval.css'
 import { Box, Text } from '~/design-system'
 import { sendTransactionCall } from '~/smart/transaction-call'
 import { type RpcCall, toRpcCall } from '~/smart/types'
+import type { RpcTransaction } from '~/utils/transactionForm'
 import { useAccountStore } from '~/zustand'
 import type { PendingRequest } from '~/zustand/pending-requests'
 
@@ -93,11 +95,27 @@ function SendCallsRequest({
   )
 }
 
+/**
+ * An `eth_sendTransaction`, editable before it is decided. The edits stay
+ * here; the decision sends the edited transaction back, and the background
+ * sends that one (for a smart account, only its from, to, value and data
+ * count). The preview simulates the transaction as it will be sent.
+ */
 function SendTransactionRequest({
   request,
 }: { request: ExtractRequest<'eth_sendTransaction'> }) {
   const { account } = useAccountStore()
-  const tx = request.params[0]
+  const [param] = (request.params ?? []) as unknown[]
+  // A malformed one edits as an empty transaction.
+  const original = useMemo(
+    () =>
+      (typeof param === 'object' && param !== null
+        ? param
+        : {}) as RpcTransaction,
+    [param],
+  )
+  const [tx, setTx] = useState(original)
+  const [editing, setEditing] = useState(false)
   // The call the background sends: a malformed one previews as no calls, and
   // approving it gets the dApp the background's error.
   const calls = useMemo(() => {
@@ -107,15 +125,43 @@ function SendTransactionRequest({
       return []
     }
   }, [tx])
+  // Unedited, the request goes back exactly as the dApp sent it.
+  const decided = useMemo(
+    () =>
+      tx === original
+        ? request
+        : ({ ...request, params: [tx] } as PendingRequest),
+    [request, tx, original],
+  )
 
   return (
     <SendApproval
-      request={request}
+      request={decided}
       origin={originOf(request)}
       method="eth_sendTransaction"
-      from={tx.from ?? account?.address ?? zeroAddress}
+      from={
+        typeof tx.from === 'string'
+          ? (tx.from as Address)
+          : (account?.address ?? zeroAddress)
+      }
       calls={calls}
       atomicRequired={false}
+      tx={tx}
+      editing={editing}
+      transaction={(preview) => (
+        <TransactionFields
+          original={original}
+          tx={tx}
+          smart={preview.data?.mode === 'smart'}
+          editing={editing}
+          onEdit={() => setEditing(true)}
+          onApply={(edited) => {
+            setTx(edited)
+            setEditing(false)
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      )}
     />
   )
 }

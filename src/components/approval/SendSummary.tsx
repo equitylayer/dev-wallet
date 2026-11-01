@@ -1,18 +1,21 @@
 import type { UseQueryResult } from '@tanstack/react-query'
-import { CircleCheck, CircleDashed } from 'lucide-react'
+import { CircleCheck, CircleDashed, TriangleAlert } from 'lucide-react'
 import type { Address } from 'viem'
 
-import { Box, Text } from '~/design-system'
+import { Box, Button, Text } from '~/design-system'
 import type { SendPreview } from '~/smart/preview'
 import { truncate } from '~/utils'
 import {
   type SendMethod,
+  estimatedCost,
   ethAmount,
+  gasShortfall,
   modeLabel,
   pathLabel,
   signAnyway,
   upgradesFirst,
 } from '~/utils/sendPreview'
+import type { RpcTransaction } from '~/utils/transactionForm'
 
 import { BalanceChanges } from './BalanceChanges'
 import * as styles from './approval.css'
@@ -23,51 +26,79 @@ const gasIntl = new Intl.NumberFormat('en-US')
 /**
  * What a send would do, from its preview: who sends, the account's mode, who
  * pays, how it goes out and what it costs, then the simulation's verdict and
- * the balance changes it predicts.
+ * the balance changes it predicts. A preview of other calls, kept while the
+ * current ones are simulated, or one that failed to refresh, is dimmed.
+ * `tx` is an `eth_sendTransaction`'s, whose gas and fees count when the node
+ * gets it as it is.
  */
 export function SendSummary({
   from,
   method,
   preview,
+  tx,
 }: {
   from: Address
   method: SendMethod
   preview: UseQueryResult<SendPreview>
+  tx?: RpcTransaction
 }) {
-  const { data } = preview
+  const { data, error, isPlaceholderData } = preview
   const simulation = data?.simulation
+  const stale = isPlaceholderData || Boolean(error)
+  const shortfall = data && !stale ? gasShortfall(method, data, tx) : null
 
   return (
     <>
       <section aria-label="Summary" className={styles.block}>
         <AddressLine label="From" address={from} />
-        {data && <Readouts preview={data} />}
-        {upgradesFirst(method, data) && (
-          <Notice tone="blue" title="Upgrades first">
+        <Box className={stale ? styles.stale : undefined} aria-busy={stale}>
+          {data && <Readouts method={method} preview={data} tx={tx} />}
+          {upgradesFirst(method, data) && (
+            <Notice tone="blue" title="Upgrades first">
+              <Text size="12px">
+                This account will be upgraded to a Kernel v3.3 smart account
+                (same address) before sending.
+              </Text>
+            </Notice>
+          )}
+        </Box>
+        <Verdict method={method} preview={preview} />
+        {shortfall && (
+          <Notice tone="yellow" title="Runs out of gas">
             <Text size="12px">
-              This account will be upgraded to a Kernel v3.3 smart account
-              (same address) before sending.
+              {`The gas limit, ${gasIntl.format(shortfall.limit)}, is under the ${gasIntl.format(shortfall.used)} gas the simulation used, and the node sends it as it is.`}
             </Text>
           </Notice>
         )}
-        <Verdict method={method} preview={preview} />
         {data?.fallbackReason && (
-          <Notice tone="yellow" title="Not sponsored">
-            <Text size="12px">{data.fallbackReason}</Text>
-          </Notice>
+          <Box className={stale ? styles.stale : undefined}>
+            <Notice tone="yellow" title="Not sponsored">
+              <Text size="12px">{data.fallbackReason}</Text>
+            </Notice>
+          </Box>
         )}
       </section>
       {simulation?.ok && simulation.balanceChanges && (
-        <BalanceChanges changes={simulation.balanceChanges} />
+        <Box className={stale ? styles.stale : undefined} aria-busy={stale}>
+          <BalanceChanges changes={simulation.balanceChanges} />
+        </Box>
       )}
     </>
   )
 }
 
-function Readouts({ preview }: { preview: SendPreview }) {
-  const { path, payer, sponsored, estimatedCostWei } = preview
-  const cost =
-    estimatedCostWei === null ? null : ethAmount(BigInt(estimatedCostWei))
+function Readouts({
+  method,
+  preview,
+  tx,
+}: {
+  method: SendMethod
+  preview: SendPreview
+  tx?: RpcTransaction
+}) {
+  const { path, payer, sponsored } = preview
+  const wei = estimatedCost(method, preview, tx)
+  const cost = wei === null ? null : ethAmount(wei)
   const route = path && pathLabel(path)
 
   return (
@@ -134,7 +165,10 @@ function Word({
   )
 }
 
-/** The simulation's verdict, or why there is none. */
+/**
+ * The simulation's verdict, or why there is none. After a failed refresh, the
+ * last verdict stays, marked out of date.
+ */
 function Verdict({
   method,
   preview,
@@ -158,6 +192,46 @@ function Verdict({
         {data ? 'Simulating the changed calls…' : 'Simulating…'}
       </Status>
     )
+  if (error)
+    return (
+      <>
+        <Box className={styles.stale}>
+          <Judgement method={method} preview={data} />
+        </Box>
+        <div role="status" className={styles.status}>
+          <TriangleAlert
+            className={styles.statusIcon.warn}
+            size={14}
+            strokeWidth={1.75}
+          />
+          <Box className={styles.grow}>
+            <Text color="text/secondary" size="12px">
+              {`Out of date: refreshing the preview failed (${error.message}). It tries again with the next block.`}
+            </Text>
+          </Box>
+          <Button
+            disabled={preview.isFetching}
+            height="20px"
+            variant="stroked fill"
+            width="fit"
+            onClick={() => void preview.refetch()}
+          >
+            Retry
+          </Button>
+        </div>
+      </>
+    )
+  return <Judgement method={method} preview={data} />
+}
+
+/** What the simulation of the calls says. */
+function Judgement({
+  method,
+  preview: data,
+}: {
+  method: SendMethod
+  preview: SendPreview
+}) {
   if (data.error)
     return (
       <Notice tone="red" title="Can't be sent">

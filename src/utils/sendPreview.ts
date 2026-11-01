@@ -9,6 +9,7 @@ import { type BatchQueue, type QueuedItem, cannotJoin } from '~/smart/queue'
 import type { AccountMode, RpcCall } from '~/smart/types'
 
 import { formatEth } from './formatEth'
+import { quantity } from './transactionForm'
 
 export type SendMethod = 'eth_sendTransaction' | 'wallet_sendCalls'
 
@@ -27,8 +28,14 @@ export function signAnyway(
 }
 
 export type SendActions = {
-  /** "Add to batch", offered only where the background would take it. */
-  addToBatch: boolean
+  /**
+   * "Add to batch": offered; in its place but disabled until the preview
+   * confirms the account's mode (`wait`); or hidden, where the background
+   * would refuse it.
+   */
+  addToBatch: 'offer' | 'wait' | 'hidden'
+  /** Why it is hidden, when a batch open for another account or network is why. */
+  batchNote: string | null
   /** The forward action: "Add to batch" once a batch is open for the account. */
   primary: 'batch' | 'approve'
   /** "Approve" reads "Sign anyway" and sends with `force`. */
@@ -39,6 +46,10 @@ export type SendActions = {
 export function sendActions(args: {
   method: SendMethod
   preview: SendPreview | undefined
+  /** The preview is on its way. */
+  loading?: boolean
+  /** The account's mode as known before the preview, if it is. */
+  mode?: AccountMode
   from: Address
   calls: readonly RpcCall[]
   /** The active network's, which the preview is for. */
@@ -46,20 +57,94 @@ export function sendActions(args: {
   queue: BatchQueue | null
 }): SendActions {
   const { preview, queue, rpcUrl } = args
+  // The preview's mode is the background's; until then, the one known, or
+  // smart, the only one that could batch.
+  const mode = preview?.mode ?? args.mode ?? 'smart'
+  const send = { rpcUrl, account: args.from, mode, calls: args.calls }
   // The background's own rule (a smart account, no deployment, the open batch
   // for this account and network), so a refusal is the exception.
+  const refusal = cannotJoin(queue, send, rpcUrl)
+  // No preview and none coming: the send can't be planned, nor batched.
   const addToBatch =
-    preview !== undefined &&
-    cannotJoin(
-      queue,
-      { rpcUrl, account: args.from, mode: preview.mode, calls: args.calls },
-      rpcUrl,
-    ) === null
+    refusal !== null || (!preview && !args.loading)
+      ? 'hidden'
+      : preview
+        ? 'offer'
+        : 'wait'
   return {
     addToBatch,
-    primary: addToBatch && queue !== null ? 'batch' : 'approve',
+    // Only the open batch is in the way: say so.
+    batchNote:
+      refusal !== null && cannotJoin(null, send, rpcUrl) === null
+        ? refusal
+        : null,
+    primary: addToBatch !== 'hidden' && queue !== null ? 'batch' : 'approve',
     signAnyway: signAnyway(args.method, preview),
   }
+}
+
+/**
+ * Whether the node gets the send as it is: a plain account's
+ * `eth_sendTransaction` (`smart-sends.ts`). Its gas, fees and nonce then
+ * count; a smart account's path picks its own.
+ */
+export function passesThrough(
+  method: SendMethod,
+  preview: SendPreview | undefined,
+): boolean {
+  return (
+    method === 'eth_sendTransaction' &&
+    preview !== undefined &&
+    preview.mode !== 'smart'
+  )
+}
+
+function gasUsed(preview: SendPreview): bigint | null {
+  const { simulation } = preview
+  return simulation.ok && simulation.gasUsed !== null
+    ? BigInt(simulation.gasUsed)
+    : null
+}
+
+/**
+ * What the send should cost, in wei. The preview's `gasUsed × maxFeePerGas`,
+ * except that a send the node gets as it is pays the dApp's fee per gas, and
+ * stops at its gas limit.
+ */
+export function estimatedCost(
+  method: SendMethod,
+  preview: SendPreview,
+  tx: Record<string, unknown> | undefined,
+): bigint | null {
+  const estimate =
+    preview.estimatedCostWei === null ? null : BigInt(preview.estimatedCostWei)
+  if (!tx || !passesThrough(method, preview)) return estimate
+  const used = gasUsed(preview)
+  const limit = quantity(tx.gas)
+  const fee = quantity(tx.maxFeePerGas) ?? quantity(tx.gasPrice)
+  // The node's fee per gas, back out of the preview's estimate.
+  const nodeFee = estimate !== null && used ? estimate / used : null
+  const price = fee ?? nodeFee
+  const gas =
+    used === null ? limit : limit !== null && limit < used ? limit : used
+  return price === null || gas === null ? null : gas * price
+}
+
+/**
+ * A send that the node gets as it is, with a gas limit under what its
+ * simulation used: it runs out of gas.
+ */
+export function gasShortfall(
+  method: SendMethod,
+  preview: SendPreview,
+  tx: Record<string, unknown> | undefined,
+): { limit: bigint; used: bigint } | null {
+  if (!tx || !passesThrough(method, preview)) return null
+  const used = gasUsed(preview)
+  const limit = quantity(tx.gas)
+  return used !== null && limit !== null && limit < used
+    ? { limit, used }
+    : null
 }
 
 /**

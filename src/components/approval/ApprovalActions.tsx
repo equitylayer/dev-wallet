@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import type { Address } from 'viem'
 
 import { Box, Button, Text } from '~/design-system'
+import { useResolvedMode } from '~/hooks/useResolvedMode'
 import { getMessenger } from '~/messengers'
 import type { SendPreview } from '~/smart/preview'
 import { flattenQueue } from '~/smart/queue'
@@ -19,8 +20,9 @@ const backgroundMessenger = getMessenger('background:wallet')
 type Status = 'approved' | 'rejected' | 'batched'
 
 /**
- * Sends the user's decision on a pending request. A refused one (an "Add to
- * batch" the background can't take) shows why, and the request stays.
+ * Sends the user's decision on a pending request: `request` as the screen
+ * shows it, maybe edited, which the background sends. A refused one (an
+ * "Add to batch" the background can't take) shows why, and the request stays.
  */
 function useDecision(request: PendingRequest) {
   const [busy, setBusy] = useState(false)
@@ -95,7 +97,8 @@ export function DecisionActions({
  * A send's decision: Reject, "Add to batch" where the background takes it
  * (the lead action once a batch is open for the account), and Approve, which
  * reads "Sign anyway" and forces the send when the simulation expects a
- * revert. The buttons keep their places; only the emphasis moves.
+ * revert. The buttons keep their places; only the emphasis moves. Nothing
+ * can be decided while the transaction is being edited.
  */
 export function SendActions({
   request,
@@ -103,23 +106,29 @@ export function SendActions({
   from,
   calls,
   preview,
+  editing = false,
 }: {
   request: PendingRequest
   method: SendMethod
   from: Address
   calls: readonly RpcCall[]
   preview: UseQueryResult<SendPreview>
+  editing?: boolean
 }) {
   const queue = useBatchQueue()
   const { network } = useNetworkStore()
+  const mode = useResolvedMode(from)
   const { busy, decide } = useDecision(request)
 
-  // Decide on the preview of these calls, never one left from others.
+  // Decide on the preview of these calls, never one left from others. One
+  // that failed to refresh is still the latest word on them (marked so).
   const simulating = preview.isLoading || preview.isPlaceholderData
   const current = simulating ? undefined : preview.data
   const actions = sendActions({
     method,
     preview: current,
+    loading: simulating,
+    mode,
     from,
     calls,
     rpcUrl: network.rpcUrl,
@@ -127,27 +136,37 @@ export function SendActions({
   })
   const batchOpen = actions.primary === 'batch' && queue !== null
   const queuedCalls = queue ? flattenQueue(queue.items).length : 0
+  const blocked = busy || editing
+
+  const note = editing
+    ? 'Apply or cancel the edit to decide.'
+    : actions.batchNote
+      ? `${actions.batchNote} Sign or discard it to batch this send.`
+      : batchOpen
+        ? `Batch open: ${queuedCalls} ${queuedCalls === 1 ? 'call' : 'calls'} so far.${
+            current && !current.simulation.ok
+              ? ' This send was simulated on its own; Review simulates the whole batch.'
+              : ''
+          }`
+        : null
 
   return (
     <>
-      {batchOpen && (
+      {note && (
         <Box className={styles.footerNote}>
           <Text color="text/tertiary" size="12px">
-            {`Batch open: ${queuedCalls} ${queuedCalls === 1 ? 'call' : 'calls'} so far.`}
-            {current && !current.simulation.ok
-              ? ' This send was simulated on its own; Review simulates the whole batch.'
-              : ''}
+            {note}
           </Text>
         </Box>
       )}
       <Box className={styles.actions}>
-        <RejectButton disabled={busy} onClick={() => decide('rejected')} />
-        {actions.addToBatch && (
+        <RejectButton disabled={blocked} onClick={() => decide('rejected')} />
+        {actions.addToBatch !== 'hidden' && (
           <Box className={styles.grow}>
             <Button
-              disabled={busy}
+              disabled={blocked || actions.addToBatch === 'wait'}
               height="28px"
-              variant={batchOpen ? 'solid invert' : 'stroked fill'}
+              variant={batchOpen && !editing ? 'solid invert' : 'stroked fill'}
               onClick={() => decide('batched')}
             >
               Add to batch
@@ -156,12 +175,12 @@ export function SendActions({
         )}
         <Box className={styles.grow}>
           <Button
-            disabled={busy || simulating}
+            disabled={blocked || simulating}
             height="28px"
             variant={
               actions.signAnyway
                 ? 'stroked red'
-                : batchOpen
+                : batchOpen || editing
                   ? 'stroked fill'
                   : 'solid invert'
             }

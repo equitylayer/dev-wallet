@@ -5,7 +5,9 @@ import type { SendPreview } from '~/smart/preview'
 import type { BatchQueue, QueuedItem } from '~/smart/queue'
 
 import {
+  estimatedCost,
   ethAmount,
+  gasShortfall,
   locateCall,
   modeLabel,
   sendActions,
@@ -65,16 +67,17 @@ const base = {
 describe('sendActions', () => {
   test('a smart account with no batch open: Approve leads, Add to batch opens one', () => {
     expect(sendActions({ ...base, preview: preview() })).toEqual({
-      addToBatch: true,
+      addToBatch: 'offer',
+      batchNote: null,
       primary: 'approve',
       signAnyway: false,
     })
   })
 
-  test("with a batch open for the account, Add to batch leads", () => {
+  test('with a batch open for the account, Add to batch leads', () => {
     expect(
       sendActions({ ...base, preview: preview(), queue: queue() }),
-    ).toMatchObject({ addToBatch: true, primary: 'batch' })
+    ).toMatchObject({ addToBatch: 'offer', primary: 'batch' })
   })
 
   test('no Add to batch where the background would refuse it', () => {
@@ -82,16 +85,76 @@ describe('sendActions', () => {
       { preview: preview({ mode: 'plain-upgradable' }) },
       { preview: preview({ mode: 'plain-never' }) },
       { preview: preview(), calls: [{ data: '0x00' as const }] },
-      { preview: preview(), queue: queue({ account: OTHER }) },
-      { preview: preview(), queue: queue({ rpcUrl: OTHER_RPC }) },
-      { preview: undefined },
     ]
     for (const args of refused) {
       expect(sendActions({ ...base, ...args })).toMatchObject({
-        addToBatch: false,
+        addToBatch: 'hidden',
+        batchNote: null,
         primary: 'approve',
       })
     }
+  })
+
+  test('a batch open for another account or network says why Add to batch is missing', () => {
+    expect(
+      sendActions({ ...base, preview: preview(), queue: queue({ account: OTHER }) }),
+    ).toEqual({
+      addToBatch: 'hidden',
+      batchNote: `A batch is already open for ${OTHER}.`,
+      primary: 'approve',
+      signAnyway: false,
+    })
+    // Known before the preview, so it never shows and goes.
+    expect(
+      sendActions({ ...base, preview: undefined, queue: queue({ rpcUrl: OTHER_RPC }) }),
+    ).toMatchObject({
+      addToBatch: 'hidden',
+      batchNote: `A batch is already open on another network (${OTHER_RPC}).`,
+    })
+    // A plain account couldn't batch anyway: no note.
+    expect(
+      sendActions({
+        ...base,
+        preview: preview({ mode: 'plain-never' }),
+        queue: queue({ account: OTHER }),
+      }).batchNote,
+    ).toBeNull()
+  })
+
+  test('while the preview loads, Add to batch waits in its place', () => {
+    expect(sendActions({ ...base, preview: undefined, loading: true })).toEqual({
+      addToBatch: 'wait',
+      batchNote: null,
+      primary: 'approve',
+      signAnyway: false,
+    })
+    expect(
+      sendActions({
+        ...base,
+        mode: 'smart',
+        preview: undefined,
+        loading: true,
+        queue: queue(),
+      }),
+    ).toMatchObject({ addToBatch: 'wait', primary: 'batch' })
+    // A plain account's is known before the preview: never shown.
+    expect(
+      sendActions({ ...base, mode: 'plain-never', preview: undefined, loading: true })
+        .addToBatch,
+    ).toBe('hidden')
+  })
+
+  test('no preview and none coming: no Add to batch', () => {
+    expect(
+      sendActions({ ...base, mode: 'smart', preview: undefined }).addToBatch,
+    ).toBe('hidden')
+  })
+
+  test("the preview's mode wins over the one known before it", () => {
+    expect(
+      sendActions({ ...base, mode: 'smart', preview: preview({ mode: 'plain-never' }) })
+        .addToBatch,
+    ).toBe('hidden')
   })
 
   test('a predicted revert makes Approve "Sign anyway"', () => {
@@ -211,5 +274,100 @@ describe('locateCall', () => {
   test('out of range, or unknown, is null', () => {
     expect(locateCall(items, 5)).toBeNull()
     expect(locateCall(items, null)).toBeNull()
+  })
+})
+
+describe('estimatedCost', () => {
+  // A plain account's send goes to the node as it is.
+  const plain = (overrides: Partial<SendPreview> = {}) =>
+    preview({
+      mode: 'plain-never',
+      onchain: { kind: 'eoa' },
+      path: 'sequential',
+      payer: ACCOUNT,
+      sponsored: false,
+      // 46,000 gas at the node's 2 gwei
+      estimatedCostWei: '92000000000000',
+      simulation: { ok: true, gasUsed: '46000', balanceChanges: [] },
+      ...overrides,
+    })
+  const GWEI = 10n ** 9n
+
+  test("the preview's estimate when the dApp sets no fee or gas", () => {
+    expect(estimatedCost('eth_sendTransaction', plain(), {})).toBe(92_000n * GWEI)
+  })
+
+  test("a pass-through send costs the dApp's fee per gas", () => {
+    expect(
+      estimatedCost('eth_sendTransaction', plain(), {
+        maxFeePerGas: '0x12a05f200', // 5 gwei
+      }),
+    ).toBe(46_000n * 5n * GWEI)
+    expect(
+      estimatedCost('eth_sendTransaction', plain(), { gasPrice: '0x3b9aca00' }),
+    ).toBe(46_000n * GWEI)
+  })
+
+  test('a gas limit under the simulated gas caps the cost: the send runs out of gas', () => {
+    expect(
+      estimatedCost('eth_sendTransaction', plain(), { gas: '0x5208' }),
+    ).toBe(21_000n * 2n * GWEI)
+    // Above it, the send uses what it needs.
+    expect(
+      estimatedCost('eth_sendTransaction', plain(), { gas: '0xf4240' }),
+    ).toBe(92_000n * GWEI)
+  })
+
+  test('without simulated gas, the gas limit and fee bound it', () => {
+    const unknown = plain({
+      estimatedCostWei: null,
+      simulation: { ok: true, gasUsed: null, balanceChanges: null },
+    })
+    expect(
+      estimatedCost('eth_sendTransaction', unknown, {
+        gas: '0x5208',
+        maxFeePerGas: '0x3b9aca00',
+      }),
+    ).toBe(21_000n * GWEI)
+    expect(
+      estimatedCost('eth_sendTransaction', unknown, { gas: '0x5208' }),
+    ).toBeNull()
+  })
+
+  test('smart accounts pick their own gas and fees: the dApp\'s are ignored', () => {
+    expect(
+      estimatedCost('eth_sendTransaction', preview(), {
+        gas: '0x5208',
+        maxFeePerGas: '0x12a05f200',
+      }),
+    ).toBe(46_000_000_000_000n)
+    expect(estimatedCost('wallet_sendCalls', plain(), undefined)).toBe(
+      92_000n * GWEI,
+    )
+  })
+})
+
+describe('gasShortfall', () => {
+  const plain = preview({
+    mode: 'plain-upgradable',
+    onchain: { kind: 'eoa' },
+    path: 'sequential',
+    payer: ACCOUNT,
+    sponsored: false,
+  })
+
+  test("a pass-through send's gas limit under the simulated gas", () => {
+    expect(gasShortfall('eth_sendTransaction', plain, { gas: '0x5208' })).toEqual(
+      { limit: 21_000n, used: 46_000n },
+    )
+  })
+
+  test('none when the limit is enough, absent, or ignored', () => {
+    expect(gasShortfall('eth_sendTransaction', plain, { gas: '0xb3b0' })).toBeNull()
+    expect(gasShortfall('eth_sendTransaction', plain, {})).toBeNull()
+    expect(
+      gasShortfall('eth_sendTransaction', preview(), { gas: '0x5208' }),
+    ).toBeNull()
+    expect(gasShortfall('eth_sendTransaction', reverting({ mode: 'plain-never' }), { gas: '0x1' })).toBeNull()
   })
 })

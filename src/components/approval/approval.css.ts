@@ -2,13 +2,14 @@
 // actions), the send summary, and call rows. The recipe is the Account home's
 // (account-home.css.ts): a 12px gutter, paper rules between blocks, faint
 // rules between rows, square corners.
-import { style, styleVariants } from '@vanilla-extract/css'
+import { globalStyle, style, styleVariants } from '@vanilla-extract/css'
 
 import {
   backgroundColorVars,
   foregroundColorVars,
   textColorForBackgroundColorVars,
 } from '~/design-system/styles/theme.css'
+import { fontFamily } from '~/design-system/tokens'
 
 const rgb = (v: string, a?: number) =>
   a === undefined ? `rgb(${v})` : `rgb(${v} / ${a})`
@@ -175,6 +176,32 @@ export const readoutValue = style({
 })
 
 ////////////////////////////////////////////////////////////////////////
+// Transaction fields: gas readouts, and the Edit state's inputs
+
+export const fieldGrid = style([readouts, { marginTop: 0 }])
+
+/** A full-width field: its label above a 24px input. */
+export const field = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 6,
+  marginBottom: 12,
+})
+
+export const fieldInput = style({ flexGrow: 1, minWidth: 0 })
+
+/** Hex and addresses in inputs wear Data Small, as everywhere else. */
+export const monoInput = style([fieldInput])
+globalStyle(`${monoInput} input`, { fontFamily: fontFamily.mono })
+
+export const editActions = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  marginTop: 16,
+})
+
+////////////////////////////////////////////////////////////////////////
 // Status and notices
 
 export const status = style({
@@ -187,7 +214,12 @@ export const status = style({
 export const statusIcon = styleVariants({
   ok: { flexShrink: 0, color: rgb(backgroundColorVars['surface/green']) },
   neutral: { flexShrink: 0, color: rgb(t3) },
+  warn: { flexShrink: 0, color: rgb(backgroundColorVars['surface/yellow']) },
 })
+
+// A preview of other calls, or one that failed to refresh: still there to
+// read, but not the current word.
+export const stale = style({ opacity: 0.45 })
 
 const tint = (
   signal: 'surface/red' | 'surface/yellow' | 'surface/blue',
