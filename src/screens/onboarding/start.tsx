@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 
-import { DWLogo } from '~/components/svgs/DWLogo'
+import { DevWalletIcon } from '~/components/svgs/DevWalletIcon'
 import {
   Box,
   Button,
@@ -18,7 +18,7 @@ export default function OnboardingStart() {
       <Rows>
         <Row alignHorizontal="center">
           <Box>
-            <DWLogo size="200px" />
+            <DevWalletIcon size="96px" />
           </Box>
         </Row>
         <Row alignVertical="center">

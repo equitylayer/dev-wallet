@@ -1,71 +1,55 @@
 import { useId } from 'react'
 
+import {
+  backgroundColorVars,
+  foregroundColorVars,
+} from '~/design-system/styles/theme.css'
+
+// The Docked D: today's D cut once, top to bottom, with the right of the bowl
+// in the theme accent as the panel docked beside the page. Drawn on a 64-unit
+// grid; public/icons/devwallet-logo.svg is the same mark at 1024 (dark only).
+const D =
+  'M14.375 15.25H31.625C41.298 15.25 49.375 22.74 49.375 32C49.375 41.26 41.298 48.75 31.625 48.75H14.375Z M23.5 24.375V39.625H31.625C36.375 39.625 40.25 36.245 40.25 32C40.25 27.755 36.375 24.375 31.625 24.375Z'
+
 export function DevWalletIcon({ size }: { size: string }) {
-  const id = useId().replace(/:/g, '')
-  const backgroundId = `${id}-devwallet-icon-background`
-  const promptId = `${id}-devwallet-icon-prompt`
+  const panelId = `${useId().replace(/:/g, '')}-docked-panel`
+  const tile = `rgb(${backgroundColorVars['surface/primary/elevated']})`
+  const ink = foregroundColorVars['text/primary']
 
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 1024 1024"
+      viewBox="0 0 64 64"
       style={{
         height: size,
         width: size,
       }}
     >
-      <title>DevWallet Icon</title>
-      <rect
-        x={32}
-        y={32}
-        width={960}
-        height={960}
-        rx={232}
-        fill={`url(#${backgroundId})`}
-      />
-      <path
-        d="M230 244H506C660.773 244 790 363.837 790 512C790 660.163 660.773 780 506 780H230V244ZM376 390V634H506C581.994 634 644 579.918 644 512C644 444.082 581.994 390 506 390H376Z"
-        fill="#F4F8EF"
-        fillRule="evenodd"
-      />
-      <path
-        d="M474 456L542 512L474 568"
-        stroke={`url(#${promptId})`}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={64}
-      />
-      <path
-        d="M572 604H670"
-        stroke="#F4F8EF"
-        strokeLinecap="round"
-        strokeWidth={58}
-      />
+      <title>DevWallet</title>
       <defs>
-        <linearGradient
-          id={backgroundId}
-          x1={132}
-          x2={900}
-          y1={84}
-          y2={956}
-          gradientUnits="userSpaceOnUse"
-        >
-          <stop stopColor="#172824" />
-          <stop offset={0.5} stopColor="#10161A" />
-          <stop offset={1} stopColor="#171B24" />
-        </linearGradient>
-        <linearGradient
-          id={promptId}
-          x1={474}
-          x2={542}
-          y1={456}
-          y2={568}
-          gradientUnits="userSpaceOnUse"
-        >
-          <stop stopColor="#83FFA1" />
-          <stop offset={1} stopColor="#49DBE9" />
-        </linearGradient>
+        <clipPath id={panelId}>
+          <rect x={40} y={0} width={24} height={64} />
+        </clipPath>
       </defs>
+      <rect
+        x={2}
+        y={2}
+        width={60}
+        height={60}
+        rx={14.5}
+        fill={tile}
+        stroke={`rgb(${ink} / 0.14)`}
+        strokeWidth={1}
+        vectorEffect="non-scaling-stroke"
+      />
+      <path d={D} fill={`rgb(${ink})`} fillRule="evenodd" />
+      <path
+        d={D}
+        fill={`rgb(${backgroundColorVars['surface/accent']})`}
+        fillRule="evenodd"
+        clipPath={`url(#${panelId})`}
+      />
+      <rect x={36} y={14} width={4} height={36} fill={tile} />
     </svg>
   )
 }
