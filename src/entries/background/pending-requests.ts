@@ -9,8 +9,10 @@ const requestTimeout = 5 * 60 * 1000
 const keepAliveInterval = 20 * 1000
 
 export type Decision =
-    | { status: 'approved'; request: PendingRequest }
-    | { status: 'rejected' | 'expired' }
+    | { status: 'approved'; request: PendingRequest; force?: boolean }
+    // TODO(Task 11): 'batched' parks the request in the batch queue; until
+    // then callers treat it as a rejection.
+    | { status: 'rejected' | 'expired' | 'batched' }
 
 export async function requestUserDecision(request: PendingRequest): Promise<Decision> {
   const decision = waitForDecision(request)
@@ -34,11 +36,11 @@ function waitForDecision(request: PendingRequest) {
 
     const unsubscribe = walletMessenger.reply(
         'pendingRequest',
-        async ({ request: pendingRequest, status }) => {
+        async ({ request: pendingRequest, status, force }) => {
           if (pendingRequest.id !== request.id) return
           settle(
               status === 'approved'
-                  ? { status, request: pendingRequest }
+                  ? { status, request: pendingRequest, force: force === true }
                   : { status },
           )
         },

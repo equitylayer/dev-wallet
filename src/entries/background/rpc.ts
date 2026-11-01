@@ -1,24 +1,16 @@
-import {
-  type Address,
-  type RpcTransactionReceipt,
-  type RpcTransactionRequest,
-  keccak256,
-  numberToHex,
-  stringToHex,
-} from 'viem'
+import { type Address, numberToHex } from 'viem'
 import { type HttpRpcClient, getHttpRpcClient } from 'viem/utils'
 
 import {
   UnauthorizedProviderError,
   UnsupportedProviderMethodError,
-  UserRejectedRequestError,
 } from '~/errors'
 import { type Messenger, getMessenger } from '~/messengers'
+import { serializeError } from '~/smart/errors'
 import { connectNode, nodeMethod } from '~/smart/node'
 import type { RpcRequest, RpcResponse } from '~/types/rpc'
 import {
   accountStore,
-  batchCallsStore,
   networkStore,
   sessionsStore,
   settingsStore,
@@ -26,11 +18,19 @@ import {
 
 import {
   assertEthAccountsRequest,
+  declinedError,
+  isTransactionMethod,
   permissionsFor,
   requiresApproval,
   withSerializedErrors,
 } from './methods'
 import { type Decision, requestUserDecision } from './pending-requests'
+import {
+  handleSend,
+  reconcileBeforeAnswering,
+  showCallsStatus,
+  walletRequest,
+} from './smart'
 
 const inpageMessenger = getMessenger('background:inpage')
 const walletMessenger = getMessenger('background:wallet')
@@ -63,19 +63,46 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
         },
       } as RpcResponse
 
-    // If the method is a "signable" method, request approval from the user.
-    if (requiresApproval(request.method, settingsStore.getState())) {
-      if (isInpage && !session)
-        return {
-          id: request.id,
-          jsonrpc: '2.0',
-          error: {
-            code: UnauthorizedProviderError.code,
-            message:
-              'The requested account and/or method has not been authorized by the user.',
-          },
-        } as RpcResponse
+    // A "signable" method needs the user's approval, unless it is bypassed.
+    const needsApproval = requiresApproval(
+        request.method,
+        settingsStore.getState(),
+    )
+    if (needsApproval && isInpage && !session)
+      return {
+        id: request.id,
+        jsonrpc: '2.0',
+        error: {
+          code: UnauthorizedProviderError.code,
+          message:
+            'The requested account and/or method has not been authorized by the user.',
+        },
+      } as RpcResponse
 
+    // Sends go through the smart-account execution core, which asks for the
+    // approval itself; plain `eth_sendTransaction`s come back to pass through.
+    if (isTransactionMethod(request.method)) {
+      const outcome = await handleSend({
+        rpcUrl,
+        request,
+        ask: needsApproval
+            ? (pending) =>
+                requestUserDecision({ ...pending, sender: meta.sender })
+            : undefined,
+      })
+      const response =
+          'passThrough' in outcome
+              ? await execute(rpcUrl, rpcClient, outcome.passThrough)
+              : ({
+                id: request.id,
+                jsonrpc: '2.0',
+                result: outcome.result,
+              } as RpcResponse)
+      walletMessenger.send('transactionExecuted', undefined)
+      return response
+    }
+
+    if (needsApproval) {
       const decision = await requestUserDecision({
         ...request,
         sender: meta.sender,
@@ -90,6 +117,23 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
         id,
       } as RpcRequest)
     }
+
+    // EIP-5792 reads are the wallet's to answer, never the node's.
+    if (
+        request.method === 'wallet_getCapabilities' ||
+        request.method === 'wallet_getCallsStatus'
+    )
+      return {
+        id: request.id,
+        jsonrpc: '2.0',
+        result: await walletRequest(rpcUrl, request),
+      } as RpcResponse
+    if (request.method === 'wallet_showCallsStatus')
+      return {
+        id: request.id,
+        jsonrpc: '2.0',
+        result: await showCallsStatus(rpcUrl, request.params),
+      } as RpcResponse
 
     if (isInpage) {
       // Connecting the site: shared by `eth_requestAccounts` and
@@ -117,19 +161,21 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
         }
 
         const { bypassConnectAuth } = settingsStore.getState()
-        if (bypassConnectAuth) return authorize()
+        if (!bypassConnectAuth) {
+          // The approval screen renders connection requests by method, so a
+          // permissions request is shown as the connection it amounts to.
+          const decision = await requestUserDecision({
+            ...request,
+            method: 'eth_requestAccounts',
+            params: undefined,
+            sender: meta.sender,
+          })
+          if (decision.status !== 'approved')
+            return { declined: declinedResponse(request, decision.status) }
+        }
 
-        // The approval screen renders connection requests by method, so a
-        // permissions request is shown as the connection it amounts to.
-        const decision = await requestUserDecision({
-          ...request,
-          method: 'eth_requestAccounts',
-          params: undefined,
-          sender: meta.sender,
-        })
-        if (decision.status !== 'approved')
-          return { declined: declinedResponse(request, decision.status) }
-
+        // The dApp may read the accounts' code next: match it to their modes.
+        await reconcileBeforeAnswering(rpcUrl)
         return authorize()
       }
 
@@ -166,6 +212,7 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
       }
 
       if (request.method === 'eth_accounts') {
+        if (session) await reconcileBeforeAnswering(rpcUrl)
         const { getAccounts } = accountStore.getState()
         const { network } = networkStore.getState()
 
@@ -183,87 +230,6 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
           result: addresses,
         } as RpcResponse
       }
-
-      if (request.method === 'wallet_getCallsStatus') {
-        const batchId = request.params![0]
-        const { transactionHashes } = batchCallsStore
-          .getState()
-          .getRecord(rpcUrl, batchId)!
-
-        const responses = await Promise.allSettled(
-            transactionHashes.map((hash) =>
-                rpcClient.request({
-                  body: {
-                    method: 'eth_getTransactionReceipt',
-                    params: [hash],
-                  },
-                }),
-            ),
-        )
-        const pending = responses.some(
-            (response) =>
-                response.status === 'rejected' || !response.value.result,
-        )
-
-        return {
-          id: request.id,
-          jsonrpc: '2.0',
-          result: {
-            status: pending ? 'PENDING' : 'CONFIRMED',
-            receipts: pending
-                ? []
-                : responses
-                    .map((response) => {
-                      if (response.status === 'rejected') return
-                      const receipt = response.value
-                          .result as RpcTransactionReceipt
-                      return {
-                        blockHash: receipt.blockHash,
-                        blockNumber: receipt.blockNumber,
-                        gasUsed: receipt.gasUsed,
-                        logs: receipt.logs,
-                        transactionHash: receipt.transactionHash,
-                        status: receipt.status,
-                      }
-                    })
-                    .filter(Boolean),
-          },
-        } as RpcResponse
-      }
-
-      if (request.method === 'wallet_getCapabilities') {
-        const { networks } = networkStore.getState()
-        return {
-          id: request.id,
-          jsonrpc: '2.0',
-          result: networks.reduce((capabilities, network) => {
-            return {
-              ...capabilities,
-              [numberToHex(network.chainId)]: {
-                atomicBatch: {
-                  supported: false,
-                },
-              },
-            }
-          }, {}),
-        } as RpcResponse
-      }
-
-      if (request.method === 'wallet_showCallsStatus') {
-        const batchId = request.params![0]
-        const { transactionHashes } = batchCallsStore
-          .getState()
-          .getRecord(rpcUrl, batchId)!
-        walletMessenger.send(
-            'pushRoute',
-            `/transaction/${transactionHashes[0]}`,
-        )
-        return {
-          id: request.id,
-          jsonrpc: '2.0',
-          result: undefined,
-        } as RpcResponse
-      }
     }
 
     return execute(rpcUrl, rpcClient, request)
@@ -277,14 +243,7 @@ function declinedResponse(
   return {
     id: request.id,
     jsonrpc: '2.0',
-    error: {
-      code: UserRejectedRequestError.code,
-      message:
-          status === 'expired'
-              ? 'The request timed out waiting for approval.'
-              : UserRejectedRequestError.message,
-      data: { request },
-    },
+    error: serializeError(declinedError(request, status)),
   } satisfies RpcResponse
 }
 
@@ -299,130 +258,9 @@ async function execute(
     request.params = [request.params[1], request.params[0]]
   }
 
-  const response = (await (() => {
-    if (request.method === 'wallet_sendCalls') {
-      return handleSendCalls({
-        ...request.params![0],
-        id: request.id,
-        rpcClient,
-        rpcUrl,
-      } as any)
-    }
-
-    // Hardhat exposes the Anvil cheat methods under `hardhat_*`.
-    return connectNode({ rpcUrl }).then(({ kind }) =>
-      rpcClient.request({
-        body: { ...request, method: nodeMethod(kind, request.method) },
-      }),
-    )
-  })()) as unknown as RpcResponse
-
-  if (
-      request.method === 'eth_sendTransaction' ||
-      request.method === 'wallet_sendCalls'
-  )
-    walletMessenger.send('transactionExecuted', undefined)
-
-  return response
-}
-
-async function handleSendCalls({
-                                 calls,
-                                 from,
-                                 id,
-                                 rpcClient,
-                                 rpcUrl,
-                               }: {
-  calls: RpcTransactionRequest[]
-  from: Address
-  id: number
-  rpcClient: HttpRpcClient
-  rpcUrl: string
-}) {
-  const { putRecord } = batchCallsStore.getState()
-
-  // Simulate calls for errors (to ensure atomicity).
-  for (const call of calls) {
-    const { error } = await rpcClient.request({
-      body: {
-        method: 'eth_call',
-        params: [{ ...call, from: from ?? call.from, nonce: undefined }],
-      },
-    })
-    if (error) throw new Error(error.message)
-  }
-
-  // Disable automining (if enabled) to mine transactions atomically.
-  const automine = await rpcClient
-      .request({
-        body: {
-          method: 'anvil_getAutomine',
-        },
-      })
-      .catch(() => {})
-  if (automine?.result)
-    await rpcClient.request({
-      body: {
-        method: 'evm_setAutomine',
-        params: [false],
-      },
-    })
-
-  try {
-    const transactionHashes = []
-    for (let i = 0; i < calls.length; i++) {
-      const call = calls[i]
-      const { result, error } = await rpcClient.request({
-        body: {
-          method: 'eth_sendTransaction',
-          params: [
-            {
-              ...call,
-              from: from ?? call.from,
-              nonce: undefined,
-            },
-          ],
-        },
-      })
-      if (error) throw new Error(error.message)
-
-      transactionHashes.push(result)
-    }
-
-    // Mine a block if automining was originally enabled.
-    if (automine?.result)
-      await rpcClient.request({
-        body: {
-          method: 'anvil_mine',
-          params: ['0x1', '0x0'],
-        },
-      })
-
-    const batchId = keccak256(stringToHex(JSON.stringify(transactionHashes)))
-    putRecord({
-      id: batchId,
-      rpcUrl,
-      chainId: await connectNode({ rpcUrl }).then((node) => node.chainId()),
-      from,
-      calls: calls.map(({ to, value, data }) => ({
-        ...(to && { to }),
-        ...(value && { value }),
-        ...(data && { data }),
-      })),
-      path: 'sequential',
-      transactionHashes,
-      createdAt: Date.now(),
-    })
-
-    return { id, jsonrpc: '2.0', result: batchId }
-  } finally {
-    // Re-enable automining (if previously enabled).
-    if (automine?.result)
-      await rpcClient.request({
-        body: {
-          method: 'evm_setAutomine',
-          params: [true],
-        },
-      })
-  }
+  // Hardhat exposes the Anvil cheat methods under `hardhat_*`.
+  const { kind } = await connectNode({ rpcUrl })
+  return (await rpcClient.request({
+    body: { ...request, method: nodeMethod(kind, request.method) },
+  })) as unknown as RpcResponse
 }

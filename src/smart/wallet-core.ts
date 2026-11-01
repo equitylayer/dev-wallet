@@ -7,6 +7,7 @@ import {
   INVALID_PARAMS,
   WalletRpcError,
   unauthorizedAccount,
+  unknownBundleId,
 } from './errors'
 import { executeCalls } from './execute'
 import { atomicStatus } from './modes'
@@ -19,9 +20,8 @@ import {
 } from './types'
 
 const UNSUPPORTED_METHOD = 4200
-const UNKNOWN_BUNDLE_ID = 5730
 
-type WalletAccount = {
+export type WalletAccount = {
   address: Address
   mode: AccountMode
   onchain: OnchainKind
@@ -42,7 +42,8 @@ export type WalletCoreDeps = {
   force?: boolean
 }
 
-function findAccount(
+/** The wallet account at `address`, matched case-insensitively. */
+export function findAccount(
   accounts: readonly WalletAccount[],
   address: string,
 ): WalletAccount | undefined {
@@ -125,9 +126,7 @@ async function callsStatus(
     throw new WalletRpcError(INVALID_PARAMS, 'Expected a batch id')
   }
   const record = deps.records.get(id)
-  if (!record) {
-    throw new WalletRpcError(UNKNOWN_BUNDLE_ID, `Unknown batch id ${id}`)
-  }
+  if (!record) throw unknownBundleId(id)
   return getCallsStatus(deps.node, record)
 }
 

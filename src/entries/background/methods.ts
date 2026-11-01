@@ -29,6 +29,13 @@ type ApprovalSettings = {
 const isOneOf = (list: readonly string[], method: string) =>
   list.includes(method)
 
+/** Whether the method sends a transaction (and so runs the execution core). */
+export function isTransactionMethod(
+  method: string,
+): method is (typeof TRANSACTION_METHODS)[number] {
+  return isOneOf(TRANSACTION_METHODS, method)
+}
+
 /** Whether the user has to approve this method before it is executed. */
 export function requiresApproval(
   method: string,
@@ -42,6 +49,50 @@ export function requiresApproval(
 /** Whether a request for this method should open the side panel. */
 export function opensSidebar(method: string, s: ApprovalSettings): boolean {
   return requiresApproval(method, s) || isOneOf(SIDEBAR_METHODS, method)
+}
+
+const USER_REJECTED = 4001
+/** EIP-5792: the user declined the account upgrade a batch needed. */
+const UPGRADE_REJECTED = 5750
+
+/**
+ * The error for a request the user didn't approve: `4001`, or `5750` when what
+ * they rejected was the account upgrade a `wallet_sendCalls` needed. A timeout
+ * is always `4001`.
+ */
+export function declinedError(
+  request: unknown,
+  status: 'rejected' | 'expired' | 'batched',
+  { upgrade = false }: { upgrade?: boolean } = {},
+): WalletRpcError {
+  const data = { request }
+  switch (status) {
+    case 'expired':
+      return new WalletRpcError(
+        USER_REJECTED,
+        'The request timed out waiting for approval.',
+        data,
+      )
+    case 'batched':
+      // TODO(Task 11): queue the request in the open batch instead.
+      return new WalletRpcError(
+        USER_REJECTED,
+        'Adding to a batch is not available yet.',
+        data,
+      )
+    case 'rejected':
+      return upgrade
+        ? new WalletRpcError(
+            UPGRADE_REJECTED,
+            'The user rejected the upgrade to a smart account.',
+            data,
+          )
+        : new WalletRpcError(
+            USER_REJECTED,
+            'The user rejected the request.',
+            data,
+          )
+  }
 }
 
 /** EIP-2255 permission, as returned by `wallet_{get,request}Permissions`. */

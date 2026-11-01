@@ -7,6 +7,7 @@ import { setupExtensionId } from './extension-id'
 import { setupInpage } from './inpage'
 import { dropOrphanedRequests } from './pending-requests'
 import { setupRpcHandler } from './rpc'
+import { setupSmartHandlers } from './smart'
 import { setupWalletSidebarHandler } from './wallet-sidebar'
 
 const contentMessenger = getMessenger('background:contentScript')
@@ -24,6 +25,7 @@ setupExtensionId()
 setupInpage()
 setupRpcHandler({ messenger: inpageMessenger })
 setupRpcHandler({ messenger: walletMessenger })
+setupSmartHandlers()
 setupWalletSidebarHandler()
 syncStores()
 void dropOrphanedRequests()

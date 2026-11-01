@@ -67,7 +67,8 @@ async function estimateCallGasLimit(
   }
 }
 
-async function getFees(
+/** EIP-1559 fees for the next block: twice the base fee plus the tip. */
+export async function getFees(
   node: Node,
 ): Promise<{ maxFeePerGas: bigint; maxPriorityFeePerGas: bigint }> {
   const [maxPriorityFeePerGas, latest] = await Promise.all([

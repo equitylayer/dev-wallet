@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test'
+import { describe, expect, test } from 'bun:test'
 
 import { WalletRpcError } from '~/smart/errors'
 
@@ -6,6 +6,8 @@ import {
   SIGNATURE_METHODS,
   TRANSACTION_METHODS,
   assertEthAccountsRequest,
+  declinedError,
+  isTransactionMethod,
   opensSidebar,
   permissionsFor,
   requiresApproval,
@@ -19,6 +21,13 @@ test('method lists', () => {
     'eth_signTypedData_v4',
   ])
   expect(TRANSACTION_METHODS).toEqual(['eth_sendTransaction', 'wallet_sendCalls'])
+})
+
+test('isTransactionMethod is true only for the send methods', () => {
+  expect(isTransactionMethod('eth_sendTransaction')).toBe(true)
+  expect(isTransactionMethod('wallet_sendCalls')).toBe(true)
+  expect(isTransactionMethod('eth_sendRawTransaction')).toBe(false)
+  expect(isTransactionMethod('wallet_getCallsStatus')).toBe(false)
 })
 
 test('transaction methods need approval unless bypassed', () => {
@@ -171,4 +180,35 @@ test('withSerializedErrors passes a normal reply through, with its arguments', a
     result: '0x1',
   })
   expect(seen).toEqual([payload, meta])
+})
+
+describe('declinedError', () => {
+  const request = { id: 3, method: 'wallet_sendCalls', params: [] }
+
+  test('a rejection is 4001 and carries the request', () => {
+    const error = declinedError(request, 'rejected')
+    expect(error).toBeInstanceOf(WalletRpcError)
+    expect(error.code).toBe(4001)
+    expect(error.message).toBe('The user rejected the request.')
+    expect(error.data).toEqual({ request })
+  })
+
+  test('a timeout is 4001 and says so', () => {
+    const error = declinedError(request, 'expired')
+    expect(error.code).toBe(4001)
+    expect(error.message).toBe('The request timed out waiting for approval.')
+  })
+
+  test('a rejected account upgrade is 5750; a timed out one stays 4001', () => {
+    expect(declinedError(request, 'rejected', { upgrade: true }).code).toBe(
+      5750,
+    )
+    expect(declinedError(request, 'expired', { upgrade: true }).code).toBe(
+      4001,
+    )
+  })
+
+  test('"batched" is a 4001 until the batch queue exists', () => {
+    expect(declinedError(request, 'batched').code).toBe(4001)
+  })
 })

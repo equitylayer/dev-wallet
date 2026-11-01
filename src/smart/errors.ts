@@ -23,6 +23,13 @@ export function unauthorizedAccount(address: string): WalletRpcError {
   )
 }
 
+/** EIP-5792: no batch with this id (on this network). */
+export const UNKNOWN_BUNDLE_ID = 5730
+
+export function unknownBundleId(id: string): WalletRpcError {
+  return new WalletRpcError(UNKNOWN_BUNDLE_ID, `Unknown batch id ${id}`)
+}
+
 /**
  * Any thrown error with a numeric `code` keeps `{ code, message, data }`:
  * wallet errors, and node errors viem throws over HTTP (`RpcRequestError`, when
