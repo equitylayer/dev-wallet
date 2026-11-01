@@ -173,38 +173,31 @@ function balanceChanges(
 async function simulateV1(
   node: Node,
   from: Address,
-  atomic: boolean,
   calls: readonly Call[],
 ): Promise<SimulationResult> {
-  // Blocks in one request build on each other, so a call that must not see the
-  // others' effects gets a request (and a block) of its own.
-  const groups = atomic ? [calls] : calls.map((call) => [call])
-  const simulated: SimulatedCall[] = []
-  for (const group of groups) {
-    const blocks = await node.request<
-      { calls?: SimulatedCall[] }[] | null
-    >('eth_simulateV1', [
+  // One block, so each call sees the state the earlier ones left.
+  const blocks = await node.request<{ calls?: SimulatedCall[] }[] | null>(
+    'eth_simulateV1',
+    [
       {
         blockStateCalls: [
-          { calls: group.map((call) => ({ from, ...toRpcCall(call) })) },
+          { calls: calls.map((call) => ({ from, ...toRpcCall(call) })) },
         ],
         traceTransfers: true,
         validation: false,
       },
       'latest',
-    ])
-    const results = blocks?.[0]?.calls
-    // Never report success for results that don't line up with the calls.
-    if (!Array.isArray(results) || results.length !== group.length) {
-      return {
-        ok: false,
-        failedIndex: null,
-        revertData: null,
-        message: `eth_simulateV1 returned ${Array.isArray(results) ? results.length : 'no'} call results for ${group.length} calls`,
-      }
+    ],
+  )
+  const simulated = blocks?.[0]?.calls
+  // Never report success for results that don't line up with the calls.
+  if (!Array.isArray(simulated) || simulated.length !== calls.length) {
+    return {
+      ok: false,
+      failedIndex: null,
+      revertData: null,
+      message: `eth_simulateV1 returned ${Array.isArray(simulated) ? simulated.length : 'no'} call results for ${calls.length} calls`,
     }
-    simulated.push(...results)
-    if (simulated.some((call) => call.status === '0x0')) break
   }
 
   const failedIndex = simulated.findIndex((call) => call.status === '0x0')
@@ -279,7 +272,13 @@ async function simulateWithEthCall(
 
   for (const [index, call] of calls.entries()) {
     const error = await ethCall(node, { ...call, from })
-    if (error) return ethCallFailure(`Call ${index + 1}`, index, error)
+    if (!error) continue
+    const failure = ethCallFailure(`Call ${index + 1}`, index, error)
+    // `eth_call` can't carry the earlier calls' state, so a later call may only
+    // revert for want of it: that's inconclusive, not a failure. A node error
+    // (no `failedIndex`) isn't about state and is reported.
+    if (index > 0 && !failure.ok && failure.failedIndex !== null) return ok
+    return failure
   }
   return ok
 }
@@ -287,11 +286,13 @@ async function simulateWithEthCall(
 /**
  * Predicts whether `calls` would succeed when sent from `from`, without mining
  * anything. Calls are simulated as `from`'s own, so no real sender setup is
- * needed. `atomic` calls share state and run together; otherwise each runs
- * alone against the current state.
+ * needed, and state always carries in call order: a call sees what the earlier
+ * ones did. `atomic` only chooses the fallback mechanism.
  *
  * Nodes with `eth_simulateV1` also report gas and balance changes. Others fall
- * back to `eth_call`, which only answers whether the batch reverts.
+ * back to `eth_call`, which only answers whether the batch reverts: an
+ * `atomic` batch runs as the account's own Kernel batch, while otherwise each
+ * call is called in turn (and only the first can be known to revert).
  */
 export async function simulateCalls(
   node: Node,
@@ -300,7 +301,7 @@ export async function simulateCalls(
   const { from, atomic, calls } = args
   if (!knownUnsupported(node.rpcUrl)) {
     try {
-      return await simulateV1(node, from, atomic, calls)
+      return await simulateV1(node, from, calls)
     } catch (e) {
       if (isMissingMethod(e)) unsupportedSince.set(node.rpcUrl, Date.now())
       else if (e instanceof WalletRpcError) return nodeError(e)

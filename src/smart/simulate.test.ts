@@ -58,6 +58,28 @@ const transfer = (to: Address, amount: bigint): Call => ({
   }),
 })
 
+const mint = (to: Address, amount: bigint): Call => ({
+  to: token,
+  data: encodeFunctionData({
+    abi: MockERC20.abi,
+    functionName: 'mint',
+    args: [to, amount],
+  }),
+})
+
+/** Burns `amount` of `owner`'s tokens (anyone may, on the mock). */
+async function burn(owner: Address, amount: bigint) {
+  await send(
+    DEV_ACCOUNTS[0],
+    token,
+    encodeFunctionData({
+      abi: MockERC20.abi,
+      functionName: 'burn',
+      args: [owner, amount],
+    }),
+  )
+}
+
 async function tokenBalance(owner: Address): Promise<bigint> {
   const result = await node.request<Hex>('eth_call', [
     {
@@ -249,31 +271,53 @@ describe('simulateCalls (eth_simulateV1)', () => {
     })
   })
 
-  test('atomic: false simulates each call alone, without carrying state', async () => {
-    // The account holds 7: two transfers of 5 can't both land in one batch.
-    await send(
-      DEV_ACCOUNTS[0],
-      token,
-      encodeFunctionData({
-        abi: MockERC20.abi,
-        functionName: 'burn',
-        args: [account, 93n],
-      }),
-    )
+  test('state carries in call order, whether or not the batch is atomic', async () => {
+    // The account holds 7: two transfers of 5 can't both land.
+    await burn(account, 93n)
     expect(await tokenBalance(account)).toBe(7n)
     const calls = [transfer(Y, 5n), transfer(Y, 5n)]
 
-    expect(
-      await simulateCalls(node, { from: account, atomic: true, calls }),
-    ).toMatchObject({ ok: false, failedIndex: 1 })
-    const result = await simulateCalls(node, {
-      from: account,
-      atomic: false,
-      calls,
-    })
-    expect(result.ok).toBe(true)
-    if (!result.ok) return
-    expect(result.gasUsed).toBeGreaterThan(0n)
+    for (const atomic of [true, false]) {
+      expect(
+        await simulateCalls(node, { from: account, atomic, calls }),
+      ).toMatchObject({ ok: false, failedIndex: 1 })
+    }
+  })
+
+  test('a call can depend on an earlier one, whether or not the batch is atomic', async () => {
+    // The account starts with nothing, so the transfer only works after the mint.
+    await burn(account, 100n)
+    expect(await tokenBalance(account)).toBe(0n)
+    const calls = [mint(account, 10n), transfer(Y, 10n)]
+
+    for (const atomic of [true, false]) {
+      const result = await simulateCalls(node, { from: account, atomic, calls })
+      expect(result.ok).toBe(true)
+      if (!result.ok) continue
+      expect(result.gasUsed).toBeGreaterThan(0n)
+      // Minted and sent on: no net change.
+      expect(result.balanceChanges).toEqual([])
+    }
+  })
+
+  test('both atomic values use a single eth_simulateV1 request', async () => {
+    let simulations = 0
+    const counting: Node = {
+      ...node,
+      request: ((method, params) => {
+        if (method === 'eth_simulateV1') simulations++
+        return node.request(method, params)
+      }) as Node['request'],
+    }
+    for (const atomic of [true, false]) {
+      simulations = 0
+      await simulateCalls(counting, {
+        from: account,
+        atomic,
+        calls: [{ to: X }, { to: Y }, transfer(Y, 1n)],
+      })
+      expect(simulations).toBe(1)
+    }
   })
 
   test('atomic: false reports the first failing call', async () => {
@@ -461,7 +505,7 @@ describe('simulateCalls (without eth_simulateV1)', () => {
     })
   })
 
-  test('non-atomic simulates each call and reports the failing one', async () => {
+  test('non-atomic calls each call in turn and reports a first-call failure', async () => {
     const { node: bare } = withoutSimulateV1()
     expect(
       await simulateCalls(bare, {
@@ -474,9 +518,58 @@ describe('simulateCalls (without eth_simulateV1)', () => {
       await simulateCalls(bare, {
         from: account,
         atomic: false,
-        calls: [{ to: X, value: 1n }, { to: REVERTER }],
+        calls: [{ to: REVERTER }, { to: X }],
       }),
-    ).toMatchObject({ ok: false, failedIndex: 1 })
+    ).toMatchObject({ ok: false, failedIndex: 0 })
+  })
+
+  test('non-atomic cannot tell that a later revert is only for want of earlier state', async () => {
+    await burn(account, 100n)
+    const { node: bare } = withoutSimulateV1()
+    const calls = [mint(account, 10n), transfer(Y, 10n)]
+    // Alone, the transfer reverts (the account holds nothing); after the mint
+    // it works, but `eth_call` can't see that.
+    expect(
+      await simulateCalls(bare, {
+        from: account,
+        atomic: false,
+        calls: [transfer(Y, 10n)],
+      }),
+    ).toMatchObject({ ok: false, failedIndex: 0 })
+    expect(
+      await simulateCalls(bare, { from: account, atomic: false, calls }),
+    ).toEqual({ ok: true, gasUsed: null, balanceChanges: null })
+    expect(
+      await simulateCalls(bare, {
+        from: account,
+        atomic: false,
+        calls: [{ to: X }, { to: REVERTER }],
+      }),
+    ).toEqual({ ok: true, gasUsed: null, balanceChanges: null })
+  })
+
+  test('non-atomic still reports a node error on a later call', async () => {
+    const { node: bare } = withoutSimulateV1()
+    let ethCalls = 0
+    const limited: Node = {
+      ...bare,
+      request: ((method, params) =>
+        method === 'eth_call' && ++ethCalls === 2
+          ? Promise.reject(new WalletRpcError(-32005, 'rate limited'))
+          : bare.request(method, params)) as Node['request'],
+    }
+    expect(
+      await simulateCalls(limited, {
+        from: account,
+        atomic: false,
+        calls: [{ to: X }, { to: Y }],
+      }),
+    ).toEqual({
+      ok: false,
+      failedIndex: null,
+      revertData: null,
+      message: 'rate limited',
+    })
   })
 
   test('the missing method is remembered for the node url, for a while', async () => {

@@ -4,6 +4,7 @@ import {
   type Hex,
   type RpcTransactionReceipt,
   encodeDeployData,
+  encodeFunctionData,
   getAddress,
   hexToBigInt,
   parseEther,
@@ -304,6 +305,59 @@ describe('rule 2: accounts that cannot batch atomically', () => {
     expect(await node.getBalance(DEVWALLET_SPONSOR)).toBe(0n)
   })
 
+  test('a call can depend on an earlier one in the batch', async () => {
+    const deployed = await executeCalls(
+      input({
+        account: plainAccount(DEV_ACCOUNTS[0]),
+        calls: [
+          {
+            data: encodeDeployData({
+              abi: MockERC20.abi,
+              bytecode: MockERC20.bytecode.object as Hex,
+              args: ['Mock', 'MCK', 18],
+            }),
+          },
+        ],
+      }),
+    )
+    const [deployment] = await receiptsOf(deployed)
+    const token = deployment?.contractAddress as Address
+    const call = (functionName: 'mint' | 'transfer', to: Address): Call => ({
+      to: token,
+      data: encodeFunctionData({
+        abi: MockERC20.abi,
+        functionName,
+        args: [to, 10n],
+      }),
+    })
+    // The account holds no tokens: the transfer only works after the mint.
+    const calls = [call('mint', account), call('transfer', Y)]
+
+    const result = await executeCalls(
+      input({ account: plainAccount(), calls }),
+    )
+
+    expect(result).toMatchObject({
+      path: 'sequential',
+      simulation: { ok: true },
+    })
+    expect(result.transactionHashes).toHaveLength(2)
+    const receipts = await receiptsOf(result)
+    expect(receipts.map((r) => r.status)).toEqual(['0x1', '0x1'])
+    const balance = await node.request<Hex>('eth_call', [
+      {
+        to: token,
+        data: encodeFunctionData({
+          abi: MockERC20.abi,
+          functionName: 'balanceOf',
+          args: [Y],
+        }),
+      },
+      'latest',
+    ])
+    expect(hexToBigInt(balance)).toBe(10n)
+  })
+
   test('a kernel account in a plain mode also sends sequentially', async () => {
     const plan = await planExecution(
       input({
@@ -318,7 +372,7 @@ describe('rule 2: accounts that cannot batch atomically', () => {
     expect(plan.path).toBe('sequential')
   })
 
-  test('calls are simulated one by one, and a failure is refused with code 3', async () => {
+  test('a failing call is refused with code 3', async () => {
     const before = await node.blockNumber()
     const calls: Call[] = [{ to: X, value: 1n }, { to: REVERTER }]
 
