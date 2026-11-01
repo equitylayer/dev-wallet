@@ -202,3 +202,31 @@ export function describeTypedData(td: TypedDataInput): DescribedTypedData {
     fields,
   }
 }
+
+/**
+ * Typed data as a request carries it: JSON, though some dApps send the object
+ * itself. `null` when it isn't typed data; a missing message shows its
+ * fields empty.
+ */
+export function parseTypedData(data: unknown): DescribedTypedData | null {
+  try {
+    const td = (
+      typeof data === 'string' ? JSON.parse(data) : data
+    ) as TypedDataInput
+    if (typeof td !== 'object' || td === null || !td.types) return null
+    return describeTypedData({ ...td, message: td.message ?? {} })
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The notice a typed-data signature needs (R34): Kernel's ERC-1271 wrapper
+ * signs a bare hash, which can authorize whatever it commits to, so it gets
+ * the hash warning, as a 32-byte message does; other typed data, none.
+ */
+export function typedDataNotice(
+  described: DescribedTypedData | null,
+): 'hash' | null {
+  return described?.kind === 'kernel-1271' ? 'hash' : null
+}

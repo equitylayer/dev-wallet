@@ -1,33 +1,18 @@
-import { useMemo } from 'react'
-
 import { Box, Text } from '~/design-system'
 import { asSent } from '~/utils/asSent'
-import {
-  type DescribedTypedData,
-  type TypedDataInput,
-  describeTypedData,
-} from '~/utils/typedData'
+import type { DescribedTypedData } from '~/utils/typedData'
 
 import * as styles from './approval.css'
 import { Empty, Notice, Section } from './parts'
 
-/** Typed data comes as JSON, though some dApps send the object itself. */
-function parse(data: unknown): DescribedTypedData | null {
-  try {
-    const td = (
-      typeof data === 'string' ? JSON.parse(data) : data
-    ) as TypedDataInput
-    if (typeof td !== 'object' || td === null || !td.types) return null
-    return describeTypedData({ ...td, message: td.message ?? {} })
-  } catch {
-    return null
-  }
-}
-
-/** Typed data as what it means: Kernel's ERC-1271 wrapper, or its fields. */
-export function TypedDataView({ data }: { data: unknown }) {
-  const described = useMemo(() => parse(data), [data])
-
+/**
+ * Typed data as what it means (`parseTypedData`): Kernel's ERC-1271 wrapper,
+ * or its fields; `data` as sent when it isn't typed data.
+ */
+export function TypedDataView({
+  data,
+  described,
+}: { data: unknown; described: DescribedTypedData | null }) {
   if (!described)
     return (
       <Section title="Data">
@@ -61,7 +46,9 @@ export function TypedDataView({ data }: { data: unknown }) {
           <Box paddingTop="12px">
             <Text color="text/tertiary" size="12px">
               Kernel {described.version}, chain {described.chainId}. DevWallet
-              signs it with the account's key, as a plain signature.
+              signs it with the account's key, as a plain signature. A
+              contract that asks the account (ERC-1271) takes it as the
+              account's signature of the inner hash.
             </Text>
           </Box>
         </Box>

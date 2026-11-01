@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { describeTypedData } from './typedData'
+import { describeTypedData, parseTypedData, typedDataNotice } from './typedData'
 
 const ACCOUNT = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
 const HASH =
@@ -284,5 +284,43 @@ describe('the domain that gets signed', () => {
       ],
       disputed: ['purpose'],
     })
+  })
+})
+
+describe('parseTypedData', () => {
+  test('reads typed data sent as JSON, or as the object itself', () => {
+    expect(parseTypedData(JSON.stringify(kernelWrapper()))).toMatchObject({
+      kind: 'kernel-1271',
+      account: ACCOUNT,
+    })
+    expect(parseTypedData(permitSingle())).toMatchObject({ kind: 'generic' })
+  })
+
+  test('a missing message shows its fields empty', () => {
+    const { message: _, ...td } = permitSingle()
+    expect(parseTypedData(td)).toMatchObject({
+      kind: 'generic',
+      fields: [
+        { path: 'details', value: '' },
+        { path: 'spender', value: '' },
+        { path: 'sigDeadline', value: '' },
+      ],
+    })
+  })
+
+  test('anything else is not typed data', () => {
+    for (const data of ['{', '"text"', null, 7, {}, { types: null }])
+      expect(parseTypedData(data)).toBeNull()
+  })
+})
+
+describe('typedDataNotice (R34)', () => {
+  test("Kernel's ERC-1271 wrapper signs a bare hash: it gets the hash warning", () => {
+    expect(typedDataNotice(parseTypedData(kernelWrapper()))).toBe('hash')
+  })
+
+  test('other typed data, or none, gets no notice', () => {
+    expect(typedDataNotice(parseTypedData(permitSingle()))).toBeNull()
+    expect(typedDataNotice(null)).toBeNull()
   })
 })

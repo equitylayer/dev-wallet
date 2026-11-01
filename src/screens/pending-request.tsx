@@ -23,6 +23,7 @@ import {
   signNotice,
 } from '~/utils/signRequest'
 import type { RpcTransaction } from '~/utils/transactionForm'
+import { parseTypedData, typedDataNotice } from '~/utils/typedData'
 import { useAccountStore } from '~/zustand'
 import type { PendingRequest } from '~/zustand/pending-requests'
 
@@ -292,20 +293,33 @@ function SignMessageRequest({
   )
 }
 
+/**
+ * `eth_signTypedData_v4`: the domain and message as fields. Kernel's ERC-1271
+ * wrapper signs a bare hash, so it gets `eth_sign`'s hash warning, and
+ * Approve says what it does (R34).
+ */
 function SignTypedDataRequest({
   request,
 }: { request: ExtractRequest<'eth_signTypedData_v4'> }) {
   const [address, data] = request.params
+  const described = useMemo(() => parseTypedData(data), [data])
+  const hash = typedDataNotice(described) === 'hash'
   return (
     <ApprovalFrame
       title="Sign typed data"
       subtitle={originOf(request)}
-      footer={<DecisionActions request={request} />}
+      footer={
+        <DecisionActions
+          request={request}
+          {...(hash && { approve: 'Sign hash', risky: true })}
+        />
+      }
     >
       <Box className={styles.block}>
         <AddressLine label="Account" address={address} />
+        {hash && <SignNotice kind="hash" />}
       </Box>
-      <TypedDataView data={data} />
+      <TypedDataView data={data} described={described} />
     </ApprovalFrame>
   )
 }
