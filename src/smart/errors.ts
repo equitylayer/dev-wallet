@@ -23,19 +23,42 @@ export function unauthorizedAccount(address: string): WalletRpcError {
   )
 }
 
+/**
+ * Any thrown error with a numeric `code` keeps `{ code, message, data }`:
+ * wallet errors, and node errors viem throws over HTTP (`RpcRequestError`, when
+ * a hosted RPC answers a JSON-RPC error with a non-2xx status). Everything else,
+ * including Node system errors whose `code` is a string (`'ECONNREFUSED'`),
+ * becomes `-32603`.
+ */
 export function serializeError(e: unknown): {
   code: number
   message: string
   data?: unknown
 } {
-  if (e instanceof WalletRpcError)
-    return {
-      code: e.code,
-      message: e.message,
-      ...(e.data !== undefined && { data: e.data }),
-    }
+  if (typeof e === 'object' && e !== null) {
+    const { code, data } = e as { code?: unknown; data?: unknown }
+    if (typeof code === 'number' && Number.isInteger(code))
+      return {
+        code,
+        message: messageOf(e),
+        ...(data !== undefined && { data }),
+      }
+  }
   return {
     code: INTERNAL_ERROR,
     message: e instanceof Error ? e.message : String(e),
   }
+}
+
+function messageOf(e: object): string {
+  const { details, message, shortMessage } = e as {
+    details?: unknown
+    message?: unknown
+    shortMessage?: unknown
+  }
+  // viem decorates `message` with the request and a version line; `details`
+  // holds the node's own text.
+  if (typeof shortMessage === 'string' && typeof details === 'string' && details)
+    return details
+  return typeof message === 'string' ? message : String(e)
 }

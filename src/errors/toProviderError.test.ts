@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test'
+import { RpcRequestError } from 'viem'
 
 import { WalletRpcError, serializeError } from '~/smart/errors'
 
@@ -118,4 +119,61 @@ test('a serialized WalletRpcError round-trips through toProviderError', () => {
   ) as ProviderRpcError
   expect(noData.code).toBe(5760)
   expect(noData.data).toBeUndefined()
+})
+
+// viem's HttpRpcClient throws this when a node answers a JSON-RPC error with a
+// non-2xx HTTP status (hosted RPCs do).
+test('serializeError keeps code, data and the node message of a viem RpcRequestError', () => {
+  const error = new RpcRequestError({
+    body: { method: 'eth_call', id: 1 },
+    error: { code: 3, message: 'execution reverted', data: '0xdead' },
+    status: 400,
+    url: 'https://rpc.example',
+  })
+  // The decorated message buries the node's text.
+  expect(error.message).not.toBe('execution reverted')
+
+  expect(serializeError(error)).toStrictEqual({
+    code: 3,
+    message: 'execution reverted',
+    data: '0xdead',
+  })
+})
+
+test('a serialized RpcRequestError reaches the dApp with its revert data', () => {
+  const error = toProviderError(
+    serializeError(
+      new RpcRequestError({
+        body: {},
+        error: { code: 3, message: 'execution reverted', data: '0xdead' },
+        status: 400,
+        url: 'https://rpc.example',
+      }),
+    ),
+  ) as ProviderRpcError
+  expect(error.code).toBe(3)
+  expect(error.data).toBe('0xdead')
+  expect(error.message).toBe('execution reverted')
+})
+
+test('serializeError keeps the code of any error with a numeric code', () => {
+  const error = Object.assign(new Error('nope'), { code: 4001, data: { a: 1 } })
+  expect(serializeError(error)).toStrictEqual({
+    code: 4001,
+    message: 'nope',
+    data: { a: 1 },
+  })
+  expect(
+    serializeError(Object.assign(new Error('nope'), { code: -32000 })),
+  ).toStrictEqual({ code: -32000, message: 'nope' })
+})
+
+test('serializeError maps string codes (Node system errors) to -32603', () => {
+  const error = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:8545'), {
+    code: 'ECONNREFUSED',
+  })
+  expect(serializeError(error)).toStrictEqual({
+    code: -32603,
+    message: 'connect ECONNREFUSED 127.0.0.1:8545',
+  })
 })

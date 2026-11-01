@@ -1,5 +1,7 @@
 import { expect, test } from 'bun:test'
 
+import { WalletRpcError } from '~/smart/errors'
+
 import {
   SIGNATURE_METHODS,
   TRANSACTION_METHODS,
@@ -7,6 +9,7 @@ import {
   opensSidebar,
   permissionsFor,
   requiresApproval,
+  withSerializedErrors,
 } from './methods'
 
 test('method lists', () => {
@@ -121,4 +124,51 @@ test('assertEthAccountsRequest rejects malformed params with -32602', () => {
   expect(rejected([{ eth_accounts: 'yes' }])).toBe(-32602)
   expect(rejected({ eth_accounts: {} })).toBe(-32602)
   expect(rejected([{ eth_accounts: {} }, { eth_accounts: {} }])).toBe(-32602)
+})
+
+test('withSerializedErrors keeps the code of a thrown WalletRpcError', async () => {
+  const handler = withSerializedErrors(async () => {
+    throw new WalletRpcError(5760, 'no', { why: 'x' })
+  })
+  expect(await handler({ request: { id: 7 } }, {})).toEqual({
+    id: 7,
+    jsonrpc: '2.0',
+    error: { code: 5760, message: 'no', data: { why: 'x' } },
+  })
+})
+
+test('withSerializedErrors turns a plain Error into -32603', async () => {
+  const handler = withSerializedErrors(async () => {
+    throw new Error('boom')
+  })
+  expect(await handler({ request: { id: 8 } }, {})).toStrictEqual({
+    id: 8,
+    jsonrpc: '2.0',
+    error: { code: -32603, message: 'boom' },
+  })
+})
+
+test('withSerializedErrors never replies with a string error', async () => {
+  const handler = withSerializedErrors(async () => {
+    throw 'a string'
+  })
+  const reply = await handler({ request: { id: 9 } }, {})
+  expect(typeof reply.error).toBe('object')
+  expect(reply.error).toStrictEqual({ code: -32603, message: 'a string' })
+})
+
+test('withSerializedErrors passes a normal reply through, with its arguments', async () => {
+  const seen: unknown[] = []
+  const handler = withSerializedErrors(async (payload, meta) => {
+    seen.push(payload, meta)
+    return { id: 1, jsonrpc: '2.0', result: '0x1' } as const
+  })
+  const payload = { request: { id: 1 } }
+  const meta = { sender: 'tab' }
+  expect(await handler(payload, meta)).toEqual({
+    id: 1,
+    jsonrpc: '2.0',
+    result: '0x1',
+  })
+  expect(seen).toEqual([payload, meta])
 })

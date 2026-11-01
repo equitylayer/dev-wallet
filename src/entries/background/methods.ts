@@ -1,7 +1,8 @@
 // Chrome-free on purpose: the background handler, the side-panel opener and the
 // unit tests all share these lists, so nothing here may import a store or
 // `chrome.*`. Settings are passed in.
-import { INVALID_PARAMS, WalletRpcError } from '~/smart/errors'
+import { INVALID_PARAMS, WalletRpcError, serializeError } from '~/smart/errors'
+import type { RpcResponse } from '~/types/rpc'
 
 export const SIGNATURE_METHODS = [
   'eth_sign',
@@ -88,4 +89,28 @@ export function assertEthAccountsRequest(params: unknown): void {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * Wraps a request handler so anything it throws goes back as a JSON-RPC error
+ * object. The messenger would otherwise reduce a throw to its message and lose
+ * the code and data that dApps read (3, 4001, 5700-5760, ...).
+ */
+export function withSerializedErrors<
+  TPayload extends { request: { id: number } },
+  TMeta,
+>(
+  handler: (payload: TPayload, meta: TMeta) => Promise<RpcResponse>,
+): (payload: TPayload, meta: TMeta) => Promise<RpcResponse> {
+  return async (payload, meta) => {
+    try {
+      return await handler(payload, meta)
+    } catch (error) {
+      return {
+        id: payload.request.id,
+        jsonrpc: '2.0',
+        error: serializeError(error),
+      }
+    }
+  }
 }

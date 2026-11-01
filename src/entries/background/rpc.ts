@@ -14,8 +14,6 @@ import {
   UserRejectedRequestError,
 } from '~/errors'
 import { type Messenger, getMessenger } from '~/messengers'
-import type { CallbackFunction } from '~/messengers/transports/types'
-import { serializeError } from '~/smart/errors'
 import { connectNode, nodeMethod } from '~/smart/node'
 import type { RpcRequest, RpcResponse } from '~/types/rpc'
 import {
@@ -30,35 +28,12 @@ import {
   assertEthAccountsRequest,
   permissionsFor,
   requiresApproval,
+  withSerializedErrors,
 } from './methods'
 import { type Decision, requestUserDecision } from './pending-requests'
 
 const inpageMessenger = getMessenger('background:inpage')
 const walletMessenger = getMessenger('background:wallet')
-
-type RequestHandler = CallbackFunction<
-  { request: RpcRequest; rpcUrl?: string },
-  RpcResponse
->
-
-/**
- * Anything thrown while handling a request goes back as a JSON-RPC error
- * object. The messenger would otherwise reduce it to its message and lose the
- * code and data that dApps read (3, 4001, 5700-5760, ...).
- */
-function withSerializedErrors(handler: RequestHandler): RequestHandler {
-  return async (payload, meta) => {
-    try {
-      return await handler(payload, meta)
-    } catch (error) {
-      return {
-        id: payload.request.id,
-        jsonrpc: '2.0',
-        error: serializeError(error),
-      } as RpcResponse
-    }
-  }
-}
 
 export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
   messenger.reply('request', withSerializedErrors(async (payload, meta) => {
@@ -73,6 +48,8 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
 
     const { getSession } = sessionsStore.getState()
     const host = new URL(meta.sender.url || '').host
+    // `file://` pages report the opaque origin `'null'`.
+    const origin = meta.sender.origin ?? new URL(meta.sender.url || '').origin
     const session = getSession({ host })
 
     const hasOnboarded = isInpage ? networkStore.getState().onboarded : rpcUrl
@@ -94,6 +71,8 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
           jsonrpc: '2.0',
           error: {
             code: UnauthorizedProviderError.code,
+            message:
+              'The requested account and/or method has not been authorized by the user.',
           },
         } as RpcResponse
 
@@ -174,7 +153,7 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
         return {
           id: request.id,
           jsonrpc: '2.0',
-          result: permissionsFor(new URL(meta.sender.url || '').origin, true),
+          result: permissionsFor(origin, true),
         } as RpcResponse
       }
 
@@ -182,10 +161,7 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
         return {
           id: request.id,
           jsonrpc: '2.0',
-          result: permissionsFor(
-            new URL(meta.sender.url || '').origin,
-            !!session,
-          ),
+          result: permissionsFor(origin, !!session),
         } as RpcResponse
       }
 
