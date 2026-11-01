@@ -6,6 +6,8 @@ import {
   UnsupportedProviderMethodError,
 } from '~/errors'
 import { type Messenger, getMessenger } from '~/messengers'
+import type { Schema } from '~/messengers/schema'
+import type { CallbackOptions } from '~/messengers/transports/types'
 import { serializeError } from '~/smart/errors'
 import { connectNode, nodeMethod } from '~/smart/node'
 import { DEVWALLET_ORIGIN } from '~/smart/queue'
@@ -39,12 +41,36 @@ const walletMessenger = getMessenger('background:wallet')
 /** How long `eth_accounts` waits for a reconcile before answering anyway. */
 const ETH_ACCOUNTS_RECONCILE_MS = 1500
 
+// A page picks its own JSON-RPC ids, so two tabs (or a page on purpose) can
+// send the same one; and the pending requests, the decisions and the batch
+// queue are all keyed by id. So each request gets an id of the background's
+// own, and the page gets its id back. Ids count up from the clock at each
+// worker start, so they never meet those of requests an earlier worker
+// persisted.
+let lastRequestId = Date.now() * 1000
+
+function nextRequestId(): number {
+  return ++lastRequestId
+}
+
 export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
   // Only extension pages may use the wallet channel: what comes on it comes
   // from DevWallet's own screens.
   const fromWallet = messenger.connection === 'background:wallet'
 
   messenger.reply('request', withSerializedErrors(async (payload, meta) => {
+    const response = await handle(
+        { ...payload, request: { ...payload.request, id: nextRequestId() } },
+        meta,
+    )
+    return { ...response, id: payload.request.id }
+  }))
+
+  /** Answers a request that carries the background's own id. */
+  async function handle(
+    payload: Schema['request'][0],
+    meta: CallbackOptions,
+  ): Promise<RpcResponse> {
     const { request, rpcUrl: rpcUrl_ } = payload
     const isInpage =
         meta.sender.tab &&
@@ -250,7 +276,7 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
     }
 
     return execute(rpcUrl, rpcClient, request)
-  }))
+  }
 }
 
 function declinedResponse(

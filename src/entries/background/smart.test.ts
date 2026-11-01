@@ -165,6 +165,7 @@ const { closeStaleBatch, setupBatchQueue } = await import('./batch-queue')
 const { requestUserDecision, setupPendingRequests } = await import(
   './pending-requests'
 )
+const { setupRpcHandler } = await import('./rpc')
 setupSmartHandlers()
 setupBatchQueue()
 setupPendingRequests()
@@ -1136,6 +1137,96 @@ describe('batch queue', () => {
       await closeStaleBatch()
       expect(queueNow()).toBe(open)
     })
+  })
+})
+
+describe('request ids', () => {
+  type Handler = (payload: unknown, meta: unknown) => Promise<RpcResponse>
+  let rpcHandler: Handler | undefined
+  setupRpcHandler({
+    messenger: {
+      connection: 'background:inpage',
+      reply: (_topic: string, handler: Handler) => {
+        rpcHandler = handler
+        return () => {}
+      },
+    } as unknown as Parameters<typeof setupRpcHandler>[0]['messenger'],
+  })
+
+  /** A page in tab `tab` sends a transfer with JSON-RPC id 7. */
+  function fromPage(tab: number, host: string) {
+    if (!rpcHandler) throw new Error('no rpc handler')
+    return rpcHandler(
+      {
+        request: {
+          id: 7,
+          method: 'eth_sendTransaction',
+          params: [{ from: smart, ...transfer }],
+        },
+        rpcUrl,
+      },
+      {
+        sender: {
+          tab: { id: tab, url: `https://${host}/` },
+          url: `https://${host}/`,
+          origin: `https://${host}`,
+          frameId: 0,
+        },
+      },
+    )
+  }
+  const pendingFrom = (tab: number) =>
+    pendingRequests.find((r) => r.sender?.tab?.id === tab) as RpcRequest
+  const decide = (request: RpcRequest, status: string) =>
+    handlers.get('pendingRequest')?.({ request, status })
+
+  async function bothPending() {
+    for (let i = 0; i < 300 && pendingRequests.length < 2; i++) {
+      await Bun.sleep(10)
+    }
+    expect(pendingRequests).toHaveLength(2)
+    expect(pendingFrom(1).id).not.toBe(pendingFrom(2).id)
+    expect([pendingFrom(1).id, pendingFrom(2).id]).not.toContain(7)
+  }
+
+  test('two tabs sending the same id get their own decisions, and their own id back', async () => {
+    const a = fromPage(1, 'a.test')
+    const b = fromPage(2, 'b.test')
+    await bothPending()
+
+    await decide(pendingFrom(2), 'rejected')
+    await decide(pendingFrom(1), 'approved')
+    const [answerA, answerB] = await Promise.all([a, b])
+    const hash = answerA.result as Hex
+    expect(answerA).toEqual({ id: 7, jsonrpc: '2.0', result: hash })
+    expect(hash).toMatch(/^0x[0-9a-f]{64}$/)
+    expect(answerB).toMatchObject({ id: 7, error: { code: 4001 } })
+    await waitForReceipt(node, hash)
+    expect(await node.getBalance(X)).toBe(1n)
+  })
+
+  test('two tabs sending the same id both wait in the batch, and both get the hash', async () => {
+    const a = fromPage(1, 'a.test')
+    const b = fromPage(2, 'b.test')
+    await bothPending()
+
+    await decide(pendingFrom(1), 'batched')
+    await decide(pendingFrom(2), 'batched')
+    const queue = batchQueue.get().queue
+    expect(queue?.items.map((i) => i.origin)).toEqual(['a.test', 'b.test'])
+    expect(new Set(queue?.items.map((i) => i.requestId)).size).toBe(2)
+
+    expect(await handlers.get('batchQueue')?.({ action: 'sign' })).toEqual({
+      ok: true,
+    })
+    const [answerA, answerB] = await Promise.all([a, b])
+    const hash = answerA.result as Hex
+    expect(hash).toMatch(/^0x[0-9a-f]{64}$/)
+    for (const answer of [answerA, answerB]) {
+      expect(answer).toEqual({ id: 7, jsonrpc: '2.0', result: hash })
+    }
+    await waitForReceipt(node, hash)
+    expect(await node.getBalance(X)).toBe(2n)
   })
 })
 
