@@ -51,8 +51,7 @@ export function AccountPlate({
       </Box>
 
       {/* Smart-account slot: the mode, delegation and payer line goes here
-          once engineering stores it (docs/superpowers/specs/2026-11-01-smart-
-          accounts-design.md). Until then it renders nothing. */}
+          once engineering stores it. Until then it renders nothing. */}
 
       {mode === 'edit' ? (
         <EditState

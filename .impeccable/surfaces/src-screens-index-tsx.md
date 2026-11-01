@@ -17,7 +17,7 @@ Confirmed decisions (2026-11-01):
 - Smart-account data (mode, Kernel delegation, sponsor, EntryPoint nonce): design the slots now, but render nothing until engineering stores the data (see docs/superpowers/specs/2026-11-01-smart-accounts-design.md §1, §10). Never claim a mode the store doesn't have.
 - Batching ("Add to batch", queue, review) is owned by the smart-accounts work. This surface only reserves the slot under the account actions.
 - Type scale steps up to 13/12/11px. Units moved from 10px to 11px after the detector flagged them, so the floor is a flat 11px.
-- Comp: `.impeccable/mocks/comp/account-home.html` (2026-11-01) refines the chosen `.impeccable/mocks/decision/account-desk.html` sketch. The user didn't review it before the build ("judt do it. if we dont like it we do later"), so it is the working reference, not a user-approved comp.
+- Comp: `.impeccable/mocks/comp/account-home.html` (2026-11-01; mocks are kept locally and gitignored) refines the chosen `.impeccable/mocks/decision/account-desk.html` sketch. The user didn't review it before the build ("judt do it. if we dont like it we do later"), so it is the working reference, not a user-approved comp.
 - Build adaptations, after the finish review (2026-11-01):
   - No label above the alias: eyebrows are banned by the craft floor.
   - With no alias, the title slot reads "Add alias" (tertiary) instead of repeating the address.

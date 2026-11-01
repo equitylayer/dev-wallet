@@ -34,10 +34,13 @@ test/contracts/out
 .claude/
 
 *.pem
+
 # Local agent tooling and scratch output
 .superpowers/
 .impeccable/preview/
 .impeccable/review/
+.impeccable/mocks/
+docs/superpowers/
 .github/agents/
 .github/hooks/
 .github/skills/
