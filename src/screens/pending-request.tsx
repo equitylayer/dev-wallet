@@ -14,6 +14,7 @@ import * as styles from '~/components/approval/approval.css'
 import { Box, Text } from '~/design-system'
 import { sendTransactionCall } from '~/smart/transaction-call'
 import { type RpcCall, toRpcCall } from '~/smart/types'
+import { asSent } from '~/utils/asSent'
 import {
   canonicalParams,
   payloadBytes,
@@ -174,10 +175,6 @@ function SendTransactionRequest({
 
 ////////////////////////////////////////////////////////////////////////
 // Signatures: plain signatures by the account's key, in every mode
-
-/** A payload the node can't decode, as the site sent it. */
-const asSent = (data: unknown) =>
-  typeof data === 'string' ? data : JSON.stringify(data)
 
 /**
  * The request as the decision forwards it: its payload as the 0x-prefixed

@@ -45,7 +45,8 @@ export type SignNoticeKind = 'hash' | 'prefixed' | 'refused'
  * The notice a signature request needs: `hash` warns that a 32-byte payload
  * can authorize a transaction or user operation; `prefixed` notes that
  * `eth_sign` signs its data as a prefixed personal message; `refused` says
- * the node won't sign a payload that isn't hex; `null`, none.
+ * the node won't sign the payload (neither hex nor an array of bytes); `null`,
+ * none.
  */
 export function signNotice(
   method: 'eth_sign' | 'personal_sign',

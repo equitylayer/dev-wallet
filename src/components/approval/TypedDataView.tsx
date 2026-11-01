@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 
 import { Box, Text } from '~/design-system'
+import { asSent } from '~/utils/asSent'
 import {
   type DescribedTypedData,
   type TypedDataInput,
@@ -36,7 +37,7 @@ export function TypedDataView({ data }: { data: unknown }) {
           </Text>
           <Box className={styles.hexBox}>
             <Text family="mono" size="12px" wrap="anywhere">
-              {typeof data === 'string' ? data : JSON.stringify(data)}
+              {asSent(data)}
             </Text>
           </Box>
         </Box>
