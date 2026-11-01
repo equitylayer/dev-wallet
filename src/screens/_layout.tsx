@@ -56,7 +56,8 @@ export default function Layout() {
       {showOfflineBanner && <OfflineBanner />}
       <Box className={styles.content}>
         {hasPendingRequest ? (
-          <PendingRequest request={pendingRequest} />
+          // A new request starts over: no edits, previews or state carried.
+          <PendingRequest key={pendingRequest.id} request={pendingRequest} />
         ) : (
           <Outlet />
         )}

@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 
 import { batchQueue } from '~/actions'
 import { StartBatch } from '~/components/BatchBar'
+import { ConfirmActions, useConfirm } from '~/components/Confirm'
 import {
   ApprovalFrame,
   CallRow,
@@ -37,7 +38,8 @@ export default function BatchReview() {
   const { account } = useAccountStore()
   const navigate = useNavigate()
 
-  if (queue) return <Review queue={queue} />
+  // Another batch starts with no question pending.
+  if (queue) return <Review key={queue.openedAt} queue={queue} />
   return (
     <ApprovalFrame title="Batch" onClose={() => navigate('/')}>
       <Empty>No batch is open.</Empty>
@@ -83,10 +85,13 @@ function Review({ queue }: { queue: BatchQueue }) {
     }
   }
 
+  // Discarding rejects every waiting request: it asks first.
+  const confirmDiscard = useConfirm()
   async function discard() {
     setBusy(true)
     const discarded = await batchQueue({ action: 'discard' })
     setBusy(false)
+    confirmDiscard.cancel()
     if (discarded) navigate('/')
   }
 
@@ -102,27 +107,24 @@ function Review({ queue }: { queue: BatchQueue }) {
       onClose={() => navigate('/')}
       footer={
         <Box className={styles.actions}>
-          <Box className={styles.fit}>
-            <Button
+          {confirmDiscard.asking ? (
+            <ConfirmActions
+              confirm={`Discard ${plural(items.length, 'request')}`}
               disabled={busy}
               height="28px"
-              variant="stroked red"
-              width="fit"
-              onClick={discard}
-            >
-              Discard
-            </Button>
-          </Box>
-          <Box className={styles.grow}>
-            <Button
-              disabled={busy || simulating || items.length === 0}
-              height="28px"
-              variant={anyway ? 'stroked red' : 'solid invert'}
-              onClick={sign}
-            >
-              {anyway ? 'Sign anyway' : 'Sign batch'}
-            </Button>
-          </Box>
+              onConfirm={discard}
+              onCancel={confirmDiscard.cancel}
+            />
+          ) : (
+            <BatchActions
+              busy={busy}
+              signDisabled={simulating || items.length === 0}
+              anyway={anyway}
+              // An empty batch rejects nothing: no need to ask.
+              onDiscard={items.length > 0 ? confirmDiscard.ask : discard}
+              onSign={sign}
+            />
+          )}
         </Box>
       }
     >
@@ -166,6 +168,47 @@ function Review({ queue }: { queue: BatchQueue }) {
   )
 }
 
+/** Discard, and Sign batch, which reads "Sign anyway" over a predicted revert. */
+function BatchActions({
+  busy,
+  signDisabled,
+  anyway,
+  onDiscard,
+  onSign,
+}: {
+  busy: boolean
+  signDisabled: boolean
+  anyway: boolean
+  onDiscard: () => void
+  onSign: () => void
+}) {
+  return (
+    <>
+      <Box className={styles.fit}>
+        <Button
+          disabled={busy}
+          height="28px"
+          variant="stroked red"
+          width="fit"
+          onClick={onDiscard}
+        >
+          Discard
+        </Button>
+      </Box>
+      <Box className={styles.grow}>
+        <Button
+          disabled={busy || signDisabled}
+          height="28px"
+          variant={anyway ? 'stroked red' : 'solid invert'}
+          onClick={onSign}
+        >
+          {anyway ? 'Sign anyway' : 'Sign batch'}
+        </Button>
+      </Box>
+    </>
+  )
+}
+
 /**
  * One request in the batch, with where it came from. A `wallet_sendCalls`
  * moves and leaves as a whole. Removing it rejects the site's request.
@@ -188,6 +231,8 @@ function QueuedRequest({
 }) {
   const { requestId } = item
   const move = (to: number) => batchQueue({ action: 'move', requestId, to })
+  // Removing rejects the site's request: it asks first.
+  const confirmRemove = useConfirm()
 
   return (
     <div className={styles.request}>
@@ -206,36 +251,46 @@ function QueuedRequest({
             </Box>
           </Box>
         </Box>
-        <Box className={styles.tools}>
-          <button
-            type="button"
-            aria-label="Move up"
-            className={styles.toolButton}
-            disabled={disabled || position === 0}
-            onClick={() => move(position - 1)}
-          >
-            <ArrowUp size={14} strokeWidth={1.75} />
-          </button>
-          <button
-            type="button"
-            aria-label="Move down"
-            className={styles.toolButton}
-            disabled={disabled || last}
-            onClick={() => move(position + 1)}
-          >
-            <ArrowDown size={14} strokeWidth={1.75} />
-          </button>
-          <button
-            type="button"
-            aria-label="Remove from the batch"
-            title="Remove from the batch: the site's request is rejected"
-            className={styles.toolButton}
+        {confirmRemove.asking ? (
+          <ConfirmActions
+            confirm="Reject and remove"
             disabled={disabled}
-            onClick={() => batchQueue({ action: 'remove', requestId })}
-          >
-            <X size={14} strokeWidth={1.75} />
-          </button>
-        </Box>
+            height="24px"
+            onConfirm={() => batchQueue({ action: 'remove', requestId })}
+            onCancel={confirmRemove.cancel}
+          />
+        ) : (
+          <Box className={styles.tools}>
+            <button
+              type="button"
+              aria-label="Move up"
+              className={styles.toolButton}
+              disabled={disabled || position === 0}
+              onClick={() => move(position - 1)}
+            >
+              <ArrowUp size={14} strokeWidth={1.75} />
+            </button>
+            <button
+              type="button"
+              aria-label="Move down"
+              className={styles.toolButton}
+              disabled={disabled || last}
+              onClick={() => move(position + 1)}
+            >
+              <ArrowDown size={14} strokeWidth={1.75} />
+            </button>
+            <button
+              type="button"
+              aria-label="Remove from the batch"
+              title="Remove from the batch: the site's request is rejected"
+              className={styles.toolButton}
+              disabled={disabled}
+              onClick={confirmRemove.ask}
+            >
+              <X size={14} strokeWidth={1.75} />
+            </button>
+          </Box>
+        )}
       </div>
       {item.calls.map((call, index) => (
         <CallRow

@@ -40,8 +40,9 @@ export function useSendPreview({
   const sender = from ?? account?.address
   const { rpcUrl } = network
 
+  const enabled = Boolean(rpcUrl && sender && calls.length > 0)
   const query = useQuery({
-    enabled: Boolean(rpcUrl && sender && calls.length > 0),
+    enabled,
     queryKey: ['previewSend', rpcUrl, sender, method, atomicRequired, calls],
     queryFn: () =>
       backgroundMessenger.send('previewSend', {
@@ -54,15 +55,18 @@ export function useSendPreview({
     // Never persisted, never reused across approvals.
     gcTime: 0,
     staleTime: 0,
-    placeholderData: keepPreviousData,
+    // While other calls are simulated, the last preview stays, marked as
+    // placeholder; with nothing to simulate, none does.
+    placeholderData: enabled ? keepPreviousData : undefined,
   })
 
   // The chain moved on: simulate again, keeping the preview on screen.
   const { data: block } = usePendingBlock()
   const blockNumber = block?.number
-  const { refetch, isSuccess } = query
+  // A failed refresh tries again too.
+  const { refetch, isPending } = query
   useEffect(() => {
-    if (isSuccess) void refetch({ cancelRefetch: false })
+    if (!isPending) void refetch({ cancelRefetch: false })
   }, [blockNumber])
 
   return query

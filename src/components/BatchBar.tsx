@@ -1,40 +1,41 @@
 import { Layers } from 'lucide-react'
-import { useState, useSyncExternalStore } from 'react'
+import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { batchQueue } from '~/actions'
 import { Box, Button, Text } from '~/design-system'
-import { useBytecode } from '~/hooks/useBytecode'
-import { classifyCode } from '~/smart/kernel'
-import { defaultMode } from '~/smart/mode-rules'
+import { useResolvedMode } from '~/hooks/useResolvedMode'
 import { flattenQueue, waitingSites } from '~/smart/queue'
-import type { AccountMode } from '~/smart/types'
 import { truncate } from '~/utils'
-import {
-  accountModesStore,
-  modeKey,
-  useBatchQueue,
-  useNetworkStore,
-} from '~/zustand'
+import type { BatchQueue } from '~/smart/queue'
+import { useBatchQueue, useNetworkStore } from '~/zustand'
 import type { Account } from '~/zustand/account'
 
 import * as styles from './BatchBar.css'
+import { ConfirmActions, useConfirm } from './Confirm'
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
 /**
  * The open batch, wherever you are: its calls, how many sites wait on it (a
  * site that waits for one receipt before its next request stalls here), and
- * Review or Discard. Nothing when no batch is open, and not on the review.
+ * Review or Discard. Discarding rejects the waiting requests, so it asks
+ * first. Nothing when no batch is open, and not on the review.
  */
 export function BatchBar() {
   const queue = useBatchQueue()
-  const navigate = useNavigate()
   const { pathname } = useLocation()
-  const [busy, setBusy] = useState(false)
-
   if (!queue || pathname === '/batch') return null
+  // Another batch starts with no question pending.
+  return <OpenBatch key={queue.openedAt} queue={queue} />
+}
 
+function OpenBatch({ queue }: { queue: BatchQueue }) {
+  const navigate = useNavigate()
+  const [busy, setBusy] = useState(false)
+  const confirm = useConfirm()
+
+  const requests = queue.items.length
   const calls = flattenQueue(queue.items).length
   const sites = waitingSites(queue.items)
   const account = truncate(queue.account, { start: 6, end: 4 })
@@ -43,6 +44,7 @@ export function BatchBar() {
     setBusy(true)
     await batchQueue({ action: 'discard' })
     setBusy(false)
+    confirm.cancel()
   }
 
   return (
@@ -60,47 +62,40 @@ export function BatchBar() {
         </Box>
       </Box>
       <Box className={styles.actions}>
-        <Button
-          disabled={busy}
-          height="24px"
-          variant="ghost red"
-          width="fit"
-          onClick={discard}
-        >
-          Discard
-        </Button>
-        <Button
-          height="24px"
-          variant="solid invert"
-          width="fit"
-          onClick={() => navigate('/batch')}
-        >
-          Review
-        </Button>
+        {confirm.asking ? (
+          <ConfirmActions
+            confirm={`Discard ${plural(requests, 'request')}`}
+            disabled={busy}
+            height="24px"
+            onConfirm={discard}
+            onCancel={confirm.cancel}
+          />
+        ) : (
+          <>
+            <Button
+              disabled={busy}
+              height="24px"
+              variant="ghost red"
+              width="fit"
+              // An empty batch rejects nothing: no need to ask.
+              onClick={requests > 0 ? confirm.ask : discard}
+            >
+              Discard
+            </Button>
+            {/* Secondary: the screen under the bar keeps its own primary. */}
+            <Button
+              height="24px"
+              variant="stroked fill"
+              width="fit"
+              onClick={() => navigate('/batch')}
+            >
+              Review
+            </Button>
+          </>
+        )}
       </Box>
     </section>
   )
-}
-
-/**
- * The account's mode as the background resolves it: the stored one, else the
- * default for its code. (Task 13's account-mode hook can take this over.)
- */
-function useMode(account: Account): AccountMode | undefined {
-  const { network } = useNetworkStore()
-  const stored = useSyncExternalStore(
-    accountModesStore.subscribe,
-    () =>
-      accountModesStore.getState().modes[
-        modeKey(network.rpcUrl, account.address)
-      ],
-  )
-  const impersonated = account.impersonate === true
-  const { data: code, isSuccess } = useBytecode({ address: account.address })
-  if (stored) return stored
-  // Only an impersonated account's default depends on its code.
-  if (impersonated && !isSuccess) return undefined
-  return defaultMode({ impersonated, onchain: classifyCode(code ?? '0x') })
 }
 
 /**
@@ -110,7 +105,7 @@ function useMode(account: Account): AccountMode | undefined {
 export function StartBatch({ account }: { account: Account }) {
   const queue = useBatchQueue()
   const { network } = useNetworkStore()
-  const mode = useMode(account)
+  const mode = useResolvedMode(account.address)
   const [busy, setBusy] = useState(false)
 
   if (queue || mode !== 'smart') return null
