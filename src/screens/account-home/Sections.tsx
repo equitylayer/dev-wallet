@@ -1,7 +1,7 @@
 import { ArrowDownLeft, ArrowUpRight, Code2, FilePlus2, Link2 } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { Address, Transaction } from 'viem'
+import type { Abi, Address, Transaction } from 'viem'
 
 import { connect, disconnect } from '~/actions'
 import { Box, Button, Text } from '~/design-system'
@@ -9,6 +9,7 @@ import { useAccountActivity } from '~/hooks/useAccountActivity'
 import { useAccountTokens } from '~/hooks/useAccountTokens'
 import { useAccounts } from '~/hooks/useAccounts'
 import { useContracts } from '~/hooks/useContracts'
+import { useFunctionName } from '~/hooks/useFunctionName'
 import { useHost } from '~/hooks/useHost'
 import { getMessenger } from '~/messengers'
 import { truncate } from '~/utils'
@@ -214,6 +215,11 @@ export function RecentActivitySection({ address }: { address: Address }) {
       accounts.find((a) => a.address.toLowerCase() === lower)?.displayName
     )
   }
+  const abiOf = (target?: Address | null) => {
+    if (!target) return undefined
+    const lower = target.toLowerCase()
+    return contracts.find((c) => c.address.toLowerCase() === lower)?.abi
+  }
 
   const recent = transactions.slice(0, RECENT_COUNT)
 
@@ -241,6 +247,7 @@ export function RecentActivitySection({ address }: { address: Address }) {
         recent.map(({ transaction, status }) => (
           <ActivityRow
             key={transaction.hash}
+            abiOf={abiOf}
             address={address}
             nameOf={nameOf}
             pending={status === 'pending'}
@@ -254,12 +261,14 @@ export function RecentActivitySection({ address }: { address: Address }) {
 }
 
 function ActivityRow({
+  abiOf,
   address,
   nameOf,
   pending,
   sponsored,
   transaction,
 }: {
+  abiOf: (target?: Address | null) => Abi | undefined
   address: Address
   nameOf: (target?: Address | null) => string | undefined
   pending: boolean
@@ -270,6 +279,10 @@ function ActivityRow({
   const outgoing = sponsored || transaction.from.toLowerCase() === lower
   const isDeploy = !transaction.to
   const isCall = transaction.input && transaction.input !== '0x'
+  const functionName = useFunctionName({
+    abi: abiOf(transaction.to),
+    data: isCall && outgoing && !isDeploy ? transaction.input : undefined,
+  })
 
   const counterparty = outgoing ? transaction.to : transaction.from
   const counterpartyLabel =
@@ -283,7 +296,7 @@ function ActivityRow({
       : isCall
         ? [
             Code2,
-            `Call ${nameOf(transaction.to) ?? ''}`.trim(),
+            `${functionName ?? 'Call'} ${nameOf(transaction.to) ?? ''}`.trim(),
             `to ${truncate(transaction.to!, { start: 6, end: 4 })}`,
           ]
         : [ArrowUpRight, 'Sent', `to ${counterpartyLabel}`]
