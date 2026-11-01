@@ -13,13 +13,13 @@ import { EIP5792_VERSION } from './calls-status'
 import {
   INVALID_PARAMS,
   WalletRpcError,
+  duplicateBundleId,
   unauthorizedAccount,
 } from './errors'
 import { type AtomicStatus, type Call, type RpcCall, toCall } from './types'
 
 const UNSUPPORTED_CAPABILITY = 5700
 const UNSUPPORTED_CHAIN_ID = 5710
-const DUPLICATE_ID = 5720
 
 function invalidParams(message: string): WalletRpcError {
   return new WalletRpcError(INVALID_PARAMS, message)
@@ -161,7 +161,7 @@ export function parseSendCalls(
     throw invalidParams('`id` must be a non-empty string')
   }
   if (id !== undefined && ctx.records.get(id)) {
-    throw new WalletRpcError(DUPLICATE_ID, `The id ${id} is already in use`)
+    throw duplicateBundleId(id)
   }
 
   if (atomicRequired !== undefined && typeof atomicRequired !== 'boolean') {

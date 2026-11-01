@@ -31,11 +31,19 @@ import {
 import { ENTRY_POINT_07, KERNEL_V3_3 } from '~/smart/constants'
 import { delegationCode } from '~/smart/kernel'
 import { type Node, connectNode } from '~/smart/node'
+import {
+  type BatchQueue,
+  enqueue,
+  moveItem,
+  openQueue,
+  removeItem,
+} from '~/smart/queue'
 import { DEV_ACCOUNTS, startAnvil, waitForReceipt } from '~/smart/testing/anvil'
 import type { AccountMode, SponsorSetting } from '~/smart/types'
-import type { RpcRequest } from '~/types/rpc'
+import type { RpcRequest, RpcResponse } from '~/types/rpc'
 
-import type { Decision } from './pending-requests'
+import type { Batcher, Decision } from './pending-requests'
+import type { SendOutcome } from './smart-sends'
 
 // -- fakes --------------------------------------------------------------------
 
@@ -58,6 +66,29 @@ const modeKey = (rpcUrl: string, address: Address) =>
   `${rpcUrl}.${address.toLowerCase()}`
 let records: BatchRecordsState = { records: {} }
 const settings: { sponsor: SponsorSetting } = { sponsor: { kind: 'devwallet' } }
+
+/** A fake store with `subscribe`, like zustand's: listeners get (next, prev). */
+function observable<T>(initial: T) {
+  let state = initial
+  const listeners = new Set<(next: T, prev: T) => void>()
+  return {
+    get: () => state,
+    set(next: T) {
+      const prev = state
+      state = next
+      for (const listener of listeners) listener(next, prev)
+    },
+    subscribe(listener: (next: T, prev: T) => void) {
+      listeners.add(listener)
+      return () => void listeners.delete(listener)
+    },
+  }
+}
+const batchQueue = observable<{ queue: BatchQueue | null }>({ queue: null })
+const editQueue = (edit: (queue: BatchQueue | null) => BatchQueue | null) =>
+  batchQueue.set({ queue: edit(batchQueue.get().queue) })
+const network = observable({ network: { rpcUrl: '' } })
+const pendingRequests: { id: number }[] = []
 
 mock.module('~/zustand', () => ({
   accountStore: { persist, getState: () => accountState },
@@ -83,6 +114,39 @@ mock.module('~/zustand', () => ({
     }),
   },
   settingsStore: { persist, getState: () => settings },
+  batchQueueStore: {
+    persist,
+    subscribe: batchQueue.subscribe,
+    getState: () => ({
+      ...batchQueue.get(),
+      openQueue: (args: { rpcUrl: string; account: Address }) =>
+        editQueue((queue) => openQueue(queue, args, Date.now())),
+      enqueue: (item: BatchQueue['items'][number]) =>
+        editQueue((queue) => enqueue(queue, item)),
+      moveItem: (from: number, to: number) =>
+        editQueue((queue) => moveItem(queue, from, to)),
+      removeItem: (requestId: number) =>
+        editQueue((queue) => removeItem(queue, requestId)),
+      clearQueue: () => editQueue(() => null),
+    }),
+  },
+  networkStore: {
+    persist,
+    subscribe: network.subscribe,
+    getState: network.get,
+  },
+  pendingRequestsStore: {
+    persist,
+    getState: () => ({
+      pendingRequests,
+      addPendingRequest: (request: { id: number }) =>
+        void pendingRequests.push(request),
+      removePendingRequest: (id: number) => {
+        const index = pendingRequests.findIndex((r) => r.id === id)
+        if (index >= 0) pendingRequests.splice(index, 1)
+      },
+    }),
+  },
 }))
 
 const sent: [string, unknown][] = []
@@ -106,8 +170,19 @@ const {
   showCallsStatus,
   walletRequest,
 } = await import('./smart')
-const { handleSend } = await import('./smart-sends')
+const smartSends = await import('./smart-sends')
+const { setupBatchQueue } = await import('./batch-queue')
+const { requestUserDecision } = await import('./pending-requests')
 setupSmartHandlers()
+setupBatchQueue()
+
+const SITE = 'a.test'
+/** `handleSend`, from a site unless `origin` says otherwise. */
+const handleSend = (
+  args: Omit<Parameters<typeof smartSends.handleSend>[0], 'origin'> & {
+    origin?: string
+  },
+) => smartSends.handleSend({ origin: SITE, ...args })
 
 // -- helpers ------------------------------------------------------------------
 
@@ -143,6 +218,9 @@ beforeEach(async () => {
   records = { records: {} }
   settings.sponsor = { kind: 'devwallet' }
   sent.length = 0
+  network.set({ network: { rpcUrl } })
+  batchQueue.set({ queue: null })
+  pendingRequests.length = 0
 })
 afterEach(() => anvil.stop())
 
@@ -356,7 +434,6 @@ describe('wallet_sendCalls', () => {
   test.each([
     ['rejected', 4001],
     ['expired', 4001],
-    ['batched', 4001],
   ] as const)('a %s decision is %d', async (status, code) => {
     const { ask } = answering(() => ({ status }))
     const error = await codeOf(
@@ -589,6 +666,291 @@ describe('eth_sendTransaction', () => {
       }),
     )
     expect(error.code).toBe(4001)
+  })
+})
+
+describe('batch queue', () => {
+  const queueNow = () => batchQueue.get().queue
+  const queuedIds = () => queueNow()?.items.map((i) => i.requestId) ?? []
+  const startBatch = (account: Address = smart) =>
+    editQueue((queue) => openQueue(queue, { rpcUrl, account }, Date.now()))
+
+  const call = (topic: string, payload: unknown) => {
+    const handler = handlers.get(topic)
+    if (!handler) throw new Error(`no handler for ${topic}`)
+    return handler(payload)
+  }
+  const batchAction = (payload: unknown) => call('batchQueue', payload)
+
+  /** The approval screen's "Add to batch". */
+  const addToBatch = async (
+    request: RpcRequest,
+    { batch }: { batch: Batcher },
+  ): Promise<Decision> => ({ status: 'batched', ...(await batch(request)) })
+
+  async function until(condition: () => boolean, what: string) {
+    for (let i = 0; i < 300; i++) {
+      if (condition()) return
+      await Bun.sleep(10)
+    }
+    throw new Error(`timed out waiting for ${what}`)
+  }
+
+  /** Starts a send that is expected to wait in the batch. */
+  function startSend(
+    request: RpcRequest,
+    ask?: Parameters<typeof handleSend>[0]['ask'],
+  ): Promise<SendOutcome> {
+    const outcome = handleSend({ rpcUrl, request, ask })
+    // Observed later by the test; never an unhandled rejection meanwhile.
+    outcome.catch(() => {})
+    return outcome
+  }
+
+  async function responseOf(outcome: Promise<SendOutcome>): Promise<RpcResponse> {
+    const settled = await outcome
+    if (!('response' in settled)) {
+      throw new Error('the send did not wait in the batch')
+    }
+    return settled.response
+  }
+
+  test('with bypass, sends join the open batch unasked, then go out as one user op', async () => {
+    startBatch()
+    const tx = sendTransactionRequest({ from: smart, ...transfer })
+    const txOutcome = startSend(tx)
+    await until(() => queuedIds().length === 1, 'the transaction to join')
+    const batch = sendCallsRequest(smart, [transfer, transfer], {
+      id: 'dapp-batch',
+    })
+    const batchOutcome = startSend(batch)
+    await until(() => queuedIds().length === 2, 'the batch to join')
+
+    // Nothing has gone out yet.
+    expect(await node.getBalance(X)).toBe(0n)
+    expect(
+      queueNow()?.items.map((i) => [i.requestId, i.origin, i.method, i.bundleId]),
+    ).toEqual([
+      [tx.id, SITE, 'eth_sendTransaction', undefined],
+      [batch.id, SITE, 'wallet_sendCalls', 'dapp-batch'],
+    ])
+
+    expect(await batchAction({ action: 'sign' })).toEqual({ ok: true })
+    const hash = (await responseOf(txOutcome)).result as Hex
+    expect(await responseOf(batchOutcome)).toEqual({
+      id: batch.id,
+      jsonrpc: '2.0',
+      result: { id: 'dapp-batch' },
+    })
+    expect((await transaction(hash)).to).toBe(
+      ENTRY_POINT_07.toLowerCase() as Address,
+    )
+    expect(getRecord(records, rpcUrl, 'dapp-batch')).toMatchObject({
+      path: 'userop',
+      transactionHashes: [hash],
+      calls: [transfer, transfer],
+    })
+    expect((await callsStatus('dapp-batch')).status).toBe(200)
+    expect(await node.getBalance(X)).toBe(3n)
+    expect(queueNow()).toBeNull()
+  })
+
+  test('with bypass, a send that cannot join goes out now', async () => {
+    startBatch()
+    // A plain account's transaction passes through, as without a batch.
+    const plain = sendTransactionRequest({ from: never, ...transfer })
+    expect(await handleSend({ rpcUrl, request: plain })).toEqual({
+      passThrough: plain,
+    })
+    // A deployment from the batch's own account is sent on its own.
+    const deployed = await handleSend({
+      rpcUrl,
+      request: sendTransactionRequest({ from: smart, data: '0x00' }),
+    })
+    expect(deployed).toEqual({ result: expect.stringMatching(/^0x/) })
+    expect(queuedIds()).toEqual([])
+  })
+
+  test('"Add to batch" opens a batch; "Approve" still sends at once; Discard is 4001', async () => {
+    const tx = sendTransactionRequest({ from: smart, ...transfer })
+    const outcome = startSend(tx, addToBatch)
+    await until(() => queuedIds().length === 1, 'the batch to open')
+    expect(queueNow()).toMatchObject({ rpcUrl, account: smart })
+
+    const { ask } = approve()
+    const now = (await handleSend({
+      rpcUrl,
+      request: sendTransactionRequest({ from: smart, to: X, value: '0x5' }),
+      ask,
+    })) as { result: Hex }
+    await waitForReceipt(node, now.result)
+    expect(await node.getBalance(X)).toBe(5n)
+    expect(queuedIds()).toEqual([tx.id])
+
+    expect(await batchAction({ action: 'discard' })).toEqual({ ok: true })
+    expect((await responseOf(outcome)).error).toMatchObject({
+      code: 4001,
+      message: 'The user discarded the batch.',
+    })
+    expect(queueNow()).toBeNull()
+    expect(await node.getBalance(X)).toBe(5n)
+  })
+
+  test.each([
+    ['a plain account', () => ({ from: never, ...transfer }), /Only smart accounts/],
+    ['a deployment', () => ({ from: smart, data: '0x00' }), /deployment/],
+    [
+      'a batch open for another account',
+      () => {
+        startBatch(upgradable)
+        return { from: smart, ...transfer }
+      },
+      new RegExp(`already open for ${upgradable}`),
+    ],
+  ])('"Add to batch" with %s is refused, and the request stays pending', async (_, tx, reason) => {
+    const request = sendTransactionRequest(tx())
+    const outcome = handleSend({
+      rpcUrl,
+      request,
+      ask: (pending, options) => requestUserDecision(pending, options),
+    })
+    await until(
+      () => pendingRequests.some((r) => r.id === request.id),
+      'the approval',
+    )
+
+    await expect(
+      call('pendingRequest', { request, status: 'batched' }),
+    ).rejects.toThrow(reason)
+    expect(pendingRequests.map((r) => r.id)).toContain(request.id)
+    expect(queuedIds()).not.toContain(request.id)
+
+    // Still the user's to decide.
+    await call('pendingRequest', { request, status: 'rejected' })
+    expect(await codeOf(outcome)).toMatchObject({ code: 4001 })
+    expect(pendingRequests).toHaveLength(0)
+    expect(await node.getBalance(X)).toBe(0n)
+  })
+
+  test('"Add to batch" through the approval: the request leaves the approvals and joins', async () => {
+    const request = sendCallsRequest(smart, [transfer])
+    const outcome = handleSend({
+      rpcUrl,
+      request,
+      ask: (pending, options) => requestUserDecision(pending, options),
+    })
+    await until(
+      () => pendingRequests.some((r) => r.id === request.id),
+      'the approval',
+    )
+    await call('pendingRequest', { request, status: 'batched' })
+    expect(pendingRequests).toHaveLength(0)
+    expect(queuedIds()).toEqual([request.id])
+
+    expect(await batchAction({ action: 'sign' })).toEqual({ ok: true })
+    const { result } = await responseOf(outcome)
+    expect(result).toEqual({ id: expect.stringMatching(/^0x[0-9a-f]{64}$/) })
+    expect((await callsStatus((result as { id: string }).id)).status).toBe(200)
+  })
+
+  test('signing a reverting batch, unforced, gives every request code 3 and closes it', async () => {
+    startBatch()
+    const ok = startSend(sendTransactionRequest({ from: smart, ...transfer }))
+    const reverting = startSend(sendCallsRequest(smart, [{ to: R }]))
+    await until(() => queuedIds().length === 2, 'both to join')
+
+    expect(await batchAction({ action: 'sign' })).toMatchObject({
+      ok: false,
+      error: { code: 3, data: '0xdeadbeef' },
+    })
+    for (const outcome of [ok, reverting]) {
+      expect((await responseOf(outcome)).error).toMatchObject({
+        code: 3,
+        data: '0xdeadbeef',
+      })
+    }
+    expect(queueNow()).toBeNull()
+    expect(records.records[rpcUrl]).toBeUndefined()
+    expect(await node.getBalance(X)).toBe(0n)
+  })
+
+  test('"Sign anyway" sends the reverting batch as a self-call that reverts on chain', async () => {
+    startBatch()
+    const ok = startSend(sendTransactionRequest({ from: smart, ...transfer }))
+    const reverting = startSend(
+      sendCallsRequest(smart, [{ to: R }], { id: 'reverting' }),
+    )
+    await until(() => queuedIds().length === 2, 'both to join')
+
+    expect(await batchAction({ action: 'sign', force: true })).toEqual({
+      ok: true,
+    })
+    const hash = (await responseOf(ok)).result as Hex
+    expect((await waitForReceipt(node, hash)).status).toBe('0x0')
+    expect((await responseOf(reverting)).result).toEqual({ id: 'reverting' })
+    expect(getRecord(records, rpcUrl, 'reverting')?.path).toBe('self-call')
+    expect((await callsStatus('reverting')).status).toBe(500)
+    expect(queueNow()).toBeNull()
+  })
+
+  test('a request the user removes gets 4001; the rest are signed', async () => {
+    startBatch()
+    const removed = sendTransactionRequest({ from: smart, ...transfer })
+    const removedOutcome = startSend(removed)
+    await until(() => queuedIds().length === 1, 'the first to join')
+    const kept = startSend(
+      sendTransactionRequest({ from: smart, to: X, value: numberToHex(2n) }),
+    )
+    await until(() => queuedIds().length === 2, 'the second to join')
+
+    // As the batch review's remove button does, from the side panel.
+    editQueue((queue) => removeItem(queue, removed.id))
+    expect((await responseOf(removedOutcome)).error).toMatchObject({
+      code: 4001,
+      message: 'The user removed the request from the batch.',
+    })
+
+    expect(await batchAction({ action: 'sign' })).toEqual({ ok: true })
+    await waitForReceipt(node, (await responseOf(kept)).result as Hex)
+    expect(await node.getBalance(X)).toBe(2n)
+  })
+
+  test('a network change declines every request in the batch with 4001', async () => {
+    startBatch()
+    const outcome = startSend(sendTransactionRequest({ from: smart, ...transfer }))
+    await until(() => queuedIds().length === 1, 'the send to join')
+
+    network.set({ network: { rpcUrl: 'http://127.0.0.1:1' } })
+    expect((await responseOf(outcome)).error).toMatchObject({
+      code: 4001,
+      message: 'The network changed while the request waited in a batch.',
+    })
+    expect(queueNow()).toBeNull()
+  })
+
+  test('a dApp id already waiting in the batch is 5720', async () => {
+    startBatch()
+    const first = startSend(sendCallsRequest(smart, [transfer], { id: 'same' }))
+    await until(() => queuedIds().length === 1, 'the batch to join')
+    expect(
+      await codeOf(
+        handleSend({
+          rpcUrl,
+          request: sendCallsRequest(smart, [transfer], { id: 'same' }),
+        }),
+      ),
+    ).toMatchObject({ code: 5720 })
+
+    await batchAction({ action: 'discard' })
+    expect((await responseOf(first)).error).toMatchObject({ code: 4001 })
+  })
+
+  test('Sign with no batch open is refused; Discard is a no-op', async () => {
+    expect(await batchAction({ action: 'sign' })).toMatchObject({
+      ok: false,
+      error: { code: -32602, message: 'No batch is open.' },
+    })
+    expect(await batchAction({ action: 'discard' })).toEqual({ ok: true })
   })
 })
 

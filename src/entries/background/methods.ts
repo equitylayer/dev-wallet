@@ -51,7 +51,8 @@ export function opensSidebar(method: string, s: ApprovalSettings): boolean {
   return requiresApproval(method, s) || isOneOf(SIDEBAR_METHODS, method)
 }
 
-const USER_REJECTED = 4001
+/** EIP-1193: the user rejected the request. */
+export const USER_REJECTED = 4001
 /** EIP-5792: the user declined the account upgrade a batch needed. */
 const UPGRADE_REJECTED = 5750
 
@@ -62,7 +63,7 @@ const UPGRADE_REJECTED = 5750
  */
 export function declinedError(
   request: unknown,
-  status: 'rejected' | 'expired' | 'batched',
+  status: 'rejected' | 'expired',
   { upgrade = false }: { upgrade?: boolean } = {},
 ): WalletRpcError {
   const data = { request }
@@ -71,13 +72,6 @@ export function declinedError(
       return new WalletRpcError(
         USER_REJECTED,
         'The request timed out waiting for approval.',
-        data,
-      )
-    case 'batched':
-      // TODO(Task 11): queue the request in the open batch instead.
-      return new WalletRpcError(
-        USER_REJECTED,
-        'Adding to a batch is not available yet.',
         data,
       )
     case 'rejected':

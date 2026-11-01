@@ -8,6 +8,7 @@ import {
 import { type Messenger, getMessenger } from '~/messengers'
 import { serializeError } from '~/smart/errors'
 import { connectNode, nodeMethod } from '~/smart/node'
+import { DEVWALLET_ORIGIN } from '~/smart/queue'
 import type { RpcRequest, RpcResponse } from '~/types/rpc'
 import {
   accountStore,
@@ -24,7 +25,7 @@ import {
   requiresApproval,
   withSerializedErrors,
 } from './methods'
-import { type Decision, requestUserDecision } from './pending-requests'
+import { type PlainDecision, requestUserDecision } from './pending-requests'
 import {
   reconcileBeforeAnswering,
   showCallsStatus,
@@ -39,6 +40,10 @@ const walletMessenger = getMessenger('background:wallet')
 const ETH_ACCOUNTS_RECONCILE_MS = 1500
 
 export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
+  // Only extension pages may use the wallet channel: what comes on it comes
+  // from DevWallet's own screens.
+  const fromWallet = messenger.connection === 'background:wallet'
+
   messenger.reply('request', withSerializedErrors(async (payload, meta) => {
     const { request, rpcUrl: rpcUrl_ } = payload
     const isInpage =
@@ -84,23 +89,28 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
 
     // Sends go through the smart-account execution core, which asks for the
     // approval itself; plain `eth_sendTransaction`s come back to pass through.
+    // A send that waited in the batch queue comes back with its response.
     if (isTransactionMethod(request.method)) {
       const outcome = await handleSend({
         rpcUrl,
         request,
+        // `file://` pages have no host.
+        origin: fromWallet ? DEVWALLET_ORIGIN : host || meta.sender.url || '',
         ask: needsApproval
-            ? (pending) =>
-                requestUserDecision({ ...pending, sender: meta.sender })
+            ? (pending, options) =>
+                requestUserDecision({ ...pending, sender: meta.sender }, options)
             : undefined,
       })
       const response =
           'passThrough' in outcome
               ? await execute(rpcUrl, rpcClient, outcome.passThrough)
-              : ({
-                id: request.id,
-                jsonrpc: '2.0',
-                result: outcome.result,
-              } as RpcResponse)
+              : 'response' in outcome
+                  ? outcome.response
+                  : ({
+                    id: request.id,
+                    jsonrpc: '2.0',
+                    result: outcome.result,
+                  } as RpcResponse)
       walletMessenger.send('transactionExecuted', undefined)
       return response
     }
@@ -245,7 +255,7 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
 
 function declinedResponse(
     request: RpcRequest,
-    status: Exclude<Decision['status'], 'approved'>,
+    status: Exclude<PlainDecision['status'], 'approved'>,
 ) {
   return {
     id: request.id,

@@ -24,6 +24,14 @@ export {
 } from './batch-calls'
 
 export {
+  type BatchQueueActions,
+  type BatchQueueState,
+  type BatchQueueStore,
+  batchQueueStore,
+  useBatchQueueStore,
+} from './batch-queue'
+
+export {
   type ContractsActions,
   type ContractsState,
   type ContractsStore,

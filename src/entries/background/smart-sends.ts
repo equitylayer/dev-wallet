@@ -1,43 +1,48 @@
 // Sends: `eth_sendTransaction` and `wallet_sendCalls`, after the approval gate,
-// through the smart-account execution core. `smart.ts` keeps the node in step
-// with the accounts' modes; `rpc.ts` routes the requests here.
+// through the smart-account execution core, or into the open batch queue
+// (`batch-queue.ts`). `smart.ts` keeps the node in step with the accounts'
+// modes; `rpc.ts` routes the requests here.
 import { getMessenger } from '~/messengers'
 import { KERNEL_V3_3 } from '~/smart/constants'
-import { type ParsedSendCalls, parseSendCalls } from '~/smart/eip5792'
 import { atomicityUnsupported, unauthorizedAccount } from '~/smart/errors'
 import { executeCalls, planExecution } from '~/smart/execute'
 import { setDelegation } from '~/smart/kernel'
 import { atomicStatus } from '~/smart/modes'
 import { sendTransactionCall, upgradesBeforeSend } from '~/smart/resolve'
-import {
-  type WalletCoreDeps,
-  findAccount,
-  handleWalletRequest,
-} from '~/smart/wallet-core'
-import type { RpcRequest } from '~/types/rpc'
-import { serialPerKey } from '~/utils/serial'
+import { findAccount, handleWalletRequest } from '~/smart/wallet-core'
+import type { RpcRequest, RpcResponse } from '~/types/rpc'
 import { accountModesStore } from '~/zustand'
 
+import { addToBatch, joinUnasked, openBatch } from './batch-queue'
 import { declinedError } from './methods'
-import type { Decision } from './pending-requests'
+import type { Batcher, Decision, Joined } from './pending-requests'
+import {
+  type IncomingSend,
+  firstParam,
+  oneSendAtATime,
+  parseBatch,
+} from './send-shared'
 import { exclusive, invalidate, reconcileSnapshot } from './smart'
 
 const walletMessenger = getMessenger('background:wallet')
 
 /**
- * One send per rpcUrl at a time, from its fresh reconcile to its last
- * transaction: concurrent sends race for the sponsor's funding nonce
- * ("Couldn't fund the sponsor: nonce too low"). Approvals wait outside it,
- * and previews don't need it. Never nested in `exclusive`, which the
- * reconciles inside it use.
+ * Asks the user; absent when bypass is on and nobody is asked. "Add to batch"
+ * calls `batch`.
  */
-const oneSendAtATime = serialPerKey()
+type Ask = (
+  request: RpcRequest,
+  options: { batch: Batcher },
+) => Promise<Decision>
 
-/** Asks the user; absent when bypass is on and nobody is asked. */
-type Ask = (request: RpcRequest) => Promise<Decision>
-
-/** The send's result, or a plain request for `rpc.ts` to pass to the node. */
-export type SendOutcome = { result: unknown } | { passThrough: RpcRequest }
+/**
+ * The send's result; the response of a request that waited in the batch
+ * queue; or a plain request for `rpc.ts` to pass to the node.
+ */
+export type SendOutcome =
+  | { result: unknown }
+  | { response: RpcResponse }
+  | { passThrough: RpcRequest }
 
 type Approved = { request: RpcRequest; force: boolean }
 
@@ -47,16 +52,20 @@ function notify(message: string): void {
 }
 
 async function approve(
-  request: RpcRequest,
+  send: IncomingSend,
   ask: Ask | undefined,
-  options: { upgrade?: boolean } = {},
-): Promise<Approved> {
+  { upgrade = false }: { upgrade?: boolean } = {},
+): Promise<Approved | Joined> {
+  const { request } = send
   // Nobody is asked, so nobody can say "Sign anyway": a predicted revert is
   // refused with code 3 (spec §4).
   if (!ask) return { request, force: false }
-  const decision = await ask(request)
+  const decision = await ask(request, {
+    batch: (pending) => addToBatch(send, pending),
+  })
+  if (decision.status === 'batched') return decision
   if (decision.status !== 'approved') {
-    throw declinedError(request, decision.status, options)
+    throw declinedError(request, decision.status, { upgrade })
   }
   const { id, method, params } = decision.request
   return {
@@ -65,26 +74,29 @@ async function approve(
   }
 }
 
-function firstParam(request: RpcRequest): Record<string, unknown> {
-  const [param] = (request.params ?? []) as unknown[]
-  return typeof param === 'object' && param !== null
-    ? (param as Record<string, unknown>)
-    : {}
+/** A request that joined the batch queue answers once the batch is done. */
+async function answered(sent: SendOutcome | Joined): Promise<SendOutcome> {
+  return 'queued' in sent ? { response: await sent.queued } : sent
 }
 
 async function sendTransaction(
-  rpcUrl: string,
-  request: RpcRequest,
+  send: IncomingSend,
   ask: Ask | undefined,
 ): Promise<SendOutcome> {
-  const approved = await approve(request, ask)
+  const { rpcUrl, request } = send
+  const approved = await approve(send, ask)
+  if ('queued' in approved) return answered(approved)
   // The approval screen sends back the transaction it showed, maybe edited;
   // anything it left out keeps the dApp's value.
   const tx = { ...firstParam(request), ...firstParam(approved.request) }
   const { from } = tx
   if (typeof from !== 'string') return { passThrough: approved.request }
 
-  return oneSendAtATime(rpcUrl, async () => {
+  const sent = await oneSendAtATime(rpcUrl, async () => {
+    if (!ask) {
+      const joined = await joinUnasked(send, approved.request)
+      if (joined) return joined
+    }
     const { deps } = await reconcileSnapshot(rpcUrl, { fresh: true })
     const account = findAccount(deps.accounts, from)
     // Plain accounts, and addresses the wallet doesn't hold, send as before.
@@ -109,15 +121,7 @@ async function sendTransaction(
       invalidate(rpcUrl)
     }
   })
-}
-
-function parse(deps: WalletCoreDeps, request: RpcRequest): ParsedSendCalls {
-  return parseSendCalls(request.params, {
-    chainId: deps.chainId,
-    activeAccount: deps.activeAccount,
-    knownAccounts: deps.accounts.map((a) => a.address),
-    records: deps.records,
-  })
+  return answered(sent)
 }
 
 /**
@@ -133,7 +137,7 @@ async function upgradeBeforeBatch(
   { notifyUser }: { notifyUser: boolean },
 ): Promise<void> {
   const { deps, aa } = await reconcileSnapshot(rpcUrl, { fresh: true })
-  const batch = parse(deps, approved.request)
+  const batch = parseBatch(deps, approved.request)
   const account = findAccount(deps.accounts, batch.from)
   if (!account) throw unauthorizedAccount(batch.from)
   const stillUpgrades = upgradesBeforeSend({
@@ -167,14 +171,16 @@ async function upgradeBeforeBatch(
 }
 
 async function sendCalls(
-  rpcUrl: string,
-  request: RpcRequest,
+  send: IncomingSend,
   ask: Ask | undefined,
-): Promise<unknown> {
+): Promise<SendOutcome> {
+  const { rpcUrl, request } = send
   // Check the batch before asking anyone: malformed params, another chain, an
-  // unknown sender or atomicity the account can't give fail at once.
+  // unknown sender, a duplicate id or atomicity the account can't give fail
+  // at once.
   const { deps, aa } = await reconcileSnapshot(rpcUrl)
-  const batch = parse(deps, request)
+  await openBatch()
+  const batch = parseBatch(deps, request)
   const account = findAccount(deps.accounts, batch.from)
   if (!account) throw unauthorizedAccount(batch.from)
   const upgrade = upgradesBeforeSend({
@@ -194,22 +200,30 @@ async function sendCalls(
     throw atomicityUnsupported()
   }
 
-  const approved = await approve(request, ask, { upgrade })
-  return oneSendAtATime(rpcUrl, async () => {
+  const approved = await approve(send, ask, { upgrade })
+  if ('queued' in approved) return answered(approved)
+  const sent = await oneSendAtATime(rpcUrl, async () => {
     try {
+      if (!ask) {
+        const joined = await joinUnasked(send, approved.request)
+        if (joined) return joined
+      }
       if (upgrade) await upgradeBeforeBatch(rpcUrl, approved, { notifyUser: !ask })
       const { deps: fresh } = await reconcileSnapshot(rpcUrl, { fresh: true })
-      return await handleWalletRequest(
-        { ...fresh, force: approved.force },
-        {
-          method: 'wallet_sendCalls',
-          params: approved.request.params as unknown[],
-        },
-      )
+      return {
+        result: await handleWalletRequest(
+          { ...fresh, force: approved.force },
+          {
+            method: 'wallet_sendCalls',
+            params: approved.request.params as unknown[],
+          },
+        ),
+      }
     } finally {
       invalidate(rpcUrl)
     }
   })
+  return answered(sent)
 }
 
 /**
@@ -218,15 +232,16 @@ async function sendCalls(
  * from a smart account, runs through the execution core, one send per rpcUrl
  * at a time; an `eth_sendTransaction` from any other account is handed back to
  * pass through.
+ *
+ * While a batch is open, a send from its account on its network joins it:
+ * unasked when bypass is on, otherwise when the user picks "Add to batch"
+ * (which opens a batch when none is open). It then waits there, and answers
+ * with the batch's outcome.
  */
-export async function handleSend(args: {
-  rpcUrl: string
-  request: RpcRequest
-  ask?: Ask
-}): Promise<SendOutcome> {
-  const { rpcUrl, request, ask } = args
-  if (request.method === 'wallet_sendCalls') {
-    return { result: await sendCalls(rpcUrl, request, ask) }
-  }
-  return sendTransaction(rpcUrl, request, ask)
+export async function handleSend(
+  args: IncomingSend & { ask?: Ask },
+): Promise<SendOutcome> {
+  const { ask, ...send } = args
+  if (send.request.method === 'wallet_sendCalls') return sendCalls(send, ask)
+  return sendTransaction(send, ask)
 }

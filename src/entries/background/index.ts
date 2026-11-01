@@ -1,6 +1,7 @@
 import { syncStores } from '~/zustand'
 
 import { getMessenger } from '../../messengers'
+import { setupBatchQueue } from './batch-queue'
 import { handleCommands } from './commands'
 import { setupContextMenu } from './context-menu'
 import { setupExtensionId } from './extension-id'
@@ -26,6 +27,7 @@ setupInpage()
 setupRpcHandler({ messenger: inpageMessenger })
 setupRpcHandler({ messenger: walletMessenger })
 setupSmartHandlers()
+setupBatchQueue()
 setupWalletSidebarHandler()
 syncStores()
 void dropOrphanedRequests()

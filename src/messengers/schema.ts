@@ -13,6 +13,13 @@ export type Schema = {
     payload: { accounts: Address[]; sessions: SessionsState['sessions'] },
     response: void,
   ]
+  /** The batch review's Sign ("Sign anyway" with `force`) and Discard. */
+  batchQueue: [
+    payload: { action: 'sign'; force?: boolean } | { action: 'discard' },
+    response:
+      | { ok: true }
+      | { ok: false; error: { code: number; message: string; data?: unknown } },
+  ]
   chainChanged: [
     payload: { chainId: string; sessions: SessionsState['sessions'] },
     response: void,
@@ -22,6 +29,11 @@ export type Schema = {
   extensionId: [payload: void, response: string]
   injectProvider: [payload: void, response: void]
   notice: [payload: { message: string }, response: void]
+  /**
+   * The user's decision on a pending request. A `batched` decision that can't
+   * join a batch is refused: the send rejects with why, and the request stays
+   * pending.
+   */
   pendingRequest: [
     payload: {
       request: RpcRequest

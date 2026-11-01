@@ -207,8 +207,4 @@ describe('declinedError', () => {
       4001,
     )
   })
-
-  test('"batched" is a 4001 until the batch queue exists', () => {
-    expect(declinedError(request, 'batched').code).toBe(4001)
-  })
 })

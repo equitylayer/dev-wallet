@@ -30,6 +30,13 @@ export function unknownBundleId(id: string): WalletRpcError {
   return new WalletRpcError(UNKNOWN_BUNDLE_ID, `Unknown batch id ${id}`)
 }
 
+/** EIP-5792: the dApp's batch id is already in use. */
+export const DUPLICATE_ID = 5720
+
+export function duplicateBundleId(id: string): WalletRpcError {
+  return new WalletRpcError(DUPLICATE_ID, `The id ${id} is already in use`)
+}
+
 /** EIP-5792: `atomicRequired` was set, but the account can't batch atomically. */
 export const ATOMICITY_NOT_SUPPORTED = 5760
 
