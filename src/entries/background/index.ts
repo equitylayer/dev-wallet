@@ -4,7 +4,6 @@ import { getMessenger } from '../../messengers'
 import { setupBatchQueue } from './batch-queue'
 import { handleCommands } from './commands'
 import { setupContextMenu } from './context-menu'
-import { setupExtensionId } from './extension-id'
 import { setupInpage } from './inpage'
 import { dropOrphanedRequests, setupPendingRequests } from './pending-requests'
 import { setupRpcHandler } from './rpc'
@@ -22,7 +21,6 @@ walletMessenger.reply('ping', async () => 'pong')
 
 handleCommands()
 void setupContextMenu()
-setupExtensionId()
 setupInpage()
 setupPendingRequests()
 setupRpcHandler({ messenger: inpageMessenger })

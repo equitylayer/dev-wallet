@@ -38,7 +38,6 @@ export type Schema = {
   ]
   connect: [payload: { chainId: string }, response: void]
   disconnect: [payload: undefined, response: void]
-  extensionId: [payload: void, response: string]
   injectProvider: [payload: void, response: void]
   notice: [payload: { message: string }, response: void]
   /**
