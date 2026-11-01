@@ -8,7 +8,9 @@ import {
   cannotJoin,
   enqueue,
   flattenQueue,
+  matchesReview,
   moveItem,
+  notActiveNetwork,
   openQueue,
   orphaned,
   queueAfterNetworkChange,
@@ -163,8 +165,12 @@ describe('cannotJoin', () => {
   })
 
   test('only on the active network', () => {
-    expect(cannotJoin(null, candidate, B)).toMatch(/active network/)
+    expect(cannotJoin(null, candidate, B)).toBe(notActiveNetwork(A, B))
     expect(cannotJoin(queue([item(1)]), candidate, B)).toMatch(/active network/)
+    expect(notActiveNetwork(A, B)).toBe(
+      `Batches are only for the active network, not ${A}.`,
+    )
+    expect(notActiveNetwork(A, A)).toBeNull()
   })
 
   test('a plain account never batches', () => {
@@ -211,24 +217,42 @@ describe('queue edits', () => {
     expect(enqueue(null, item(1))).toBeNull()
   })
 
-  test('moveItem moves one item (a whole wallet_sendCalls group)', () => {
+  test('moveItem moves a request (a whole wallet_sendCalls group) to a position', () => {
     const open = queue([item(1), item(2), item(3)])
-    expect(ids(moveItem(open, 0, 2)?.items ?? [])).toEqual([2, 3, 1])
-    expect(ids(moveItem(open, 2, 0)?.items ?? [])).toEqual([3, 1, 2])
+    expect(ids(moveItem(open, 1, 2)?.items ?? [])).toEqual([2, 3, 1])
+    expect(ids(moveItem(open, 3, 0)?.items ?? [])).toEqual([3, 1, 2])
     expect(ids(open.items)).toEqual([1, 2, 3])
   })
 
-  test('moveItem out of range changes nothing', () => {
+  test('moveItem of an unknown request or out of range changes nothing', () => {
     const open = queue([item(1), item(2)])
-    expect(moveItem(open, 0, 2)).toBe(open)
-    expect(moveItem(open, -1, 0)).toBe(open)
-    expect(moveItem(null, 0, 1)).toBeNull()
+    expect(moveItem(open, 1, 2)).toBe(open)
+    expect(moveItem(open, 1, -1)).toBe(open)
+    expect(moveItem(open, 9, 0)).toBe(open)
+    expect(moveItem(open, 1, 0)).toBe(open)
+    expect(moveItem(null, 1, 1)).toBeNull()
   })
 
   test('removeItem removes by request id', () => {
     const open = queue([item(1), item(2), item(3)])
     expect(ids(removeItem(open, 2)?.items ?? [])).toEqual([1, 3])
     expect(removeItem(open, 9)).toBe(open)
+  })
+})
+
+describe('matchesReview', () => {
+  const items = [item(1), item(2), item(3)]
+
+  test('the same requests in the same order match', () => {
+    expect(matchesReview(items, [1, 2, 3])).toBe(true)
+    expect(matchesReview([], [])).toBe(true)
+  })
+
+  test('a reorder, a removal or a request that joined since does not', () => {
+    expect(matchesReview(items, [2, 1, 3])).toBe(false)
+    expect(matchesReview(items, [1, 2])).toBe(false)
+    expect(matchesReview(items, [1, 2, 3, 4])).toBe(false)
+    expect(matchesReview(items, [1, 2, 4])).toBe(false)
   })
 })
 

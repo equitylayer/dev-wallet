@@ -50,6 +50,17 @@ export function atomicityUnsupported(): WalletRpcError {
 }
 
 /**
+ * DevWallet's own code, in JSON-RPC's range for server errors: the batch
+ * review's Sign was refused because the batch changed after the review showed
+ * it. Only the wallet UI sees it, never a dApp.
+ */
+export const BATCH_CHANGED = -32010
+
+export function batchChanged(): WalletRpcError {
+  return new WalletRpcError(BATCH_CHANGED, 'The batch changed. Review it again.')
+}
+
+/**
  * Any thrown error with a numeric `code` keeps `{ code, message, data }`:
  * wallet errors, and node errors viem throws over HTTP (`RpcRequestError`, when
  * a hosted RPC answers a JSON-RPC error with a non-2xx status). Everything else,

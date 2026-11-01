@@ -29,6 +29,7 @@ import {
   putRecord,
 } from '~/smart/batch-records'
 import { ENTRY_POINT_07, KERNEL_V3_3 } from '~/smart/constants'
+import { BATCH_CHANGED } from '~/smart/errors'
 import { delegationCode } from '~/smart/kernel'
 import { type Node, connectNode } from '~/smart/node'
 import type { BatchQueue, QueuedItem } from '~/smart/queue'
@@ -677,6 +678,9 @@ describe('batch queue', () => {
   /** The side panel's "Start batch". */
   const startBatch = (account: Address = smart) =>
     batchAction({ action: 'open', rpcUrl, account })
+  /** The review's Sign, having seen the batch as it is now. */
+  const sign = (extra: object = {}) =>
+    batchAction({ action: 'sign', reviewed: queuedIds(), ...extra })
 
   /** The approval screen's "Add to batch", without the pending store. */
   const addToBatch = async (
@@ -747,7 +751,7 @@ describe('batch queue', () => {
       [batch.id, SITE, 'wallet_sendCalls', 'dapp-batch'],
     ])
 
-    expect(await batchAction({ action: 'sign' })).toEqual({ ok: true })
+    expect(await sign()).toEqual({ ok: true })
     const hash = (await responseOf(txOutcome)).result as Hex
     expect(await responseOf(batchOutcome)).toEqual({
       id: batch.id,
@@ -848,9 +852,15 @@ describe('batch queue', () => {
       { action: 'open', rpcUrl, account: 'nope' },
       { action: 'remove' },
       { action: 'remove', requestId: tx.id + 1 },
-      { action: 'move', from: 0 },
-      { action: 'move', from: -1, to: 0 },
-      { action: 'move', from: 0, to: 1 },
+      { action: 'move', requestId: tx.id },
+      { action: 'move', requestId: tx.id, to: -1 },
+      { action: 'move', requestId: tx.id, to: 1 },
+      { action: 'move', requestId: tx.id + 1, to: 0 },
+      // The positional move it replaced.
+      { action: 'move', from: 0, to: 0 },
+      { action: 'sign' },
+      { action: 'sign', reviewed: String(tx.id) },
+      { action: 'sign', reviewed: [String(tx.id)] },
     ]) {
       expect(await batchAction(payload)).toMatchObject({
         ok: false,
@@ -909,7 +919,7 @@ describe('batch queue', () => {
     expect(pendingRequests).toHaveLength(0)
     expect(queuedIds()).toEqual([request.id])
 
-    expect(await batchAction({ action: 'sign' })).toEqual({ ok: true })
+    expect(await sign()).toEqual({ ok: true })
     const { result } = await responseOf(outcome)
     expect(result).toEqual({ id: expect.stringMatching(/^0x[0-9a-f]{64}$/) })
     expect((await callsStatus((result as { id: string }).id)).status).toBe(200)
@@ -937,7 +947,7 @@ describe('batch queue', () => {
     const ok = await joined(sendTransactionRequest({ from: smart, ...transfer }))
     const reverting = await joined(sendCallsRequest(smart, [{ to: R }]))
 
-    expect(await batchAction({ action: 'sign' })).toMatchObject({
+    expect(await sign()).toMatchObject({
       ok: false,
       error: { code: 3, data: '0xdeadbeef' },
     })
@@ -959,7 +969,7 @@ describe('batch queue', () => {
       sendCallsRequest(smart, [{ to: R }], { id: 'reverting' }),
     )
 
-    expect(await batchAction({ action: 'sign', force: true })).toEqual({
+    expect(await sign({ force: true })).toEqual({
       ok: true,
     })
     const hash = (await responseOf(ok)).result as Hex
@@ -990,12 +1000,12 @@ describe('batch queue', () => {
       code: 4001,
       message: 'The user removed the request from the batch.',
     })
-    expect(await batchAction({ action: 'move', from: 0, to: 1 })).toEqual({
-      ok: true,
-    })
+    expect(
+      await batchAction({ action: 'move', requestId: first.id, to: 1 }),
+    ).toEqual({ ok: true })
     expect(queuedIds()).toEqual([third.id, first.id])
 
-    expect(await batchAction({ action: 'sign' })).toEqual({ ok: true })
+    expect(await sign()).toEqual({ ok: true })
     const hash = (await responseOf(firstSend)).result
     expect((await responseOf(thirdSend)).result).toBe(hash)
     await waitForReceipt(node, hash as Hex)
@@ -1010,7 +1020,7 @@ describe('batch queue', () => {
     const request = sendTransactionRequest({ from: smart, ...transfer })
     const outcome = await joined(request)
 
-    const signing = batchAction({ action: 'sign' })
+    const signing = sign()
     const removing = batchAction({ action: 'remove', requestId: request.id })
     expect(await signing).toEqual({ ok: true })
     expect(await removing).toMatchObject({ ok: false, error: { code: -32602 } })
@@ -1021,7 +1031,7 @@ describe('batch queue', () => {
     await startBatch()
     const outcome = await joined(sendTransactionRequest({ from: smart, ...transfer }))
 
-    const signing = batchAction({ action: 'sign' })
+    const signing = sign()
     network.set({ network: { rpcUrl: OFF }, onboarded: true })
     expect(await signing).toEqual({ ok: true })
     expect((await responseOf(outcome)).result).toMatch(/^0x[0-9a-f]{64}$/)
@@ -1081,8 +1091,48 @@ describe('batch queue', () => {
     })
   })
 
+  test('Sign refuses a batch that changed since the review, and sends nothing', async () => {
+    await startBatch()
+    const first = sendTransactionRequest({ from: smart, ...transfer })
+    const firstOutcome = await joined(first)
+    const reviewed = queuedIds()
+    // With bypass on, a send joins after the user's last look.
+    const late = sendTransactionRequest({ from: smart, to: X, value: '0x2' })
+    const lateOutcome = await joined(late)
+
+    const changed = {
+      ok: false,
+      error: { code: BATCH_CHANGED, message: 'The batch changed. Review it again.' },
+    }
+    expect(await batchAction({ action: 'sign', reviewed })).toEqual(changed)
+    expect(
+      await batchAction({ action: 'sign', reviewed: [late.id, first.id] }),
+    ).toEqual(changed)
+    expect(queuedIds()).toEqual([first.id, late.id])
+    expect(await node.getBalance(X)).toBe(0n)
+
+    expect(await sign()).toEqual({ ok: true })
+    const hash = (await responseOf(firstOutcome)).result
+    expect((await responseOf(lateOutcome)).result).toBe(hash)
+    await waitForReceipt(node, hash as Hex)
+    expect(await node.getBalance(X)).toBe(3n)
+  })
+
+  test('"Start batch" for another network than the active one is refused before connecting to it', async () => {
+    expect(
+      await batchAction({ action: 'open', rpcUrl: OFF, account: smart }),
+    ).toEqual({
+      ok: false,
+      error: {
+        code: -32602,
+        message: `Batches are only for the active network, not ${OFF}.`,
+      },
+    })
+    expect(queueNow()).toBeNull()
+  })
+
   test('Sign with no batch open is refused; Discard is a no-op', async () => {
-    expect(await batchAction({ action: 'sign' })).toMatchObject({
+    expect(await sign()).toMatchObject({
       ok: false,
       error: { code: -32602, message: 'No batch is open.' },
     })
@@ -1216,9 +1266,12 @@ describe('request ids', () => {
     expect(queue?.items.map((i) => i.origin)).toEqual(['a.test', 'b.test'])
     expect(new Set(queue?.items.map((i) => i.requestId)).size).toBe(2)
 
-    expect(await handlers.get('batchQueue')?.({ action: 'sign' })).toEqual({
-      ok: true,
-    })
+    expect(
+      await handlers.get('batchQueue')?.({
+        action: 'sign',
+        reviewed: queue?.items.map((i) => i.requestId),
+      }),
+    ).toEqual({ ok: true })
     const [answerA, answerB] = await Promise.all([a, b])
     const hash = answerA.result as Hex
     expect(hash).toMatch(/^0x[0-9a-f]{64}$/)

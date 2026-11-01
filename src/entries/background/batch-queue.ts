@@ -12,6 +12,7 @@ import {
   EXECUTION_REVERTED,
   INVALID_PARAMS,
   WalletRpcError,
+  batchChanged,
   serializeError,
   unauthorizedAccount,
 } from '~/smart/errors'
@@ -19,6 +20,7 @@ import { type ExecutionResult, executeCalls } from '~/smart/execute'
 import {
   type BatchQueue,
   flattenQueue,
+  matchesReview,
   moveItem,
   queueAfterNetworkChange,
   queueRecords,
@@ -145,13 +147,19 @@ function settle(queue: BatchQueue, { deps, account, result }: Sent) {
 
 /**
  * Signs the open batch: each request gets its own answer from the one
- * execution. A predicted revert nobody forced is every request's answer too,
- * and closes the batch; a failure before anything is sent leaves the batch
- * open, to try again or discard.
+ * execution. Only the batch as reviewed is signed: the requests in `reviewed`,
+ * in that order; one that changed since (a join, an edit) is refused, and
+ * nothing is sent. A predicted revert nobody forced is every request's answer
+ * too, and closes the batch; a failure before anything is sent leaves the
+ * batch open, to try again or discard.
  */
-function sign(force: boolean): Promise<BatchQueueResult> {
+function sign(
+  reviewed: readonly number[],
+  force: boolean,
+): Promise<BatchQueueResult> {
   return withOpenBatch(async (queue) => {
     if (!queue) return failed(noBatch())
+    if (!matchesReview(queue.items, reviewed)) return failed(batchChanged())
     if (queue.items.length === 0) return failed(invalid('The batch is empty.'))
     let sent: Sent
     try {
@@ -197,15 +205,15 @@ function remove(requestId: number): Promise<BatchQueueResult> {
   })
 }
 
-/** Moves the item at `from` to `to`; a `wallet_sendCalls` moves whole. */
-function move(from: number, to: number): Promise<BatchQueueResult> {
+/** Moves a request (a `wallet_sendCalls` whole) to position `to`. */
+function move(requestId: number, to: number): Promise<BatchQueueResult> {
   return withOpenBatch((queue) => {
-    if (!queue) return failed(noBatch())
-    const { length } = queue.items
-    if (from >= length || to >= length) {
-      return failed(invalid(`The batch has ${length} items.`))
+    if (!queue?.items.some((i) => i.requestId === requestId)) {
+      return failed(invalid(`Request ${requestId} is not in the batch.`))
     }
-    editQueue((current) => moveItem(current, from, to))
+    const { length } = queue.items
+    if (to >= length) return failed(invalid(`The batch has ${length} items.`))
+    editQueue((current) => moveItem(current, requestId, to))
     return ok
   })
 }
@@ -235,6 +243,9 @@ export async function closeStaleBatch(): Promise<void> {
 const isPosition = (value: unknown): value is number =>
   Number.isInteger(value) && (value as number) >= 0
 
+const isRequestIds = (value: unknown): value is number[] =>
+  Array.isArray(value) && value.every((id) => Number.isSafeInteger(id))
+
 /** The batch review's message, validated: a bad payload is `-32602`. */
 async function handle(payload: unknown): Promise<BatchQueueResult> {
   const message = (
@@ -242,7 +253,10 @@ async function handle(payload: unknown): Promise<BatchQueueResult> {
   ) as Record<string, unknown>
   switch (message.action) {
     case 'sign':
-      return sign(message.force === true)
+      if (!isRequestIds(message.reviewed)) {
+        return failed(invalid('Expected the reviewed requestIds to sign.'))
+      }
+      return sign(message.reviewed, message.force === true)
     case 'discard':
       return discard()
     case 'open': {
@@ -263,10 +277,10 @@ async function handle(payload: unknown): Promise<BatchQueueResult> {
       }
       return remove(message.requestId as number)
     case 'move':
-      if (!isPosition(message.from) || !isPosition(message.to)) {
-        return failed(invalid('Expected positions { from, to } to move.'))
+      if (!Number.isSafeInteger(message.requestId) || !isPosition(message.to)) {
+        return failed(invalid('Expected { requestId, to } to move.'))
       }
-      return move(message.from, message.to)
+      return move(message.requestId as number, message.to)
     default:
       return failed(invalid(`Unknown batch action ${JSON.stringify(message.action)}.`))
   }

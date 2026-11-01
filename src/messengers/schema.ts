@@ -17,14 +17,17 @@ export type Schema = {
    * The batch review's changes to the open batch; the background is its only
    * writer. `open` is "Start batch", `sign` with `force` is "Sign anyway", and
    * `remove` takes a request (a `wallet_sendCalls` whole) out, with 4001.
+   * `sign` names the requests the review showed, in its order: a batch that
+   * changed since is refused (`BATCH_CHANGED`). `move` puts a request at
+   * position `to`.
    */
   batchQueue: [
     payload:
-      | { action: 'sign'; force?: boolean }
+      | { action: 'sign'; reviewed: number[]; force?: boolean }
       | { action: 'discard' }
       | { action: 'open'; rpcUrl: string; account: Address }
       | { action: 'remove'; requestId: number }
-      | { action: 'move'; from: number; to: number },
+      | { action: 'move'; requestId: number; to: number },
     response:
       | { ok: true }
       | { ok: false; error: { code: number; message: string; data?: unknown } },

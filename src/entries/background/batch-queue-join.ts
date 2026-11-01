@@ -15,6 +15,7 @@ import {
   type QueuedItem,
   cannotJoin,
   enqueue,
+  notActiveNetwork,
   openQueue,
 } from '~/smart/queue'
 import { sendTransactionCall } from '~/smart/resolve'
@@ -123,6 +124,9 @@ function park(send: IncomingSend, entry: Entry): Joined {
  */
 export function startBatch(rpcUrl: string, address: Address): Promise<void> {
   return oneSendAtATime(rpcUrl, async () => {
+    // Before the reconcile: another network may well be unreachable.
+    const inactive = notActiveNetwork(rpcUrl, activeRpcUrl())
+    if (inactive) throw new WalletRpcError(INVALID_PARAMS, inactive)
     await openBatch()
     const { deps } = await reconcileSnapshot(rpcUrl)
     const account = findAccount(deps.accounts, address)

@@ -86,6 +86,16 @@ export function queueAfterNetworkChange(
   return { queue: null, reject: queue.items.map((i) => i.requestId) }
 }
 
+/** Why `rpcUrl` can't have a batch: it isn't the active network. */
+export function notActiveNetwork(
+  rpcUrl: string,
+  activeRpcUrl: string,
+): string | null {
+  return rpcUrl === activeRpcUrl
+    ? null
+    : `Batches are only for the active network, not ${rpcUrl}.`
+}
+
 /**
  * Why a send can't join `queue` (or open one, when there is none), or `null`
  * when it can. Batches are for the active network only; only a smart account
@@ -103,9 +113,8 @@ export function cannotJoin(
   },
   activeRpcUrl: string,
 ): string | null {
-  if (send.rpcUrl !== activeRpcUrl) {
-    return `Batches are only for the active network, not ${send.rpcUrl}.`
-  }
+  const inactive = notActiveNetwork(send.rpcUrl, activeRpcUrl)
+  if (inactive) return inactive
   if (send.mode !== 'smart') {
     return `Only smart accounts can batch: ${send.account} is ${send.mode}.`
   }
@@ -140,16 +149,20 @@ export function enqueue(
   return queue && { ...queue, items: [...queue.items, item] }
 }
 
-/** Moves the item at `from` to `to`; out of range changes nothing. */
+/**
+ * Moves the request's item (a `wallet_sendCalls` whole) to position `to`. By
+ * request, not position: a join landing first would shift the positions. An
+ * unknown request or a position out of range changes nothing.
+ */
 export function moveItem(
   queue: BatchQueue | null,
-  from: number,
+  requestId: number,
   to: number,
 ): BatchQueue | null {
   if (!queue) return queue
-  const inRange = (i: number) =>
-    Number.isInteger(i) && i >= 0 && i < queue.items.length
-  if (!inRange(from) || !inRange(to) || from === to) return queue
+  const from = queue.items.findIndex((i) => i.requestId === requestId)
+  const inRange = Number.isInteger(to) && to >= 0 && to < queue.items.length
+  if (from === -1 || !inRange || from === to) return queue
   const items = [...queue.items]
   const [moved] = items.splice(from, 1)
   items.splice(to, 0, moved as QueuedItem)
@@ -165,6 +178,21 @@ export function removeItem(
 }
 
 // -- signing ------------------------------------------------------------------
+
+/**
+ * Whether the queue holds exactly the requests the review showed, in its
+ * order: Sign signs what was reviewed, never a batch that changed since (a
+ * join, a removal, a move).
+ */
+export function matchesReview(
+  items: readonly QueuedItem[],
+  reviewed: readonly number[],
+): boolean {
+  return (
+    items.length === reviewed.length &&
+    items.every((item, i) => item.requestId === reviewed[i])
+  )
+}
 
 /**
  * The batch records of a signed queue: one per queued `wallet_sendCalls`,
