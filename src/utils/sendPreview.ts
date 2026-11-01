@@ -87,7 +87,9 @@ export function sendActions(args: {
 /**
  * Whether the node gets the send as it is: an `eth_sendTransaction` the
  * background passes through (`dropsExtras`, as `smart-sends.ts` decides). Its
- * gas, fees and nonce then count; a smart account's path picks its own.
+ * gas, fees and nonce then count; a smart account's path picks its own. A
+ * page's transaction always has a `from` by then (R50), so a smart account's
+ * is never warned of running out of gas on the dApp's limit.
  */
 export function passesThrough(
   method: SendMethod,

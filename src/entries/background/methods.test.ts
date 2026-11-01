@@ -11,6 +11,7 @@ import {
   needsSession,
   opensSidebar,
   refusedFromPage,
+  takesFrom,
   permissionsFor,
   requestRpcUrl,
   requiresApproval,
@@ -312,5 +313,26 @@ describe('refusedFromPage', () => {
   ])('%p is not refused', (method) => {
     expect(refusedFromPage(method, {})).toBe(false)
     expect(refusedFromPage(method, { bypassTransactionAuth: true })).toBe(false)
+  })
+})
+
+describe('takesFrom', () => {
+  test.each([
+    'eth_sendTransaction',
+    'eth_signTransaction',
+    'eth_sendTransactionSync',
+  ])('%s is a transaction from an account', (method) => {
+    expect(takesFrom(method)).toBe(true)
+  })
+
+  test.each([
+    'wallet_sendCalls',
+    'personal_sign',
+    'eth_sendRawTransaction',
+    'eth_call',
+    'toString',
+    '',
+  ])('%p is not', (method) => {
+    expect(takesFrom(method)).toBe(false)
   })
 })

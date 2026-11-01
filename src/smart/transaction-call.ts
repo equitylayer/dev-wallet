@@ -53,3 +53,21 @@ export function dropsExtras(
 ): boolean {
   return typeof tx.from === 'string' && mode === 'smart'
 }
+
+/**
+ * `tx` sent from `address` when it names no account (`from` absent or null),
+ * as `eth_accounts` would have the page pick; a string `from` is kept, `tx`
+ * itself.
+ *
+ * @throws WalletRpcError `-32602` for a `from` that isn't a string, or a
+ *   `tx` that isn't a transaction object.
+ */
+export function withFrom(tx: unknown, address: Address): Record<string, unknown> {
+  if (typeof tx !== 'object' || tx === null || Array.isArray(tx)) {
+    throw invalid('Expected a transaction object')
+  }
+  const { from } = tx as Record<string, unknown>
+  if (typeof from === 'string') return tx as Record<string, unknown>
+  if (from != null) throw invalid('`from` must be an address')
+  return { ...tx, from: address }
+}

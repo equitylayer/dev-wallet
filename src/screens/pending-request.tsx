@@ -112,7 +112,6 @@ function SendCallsRequest({
 function SendTransactionRequest({
   request,
 }: { request: ExtractRequest<'eth_sendTransaction'> }) {
-  const { account } = useAccountStore()
   const [param] = (request.params ?? []) as unknown[]
   // A malformed one edits as an empty transaction.
   const original = useMemo(
@@ -147,11 +146,10 @@ function SendTransactionRequest({
       request={decided}
       origin={originOf(request)}
       method="eth_sendTransaction"
-      from={
-        typeof tx.from === 'string'
-          ? (tx.from as Address)
-          : (account?.address ?? zeroAddress)
-      }
+      // A page's transaction always names its account: the background gives
+      // one with none the active account (R50), and the wallet's own name
+      // theirs. Without one it is no account's, never the active one's.
+      from={typeof tx.from === 'string' ? (tx.from as Address) : zeroAddress}
       calls={calls}
       atomicRequired={false}
       tx={tx}

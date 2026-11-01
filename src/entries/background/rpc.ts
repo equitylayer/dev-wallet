@@ -14,6 +14,7 @@ import type { CallbackOptions } from '~/messengers/transports/types'
 import { serializeError } from '~/smart/errors'
 import { connectNode, nodeMethod } from '~/smart/node'
 import { DEVWALLET_ORIGIN } from '~/smart/queue'
+import { withFrom } from '~/smart/transaction-call'
 import type { RpcRequest, RpcResponse } from '~/types/rpc'
 import { senderHost } from '~/utils/host'
 import {
@@ -32,6 +33,7 @@ import {
   refusedFromPage,
   requestRpcUrl,
   requiresApproval,
+  takesFrom,
   withSerializedErrors,
 } from './methods'
 import { type PlainDecision, requestUserDecision } from './pending-requests'
@@ -133,6 +135,23 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
           message: `DevWallet doesn't let a page call ${request.method} unless transactions are bypassed.`,
         },
       } as RpcResponse
+
+    // A page's transaction that names no account goes from the active one,
+    // the first `eth_accounts` gives, never from the node's default (R50).
+    // The request itself carries it: the approval, the batch queue and the
+    // pass-through all read it.
+    if (isInpage && takesFrom(request.method)) {
+      const { network } = networkStore.getState()
+      const [account] = accountStore
+          .getState()
+          .getAccounts({ activeFirst: true, rpcUrl: network.rpcUrl })
+      if (!account) return unauthorized(request)
+      const params = Array.isArray(request.params) ? request.params : []
+      ;(request as { params: unknown[] }).params = [
+        withFrom(params[0], account.address),
+        ...params.slice(1),
+      ]
+    }
 
     // Sends go through the smart-account execution core, which asks for the
     // approval itself; plain `eth_sendTransaction`s come back to pass through.

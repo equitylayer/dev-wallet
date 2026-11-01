@@ -39,6 +39,15 @@ const NODE_SIGNED_METHODS = [
   'eth_sendTransactionSync',
 ] as const
 
+/**
+ * Methods whose first param is a transaction from an account: a page's that
+ * names none goes from the active account, never the node's default (R50).
+ */
+const FROM_METHODS = [
+  'eth_sendTransaction',
+  ...NODE_SIGNED_METHODS,
+] as const
+
 /** Methods that open the side panel without needing a decision to execute. */
 const SIDEBAR_METHODS = [
   'eth_requestAccounts',
@@ -83,6 +92,11 @@ export function needsSession(method: string): boolean {
  */
 export function refusedFromPage(method: string, s: ApprovalSettings): boolean {
   return isOneOf(NODE_SIGNED_METHODS, method) && !s.bypassTransactionAuth
+}
+
+/** Whether a page's request names the account it sends from (`FROM_METHODS`). */
+export function takesFrom(method: string): boolean {
+  return isOneOf(FROM_METHODS, method)
 }
 
 /** Whether a request for this method should open the side panel. */

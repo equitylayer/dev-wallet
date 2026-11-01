@@ -19,6 +19,7 @@ import {
   type RpcTransaction,
   getAddress,
   numberToHex,
+  recoverTransactionAddress,
 } from 'viem'
 
 import {
@@ -36,6 +37,7 @@ import type { BatchQueue, QueuedItem } from '~/smart/queue'
 import { DEV_ACCOUNTS, startAnvil, waitForReceipt } from '~/smart/testing/anvil'
 import type { AccountMode, SponsorSetting } from '~/smart/types'
 import type { RpcRequest, RpcResponse } from '~/types/rpc'
+import { filterAccounts } from '~/utils/accounts'
 
 import type { Batcher, Decision } from './pending-requests'
 import type { SendOutcome } from './smart-sends'
@@ -92,7 +94,14 @@ const pendingRequests: (RpcRequest & {
 })[] = []
 
 mock.module('~/zustand', () => ({
-  accountStore: { persist, getState: () => accountState },
+  accountStore: {
+    persist,
+    getState: () => ({
+      ...accountState,
+      getAccounts: (options: { activeFirst?: boolean; rpcUrl?: string }) =>
+        filterAccounts({ ...accountState, ...options }),
+    }),
+  },
   accountModesStore: {
     persist,
     getState: () => ({
@@ -1508,6 +1517,84 @@ describe('page requests', () => {
       expect(await node.getBalance(X)).toBe(2n)
       expect(pendingRequests).toHaveLength(0)
     })
+
+    describe('a send with no `from` (R50)', () => {
+      const active = (address: Address) => {
+        accountState.account = accountState.accounts.find(
+          (a) => a.address === address,
+        )
+      }
+      const lower = (address: string) => address.toLowerCase()
+
+      test("goes from the active account, never the node's default", async () => {
+        active(never)
+        const sent = await ask(
+          'eth_sendTransaction',
+          [transfer],
+          top('dapp.test'),
+        )
+        const receipt = await waitForReceipt(node, sent.result as Hex)
+        expect(lower(receipt.from)).toBe(lower(never))
+        expect(lower(receipt.from)).not.toBe(lower(DEV_ACCOUNTS[0]))
+        expect(await node.getBalance(X)).toBe(1n)
+      })
+
+      test('from a smart active account, it goes through the core', async () => {
+        const sent = await ask(
+          'eth_sendTransaction',
+          [transfer],
+          top('dapp.test'),
+        )
+        const receipt = await waitForReceipt(node, sent.result as Hex)
+        // Not a plain transfer to X from the node's default account.
+        expect(lower(receipt.to ?? '')).not.toBe(lower(X))
+        expect(await node.getBalance(X)).toBe(1n)
+      })
+
+      test('a signed transaction is signed by the active account', async () => {
+        active(never)
+        const signed = await ask(
+          'eth_signTransaction',
+          [transfer],
+          top('dapp.test'),
+        )
+        expect(
+          await recoverTransactionAddress({
+            serializedTransaction: signed.result as never,
+          }),
+        ).toBe(never)
+      })
+
+      test('with no account to send from, the site is refused', async () => {
+        accountState.accounts = []
+        accountState.account = undefined
+        const fetches = spyOn(globalThis, 'fetch')
+        try {
+          for (const method of [
+            'eth_sendTransaction',
+            'eth_signTransaction',
+          ]) {
+            expect(
+              await ask(method, [transfer], top('dapp.test')),
+            ).toMatchObject({ error: { code: 4100 } })
+          }
+          expect(fetches).not.toHaveBeenCalled()
+        } finally {
+          fetches.mockRestore()
+        }
+      })
+
+      test('a `from` that is not a string is invalid params', async () => {
+        expect(
+          await ask(
+            'eth_sendTransaction',
+            [{ ...transfer, from: 1 }],
+            top('dapp.test'),
+          ),
+        ).toMatchObject({ error: { code: -32602 } })
+        expect(await node.getBalance(X)).toBe(0n)
+      })
+    })
   })
 
   describe('with bypass off', () => {
@@ -1544,6 +1631,21 @@ describe('page requests', () => {
     test('a wallet page still has the node sign', async () => {
       const signed = await ask('eth_signTransaction', [tx], walletPage())
       expect(signed.result).toMatch(/^0x[0-9a-f]+$/)
+    })
+
+    test('the approval of a send with no `from` shows the active account (R50)', async () => {
+      const answer = ask('eth_sendTransaction', [transfer], top('dapp.test'))
+      for (let i = 0; i < 300 && pendingRequests.length < 1; i++)
+        await Bun.sleep(10)
+      const [pending] = pendingRequests as RpcRequest[]
+      expect(
+        (pending?.params as [{ from?: string }] | undefined)?.[0]?.from,
+      ).toBe(smart)
+      await handlers.get('pendingRequest')?.({
+        request: pending,
+        status: 'rejected',
+      })
+      expect(await answer).toMatchObject({ error: { code: 4001 } })
     })
   })
 })
