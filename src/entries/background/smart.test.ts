@@ -60,7 +60,11 @@ const modes = new Map<string, AccountMode>()
 const modeKey = (rpcUrl: string, address: Address) =>
   `${rpcUrl}.${address.toLowerCase()}`
 let records: BatchRecordsState = { records: {} }
-const settings: { sponsor: SponsorSetting } = { sponsor: { kind: 'devwallet' } }
+const settings: {
+  sponsor: SponsorSetting
+  bypassSignatureAuth?: boolean
+  bypassTransactionAuth?: boolean
+} = { sponsor: { kind: 'devwallet' } }
 
 /** A fake store with `subscribe`, like zustand's: listeners get (next, prev). */
 function observable<T>(initial: T) {
@@ -1379,6 +1383,95 @@ describe('page requests', () => {
     expect(
       (await ask('wallet_getPermissions', [], top('www.dapp.test'))).result,
     ).toHaveLength(1)
+  })
+
+  describe('with both bypasses on', () => {
+    beforeEach(() => {
+      settings.bypassSignatureAuth = true
+      settings.bypassTransactionAuth = true
+    })
+    afterEach(() => {
+      delete settings.bypassSignatureAuth
+      delete settings.bypassTransactionAuth
+    })
+
+    const tx = { from: smart, ...transfer }
+    const typedData = {
+      types: {
+        EIP712Domain: [{ name: 'name', type: 'string' }],
+        Mail: [{ name: 'note', type: 'string' }],
+      },
+      domain: { name: 'x' },
+      primaryType: 'Mail',
+      message: { note: 'hi' },
+    }
+    /** Every method that signs or sends with an account's key. */
+    const keyed: [string, unknown[]][] = [
+      ['eth_sendTransaction', [tx]],
+      [
+        'wallet_sendCalls',
+        [{ version: '2.0.0', chainId: '0x7a69', from: smart, calls: [transfer] }],
+      ],
+      ['eth_sign', [smart, '0x68656c6c6f']],
+      ['personal_sign', ['0x68656c6c6f', smart]],
+      ['eth_signTypedData', [smart, typedData]],
+      ['eth_signTypedData_v3', [smart, typedData]],
+      ['eth_signTypedData_v4', [smart, typedData]],
+      ['eth_signTransaction', [tx]],
+    ]
+
+    test('a site that is not connected gets 4100, and the node never hears of it', async () => {
+      const fetches = spyOn(globalThis, 'fetch')
+      try {
+        for (const [method, params] of keyed) {
+          expect(await ask(method, params, top('evil.test'))).toMatchObject({
+            id: 1,
+            error: { code: 4100 },
+          })
+        }
+        const bodies = fetches.mock.calls.map(([, init]) =>
+          String(init?.body ?? ''),
+        )
+        for (const method of [
+          ...keyed.map(([m]) => m),
+          'eth_sendRawTransaction',
+          'eth_sendUserOperation',
+        ]) {
+          expect(bodies.filter((b) => b.includes(`"${method}"`))).toEqual([])
+        }
+      } finally {
+        fetches.mockRestore()
+      }
+      expect(pendingRequests).toHaveLength(0)
+      expect(await node.getBalance(X)).toBe(0n)
+    })
+
+    test("a subframe of a connected site isn't connected for them either", async () => {
+      for (const [method, params] of keyed) {
+        expect(
+          await ask(method, params, subframe('evil.test', 'dapp.test')),
+        ).toMatchObject({ error: { code: 4100 } })
+      }
+    })
+
+    test('a connected site still signs and sends, unasked', async () => {
+      const signature = await ask(
+        'personal_sign',
+        ['0x68656c6c6f', smart],
+        top('dapp.test'),
+      )
+      expect(signature.result).toMatch(/^0x[0-9a-f]{130}$/)
+
+      const signed = await ask('eth_signTransaction', [tx], top('dapp.test'))
+      expect(signed.result).toMatch(/^0x[0-9a-f]+$/)
+
+      const sent = await ask('eth_sendTransaction', [tx], top('dapp.test'))
+      const hash = sent.result as Hex
+      expect(hash).toMatch(/^0x[0-9a-f]{64}$/)
+      await waitForReceipt(node, hash)
+      expect(await node.getBalance(X)).toBe(1n)
+      expect(pendingRequests).toHaveLength(0)
+    })
   })
 })
 

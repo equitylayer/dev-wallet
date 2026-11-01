@@ -8,6 +8,7 @@ import {
   assertEthAccountsRequest,
   declinedError,
   isTransactionMethod,
+  needsSession,
   opensSidebar,
   permissionsFor,
   requestRpcUrl,
@@ -239,5 +240,42 @@ describe('requestRpcUrl', () => {
     expect(requestRpcUrl({ fromPage: false, requested: '', current })).toBe(
       current,
     )
+  })
+})
+
+describe('needsSession', () => {
+  test.each([
+    'eth_sign',
+    'personal_sign',
+    'eth_signTypedData',
+    'eth_signTypedData_v3',
+    'eth_signTypedData_v4',
+    'eth_signTransaction',
+    'eth_sendTransaction',
+    'wallet_sendCalls',
+  ])('%s signs or sends with an account key: a site must be connected', (method) => {
+    expect(needsSession(method)).toBe(true)
+  })
+
+  test('covers every method that needs approval, whatever the bypass settings', () => {
+    for (const method of [...SIGNATURE_METHODS, ...TRANSACTION_METHODS])
+      expect(needsSession(method)).toBe(true)
+  })
+
+  test.each([
+    'eth_chainId',
+    'eth_accounts',
+    'eth_requestAccounts',
+    'wallet_requestPermissions',
+    'wallet_getPermissions',
+    'wallet_getCapabilities',
+    'wallet_getCallsStatus',
+    'wallet_showCallsStatus',
+    'eth_call',
+    'eth_sendRawTransaction',
+    'toString',
+    '',
+  ])('%p does not', (method) => {
+    expect(needsSession(method)).toBe(false)
   })
 })

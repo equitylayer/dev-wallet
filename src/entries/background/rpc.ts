@@ -27,6 +27,7 @@ import {
   assertEthAccountsRequest,
   declinedError,
   isTransactionMethod,
+  needsSession,
   permissionsFor,
   requestRpcUrl,
   requiresApproval,
@@ -114,7 +115,9 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
         request.method,
         settingsStore.getState(),
     )
-    if (needsApproval && isInpage && !session)
+    // Signing or sending with an account's key needs a connected site, bypass
+    // or not: the bypass skips asking the user, not authorizing the site.
+    if (isInpage && !session && needsSession(request.method))
       return {
         id: request.id,
         jsonrpc: '2.0',

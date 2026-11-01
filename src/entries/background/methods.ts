@@ -14,6 +14,20 @@ export const TRANSACTION_METHODS = [
   'wallet_sendCalls',
 ] as const
 
+/**
+ * Every method that signs or sends with an account's key on the node (Anvil
+ * 1.7.1 and Hardhat), the wallet's own sends included. A page must be
+ * connected to call any of them, whatever the bypass settings: bypassing
+ * the approval is not authorizing the site.
+ */
+const SESSION_METHODS = [
+  ...SIGNATURE_METHODS,
+  ...TRANSACTION_METHODS,
+  'eth_signTypedData',
+  'eth_signTypedData_v3',
+  'eth_signTransaction',
+] as const
+
 /** Methods that open the side panel without needing a decision to execute. */
 const SIDEBAR_METHODS = [
   'eth_requestAccounts',
@@ -44,6 +58,11 @@ export function requiresApproval(
   if (isOneOf(SIGNATURE_METHODS, method)) return !s.bypassSignatureAuth
   if (isOneOf(TRANSACTION_METHODS, method)) return !s.bypassTransactionAuth
   return false
+}
+
+/** Whether only a connected site may call this method (`SESSION_METHODS`). */
+export function needsSession(method: string): boolean {
+  return isOneOf(SESSION_METHODS, method)
 }
 
 /** Whether a request for this method should open the side panel. */
