@@ -1,7 +1,5 @@
-import { useQueries } from '@tanstack/react-query'
 import { useMemo } from 'react'
-import { type Address, formatEther, type Transaction } from 'viem'
-import { recoverAuthorizationAddress } from 'viem/utils'
+import { type Address, formatEther } from 'viem'
 
 import { LoadMore, Tooltip, useVirtualList } from '~/components'
 import {
@@ -15,86 +13,21 @@ import {
     Stack,
     Text,
 } from '~/design-system'
-import { useInfiniteBlockTransactions } from '~/hooks/useInfiniteBlockTransactions'
-import { usePendingTransactions } from '~/hooks/usePendingTransactions'
+import { useAccountActivity } from '~/hooks/useAccountActivity'
 
 const numberIntl4SigFigs = new Intl.NumberFormat('en-US', {
     maximumSignificantDigits: 4,
 })
 
 export function Activity({ accountAddress }: { accountAddress: Address }) {
-    const { data: pendingTransactions } = usePendingTransactions()
-
-    const query = useInfiniteBlockTransactions()
     const {
-        data: infiniteBlockTransactions,
+        accountLower,
         isFetched,
         isFetchingNextPage,
-    } = query
-
-    const accountLower = accountAddress.toLowerCase()
-
-    const allMined = useMemo(
-        () =>
-            (infiniteBlockTransactions?.pages.flat() as Transaction[] | undefined) ??
-            [],
-        [infiniteBlockTransactions],
-    )
-
-    // EIP-7702 txs carry authorizations signed by other EOAs. The authority
-    // isn't stored explicitly — we have to ecrecover it from each signature
-    // — so we cache the result per tx hash (forever, since signatures are
-    // deterministic).
-    const authorizationTxs = useMemo(
-        () =>
-            allMined.filter(
-                (tx) => tx.type === 'eip7702' && (tx.authorizationList?.length ?? 0) > 0,
-            ),
-        [allMined],
-    )
-    const authorityResults = useQueries({
-        queries: authorizationTxs.map((tx) => ({
-            queryKey: ['authority-recovery', tx.hash] as const,
-            staleTime: Number.POSITIVE_INFINITY,
-            gcTime: Number.POSITIVE_INFINITY,
-            queryFn: async () => {
-                const authorities = await Promise.all(
-                    (tx.authorizationList ?? []).map((authorization) =>
-                        recoverAuthorizationAddress({ authorization }),
-                    ),
-                )
-                return authorities.map((a: string) => a.toLowerCase())
-            },
-        })),
-    })
-    const sponsoredHashes = useMemo(() => {
-        const set = new Set<string>()
-        authorizationTxs.forEach((tx, i) => {
-            const authorities = authorityResults[i]?.data
-            if (
-                authorities?.includes(accountLower) &&
-                tx.from.toLowerCase() !== accountLower
-            )
-                set.add(tx.hash)
-        })
-        return set
-    }, [accountLower, authorizationTxs, authorityResults])
-
-    const transactions = useMemo(() => {
-        const matches = (tx: Transaction) =>
-            tx.from.toLowerCase() === accountLower ||
-            (tx.to || '').toLowerCase() === accountLower ||
-            sponsoredHashes.has(tx.hash)
-
-        return [
-            ...(pendingTransactions ?? [])
-                .filter(matches)
-                .map((transaction) => ({ transaction, status: 'pending' as const })),
-            ...allMined
-                .filter(matches)
-                .map((transaction) => ({ transaction, status: 'mined' as const })),
-        ]
-    }, [accountLower, pendingTransactions, allMined, sponsoredHashes])
+        query,
+        sponsoredHashes,
+        transactions,
+    } = useAccountActivity(accountAddress)
 
     const isEmpty = isFetched && transactions.length === 0
 

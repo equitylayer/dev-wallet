@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-01T02:41:36+00:00",
+  "generatedAt": "2026-11-01T03:47:13+00:00",
   "title": "Design System: DevWallet",
   "extensions": {
     "colorMeta": {
@@ -424,6 +424,21 @@
           "#d5f5fb"
         ]
       },
+      "prompt-teal-wash": {
+        "role": "primary",
+        "displayName": "Prompt Teal Wash",
+        "canonical": "#e3eff0",
+        "tonalRamp": [
+          "#202c2d",
+          "#344e51",
+          "#467376",
+          "#56999f",
+          "#7aaeb3",
+          "#a1c1c4",
+          "#c9d8da",
+          "#f0f4f4"
+        ]
+      },
       "phosphor-amber": {
         "role": "primary",
         "displayName": "Phosphor Amber (dark accent)",
@@ -437,6 +452,36 @@
           "#d49838",
           "#f0c07c",
           "#ffeac6"
+        ]
+      },
+      "phosphor-amber-wash": {
+        "role": "primary",
+        "displayName": "Phosphor Amber Wash",
+        "canonical": "#2c2416",
+        "tonalRamp": [
+          "#2e281f",
+          "#524733",
+          "#796644",
+          "#a28553",
+          "#b69f77",
+          "#c6b89f",
+          "#dbd4c8",
+          "#f4f3f0"
+        ]
+      },
+      "on-amber": {
+        "role": "primary",
+        "displayName": "On Amber",
+        "canonical": "#1d1407",
+        "tonalRamp": [
+          "#342919",
+          "#5f4825",
+          "#8f672e",
+          "#c38831",
+          "#cfa15d",
+          "#d6b98f",
+          "#e2d4c0",
+          "#f6f3ef"
         ]
       },
       "signal-blue": {
@@ -689,13 +734,17 @@
         "displayName": "Headline",
         "purpose": "Rare section headings in onboarding and playgrounds."
       },
+      "title-large": {
+        "displayName": "Title Large",
+        "purpose": "The account alias on the account plate, or \"Add alias\" in tertiary ink."
+      },
       "title": {
         "displayName": "Title",
-        "purpose": "Screen titles in the container header."
+        "purpose": "Screen titles in the container header and section heads on detail screens."
       },
       "body-large": {
         "displayName": "Body Large",
-        "purpose": "36px button labels, 36px input text; the Text default."
+        "purpose": "36px button labels and input text; the Text default."
       },
       "body-prose": {
         "displayName": "Body Prose",
@@ -703,23 +752,27 @@
       },
       "body": {
         "displayName": "Body",
-        "purpose": "Workhorse: row titles, aliases, header values, toast titles."
+        "purpose": "Workhorse: bottom nav labels, 28px button labels, row titles and section headers (medium)."
       },
       "caption": {
         "displayName": "Caption",
-        "purpose": "Compact button labels (18–24px) and secondary metadata."
+        "purpose": "Account chips, row metadata, section-header actions, 24px button labels, status-line words."
       },
       "label": {
         "displayName": "Label",
-        "purpose": "9px uppercase readout labels and unit labels; always tertiary ink."
+        "purpose": "11px sentence-case readout labels, units beside a number, tags; the floor."
+      },
+      "data-readout": {
+        "displayName": "Data Readout",
+        "purpose": "The plate's Balance and Nonce values (IBM Plex Mono, tabular)."
       },
       "data": {
         "displayName": "Data",
-        "purpose": "Addresses, hashes, balances, block numbers, chain ids, RPC URLs (IBM Plex Mono, tabular)."
+        "purpose": "Balances and amounts at the right of rows (IBM Plex Mono, tabular)."
       },
       "data-small": {
         "displayName": "Data Small",
-        "purpose": "Truncated addresses, decoded ABI values, compact hex inputs."
+        "purpose": "Full and truncated addresses, token names, status-line host, chain id and block, compact hex inputs."
       }
     },
     "shadows": [
@@ -729,54 +782,69 @@
         "purpose": "Physical cue on the toggle knob only; the system is otherwise flat."
       },
       {
-        "name": "tab-active-rule",
+        "name": "accent-rule-bottom",
         "value": "inset 0 -1.5px 0 <theme accent>",
-        "purpose": "Structural underline on the active tab; not elevation."
+        "purpose": "Active account chip, \"All\" and active in-screen tab: a structural rule on the edge facing the content, not elevation."
       },
       {
-        "name": "account-active-rule",
-        "value": "inset 2px 0 0 <theme accent>",
-        "purpose": "Left rule marking the selected account row."
+        "name": "accent-rule-top",
+        "value": "inset 0 1.5px 0 <theme accent>",
+        "purpose": "Active bottom-nav item: the rule sits on the top edge, facing the content."
       },
       {
-        "name": "focus-ring",
-        "value": "0 0 0 2px <theme accent at 18–22% alpha>",
-        "purpose": "Decided focus treatment for inputs and controls (paired with a 1px accent border)."
+        "name": "focus-outline",
+        "value": "outline: 1.5px solid <theme accent>; outline-offset: -1.5px",
+        "purpose": "Every :focus-visible element; inputs drop it for an accent border."
       }
     ],
     "motion": [
       {
-        "name": "press-shrink",
-        "value": "transform: scale(0.98)",
-        "purpose": "Buttons on hover+active press; no colour transition."
+        "name": "plate-arrive",
+        "value": "background-color rgb(accent / 0.12) to transparent, 600ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "The one authored moment: the account plate's accent wash on account switch. Off under reduced motion."
       },
       {
-        "name": "hover-filter",
-        "value": "filter: brightness(var) contrast(var)",
-        "purpose": "Per-surface hover: ~0.98 brightness on paper, ~0.85–0.95 contrast on black."
+        "name": "mine-swing",
+        "value": "rotate 0deg to 45deg to 0deg, 300ms linear",
+        "purpose": "The status-line pickaxe swings once per new block. Off under reduced motion."
+      },
+      {
+        "name": "shell-state",
+        "value": "background-color, color 120ms ease-out",
+        "purpose": "Hover and state changes on account chips and nav items."
+      },
+      {
+        "name": "row-tools-reveal",
+        "value": "opacity 120ms ease-out",
+        "purpose": "Row tools fade in on hover or focus-within."
       },
       {
         "name": "field-border",
         "value": "border-color 100ms ease",
-        "purpose": "Input border deepening on hover/focus."
+        "purpose": "Input border on hover and the accent border on focus."
       },
       {
         "name": "toggle-slide",
-        "value": "200ms ease",
-        "purpose": "Toggle track colour and knob position."
+        "value": "left 200ms ease",
+        "purpose": "Toggle knob position."
       },
       {
-        "name": "mine-rock",
-        "value": "rotate 0→45°→0 over 0.3s linear",
-        "purpose": "Pickaxe glyph when a block is mined."
+        "name": "press-shrink",
+        "value": "transform: scale(0.98)",
+        "purpose": "Design-system buttons on press; no color transition."
       },
       {
-        "name": "balance-flash",
-        "value": "background-color pulse to --flash-color, ease-out",
-        "purpose": "Account cell flashes when its balance changes."
+        "name": "hover-filter",
+        "value": "filter: brightness(var) contrast(var)",
+        "purpose": "Design-system button hover: ~0.98 brightness on paper, ~0.85-0.95 contrast on black."
       }
     ],
     "breakpoints": [
+      {
+        "name": "status-compact",
+        "value": "380px",
+        "purpose": "Container query on the status line: below it gaps tighten and the mining-mode word hides."
+      },
       {
         "name": "panel-wide",
         "value": "480px"
@@ -788,25 +856,25 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "The single forward action on a screen (Send, Continue). Ink on paper, square, shrinks 2% on press.",
-      "html": "<button class=\"ds-btn-primary\">Send</button>",
-      "css": ".ds-btn-primary { background: #2a2520; color: #fdfcfb; height: 36px; padding: 0 12px; min-width: 120px; border: none; border-radius: 0; font: 400 15px/21px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.35px; cursor: pointer; } .ds-btn-primary:hover { filter: brightness(0.92); } .ds-btn-primary:active { transform: scale(0.98); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px #fdfcfb, 0 0 0 4px rgb(0 113 127 / 0.55); }"
+      "description": "The single forward action on a screen (Send). 28px on the plate; ink on paper, square, shrinks 2% on press.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m22 2-7 20-4-9-9-4Z\"/><path d=\"M22 2 11 13\"/></svg>Send</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 110px; height: 28px; padding: 0 12px; background: #2a2520; color: #fdfcfb; border: none; border-radius: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 13px; font-weight: 500; line-height: 17px; cursor: pointer; } .ds-btn-primary:hover { filter: brightness(0.92); } .ds-btn-primary:active { transform: scale(0.98); } .ds-btn-primary:focus-visible { outline: 1.5px solid #00717f; outline-offset: -1.5px; outline-color: #fdfcfb; box-shadow: inset 0 0 0 3px #00717f; }"
+    },
+    {
+      "name": "Stroked Button",
+      "kind": "button",
+      "refersTo": "button-stroked",
+      "description": "Secondary actions beside the primary (Edit state, Impersonate, Cancel): transparent with a 1px fill border.",
+      "html": "<button class=\"ds-btn-stroked\">Edit state</button>",
+      "css": ".ds-btn-stroked { min-width: 110px; height: 28px; padding: 0 12px; background: transparent; color: #2a2520; border: 1px solid #e8e5e0; border-radius: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 13px; line-height: 17px; cursor: pointer; } .ds-btn-stroked:hover { background: rgb(42 37 32 / 0.05); } .ds-btn-stroked:active { transform: scale(0.98); } .ds-btn-stroked:focus-visible { outline: 1.5px solid #00717f; outline-offset: -1.5px; }"
     },
     {
       "name": "Compact Ghost Button",
       "kind": "button",
       "refersTo": "button-compact-ghost",
-      "description": "The most common button: 24px, text-only row and header actions with a faint ink wash on hover.",
-      "html": "<button class=\"ds-btn-ghost\">Impersonate</button>",
-      "css": ".ds-btn-ghost { background: transparent; color: #2a2520; height: 24px; padding: 0 6px; border: none; border-radius: 0; font: 400 11px/15px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.56px; cursor: pointer; } .ds-btn-ghost:hover { background: rgb(0 0 0 / 0.05); } .ds-btn-ghost:active { transform: scale(0.98); } .ds-btn-ghost:focus-visible { outline: none; box-shadow: inset 0 0 0 1px #00717f, 0 0 0 2px rgb(0 113 127 / 0.18); }"
-    },
-    {
-      "name": "Compact Stroked Button",
-      "kind": "button",
-      "refersTo": "button-compact-stroked",
-      "description": "Secondary action beside a value: transparent with a 1px fill-coloured border.",
-      "html": "<button class=\"ds-btn-stroked\">Set balance</button>",
-      "css": ".ds-btn-stroked { background: transparent; color: #2a2520; height: 24px; padding: 0 6px; border: 1px solid #e8e5e0; border-radius: 0; font: 400 11px/15px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.56px; cursor: pointer; } .ds-btn-stroked:hover { background: rgb(0 0 0 / 0.05); } .ds-btn-stroked:active { transform: scale(0.98); } .ds-btn-stroked:focus-visible { outline: none; border-color: #00717f; box-shadow: 0 0 0 2px rgb(0 113 127 / 0.18); }"
+      "description": "24px text-only row and identity tools with a faint ink wash on hover.",
+      "html": "<button class=\"ds-btn-ghost\">Import token</button>",
+      "css": ".ds-btn-ghost { height: 24px; padding: 0 8px; background: transparent; color: #2a2520; border: none; border-radius: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px; line-height: 16px; letter-spacing: 0.1px; cursor: pointer; } .ds-btn-ghost:hover { background: rgb(42 37 32 / 0.05); } .ds-btn-ghost:active { transform: scale(0.98); } .ds-btn-ghost:focus-visible { outline: 1.5px solid #00717f; outline-offset: -1.5px; }"
     },
     {
       "name": "Destructive Ghost Button",
@@ -814,60 +882,69 @@
       "refersTo": "button-destructive-ghost",
       "description": "Remove, reset and other destructive row actions in signal red.",
       "html": "<button class=\"ds-btn-danger\">Remove</button>",
-      "css": ".ds-btn-danger { background: transparent; color: #dc3d43; height: 24px; padding: 0 6px; border: none; border-radius: 0; font: 400 11px/15px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.56px; cursor: pointer; } .ds-btn-danger:hover { background: rgb(255 229 228 / 0.5); } .ds-btn-danger:active { transform: scale(0.98); } .ds-btn-danger:focus-visible { outline: none; box-shadow: inset 0 0 0 1px #dc3d43; }"
+      "css": ".ds-btn-danger { height: 24px; padding: 0 8px; background: transparent; color: #dc3d43; border: none; border-radius: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px; line-height: 16px; letter-spacing: 0.1px; cursor: pointer; } .ds-btn-danger:hover { background: rgb(255 229 228 / 0.6); } .ds-btn-danger:active { transform: scale(0.98); } .ds-btn-danger:focus-visible { outline: 1.5px solid #00717f; outline-offset: -1.5px; }"
     },
     {
       "name": "Input",
       "kind": "input",
       "refersTo": "input-compact",
-      "description": "Square field on the raised canvas; hex values in IBM Plex Mono. Focus is an accent border plus a soft accent ring.",
+      "description": "Square field on the raised canvas; hex in IBM Plex Mono. Focus turns the border to the accent; the caret is the accent.",
       "html": "<input class=\"ds-input\" placeholder=\"0x… address\" value=\"0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC\">",
-      "css": ".ds-input { width: 280px; height: 24px; padding: 0 6px; background: #fdfcfb; color: #2a2520; border: 1px solid rgb(0 0 0 / 0.2); border-radius: 0; font: 400 11px/15px 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; transition: border-color 100ms ease; caret-color: #00717f; } .ds-input::placeholder { color: rgb(42 37 32 / 0.4); } .ds-input:hover { border-color: rgb(0 0 0 / 0.3); } .ds-input:focus, .ds-input:focus-visible { outline: none; border-color: #00717f; box-shadow: 0 0 0 2px rgb(0 113 127 / 0.18); } .ds-input[aria-invalid=\"true\"] { border-color: #dc3d43; }"
+      "css": ".ds-input { width: 300px; height: 24px; padding: 0 6px; background: #fdfcfb; color: #2a2520; border: 1px solid rgb(42 37 32 / 0.2); border-radius: 0; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 11px; line-height: 15px; transition: border-color 100ms ease; caret-color: #00717f; } .ds-input::placeholder { color: #7a7570; } .ds-input::selection { background: rgb(0 113 127 / 0.28); } .ds-input:hover { border-color: rgb(42 37 32 / 0.3); } .ds-input:focus, .ds-input:focus-visible { outline: none; border-color: #00717f; } .ds-input[aria-invalid=\"true\"] { border-color: #dc3d43; }"
     },
     {
-      "name": "Tabs",
+      "name": "Account Strip",
       "kind": "nav",
-      "refersTo": "tab-active",
-      "description": "Equal-width text tabs; the active tab is primary ink with a 1.5px inset accent rule. No transition.",
-      "html": "<nav class=\"ds-tabs\"><a class=\"ds-tab is-active\" href=\"#\">Accounts</a><a class=\"ds-tab\" href=\"#\">Contracts</a><a class=\"ds-tab\" href=\"#\">TXs</a><a class=\"ds-tab\" href=\"#\">Blocks</a></nav>",
-      "css": ".ds-tabs { display: flex; width: 340px; background: #fdfcfb; border-bottom: 1px solid #dcd9d4; } .ds-tab { flex: 1; text-align: center; padding: 9px 0 8px; color: #7a7570; text-decoration: none; font: 400 12px/15px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.52px; } .ds-tab:hover { color: #5a5550; } .ds-tab.is-active { color: #2a2520; box-shadow: inset 0 -1.5px 0 #00717f; } .ds-tab:focus-visible { outline: none; box-shadow: inset 0 0 0 1px #00717f; }"
+      "refersTo": "account-chip-active",
+      "description": "Global quick switch on the ground color: home cell, scrolling account chips (active = raised canvas + 1.5px accent bottom rule), \"All\" with the count.",
+      "html": "<nav class=\"ds-strip\" aria-label=\"Accounts\"><a class=\"ds-strip-home\" href=\"#\" aria-label=\"Account home\"><span class=\"ds-logo\"></span></a><div class=\"ds-chips\"><button class=\"ds-chip\" aria-current=\"true\">deployer</button><button class=\"ds-chip ds-mono\">0x7099…79C8</button><button class=\"ds-chip ds-mono\">0x3C44…93BC</button><button class=\"ds-chip\">alice</button></div><a class=\"ds-all\" href=\"#\">All <span class=\"ds-count\">10</span></a></nav>",
+      "css": ".ds-strip { display: flex; align-items: stretch; width: 340px; height: 40px; background: #f9f7f4; border-bottom: 1px solid #dcd9d4; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px; line-height: 16px; letter-spacing: 0.1px; } .ds-strip-home { display: grid; place-items: center; width: 40px; flex-shrink: 0; border-right: 1px solid #ebe8e3; } .ds-strip-home:hover { background: #faf9f7; } .ds-logo { width: 22px; height: 22px; border-radius: 5px; background: linear-gradient(135deg, #0d4f5c, #1b2a4a); } .ds-chips { display: flex; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); } .ds-chip { flex-shrink: 0; padding: 0 12px; background: none; border: 0; border-right: 1px solid #ebe8e3; color: #5a5550; font: inherit; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background-color 120ms ease-out, color 120ms ease-out; } .ds-chip.ds-mono { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; font-weight: 400; letter-spacing: 0; } .ds-chip:hover { background: #faf9f7; color: #2a2520; } .ds-chip[aria-current=\"true\"] { cursor: default; color: #2a2520; background: #fdfcfb; box-shadow: inset 0 -1.5px 0 #00717f; } .ds-chip:focus-visible, .ds-all:focus-visible { outline: 1.5px solid #00717f; outline-offset: -1.5px; } .ds-all { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 0 12px; color: #5a5550; text-decoration: none; border-left: 1px solid #dcd9d4; } .ds-all:hover { background: #faf9f7; color: #2a2520; } .ds-count { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; color: #7a7570; }"
     },
     {
-      "name": "Instrument Readout",
+      "name": "Bottom Nav and Status Line",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "Footer on the ground color: four equal 36px sections (active = raised canvas + 1.5px accent top rule) over the 32px status line.",
+      "html": "<footer class=\"ds-foot\"><nav class=\"ds-nav\"><button class=\"ds-nav-item\" aria-current=\"page\">Account</button><button class=\"ds-nav-item\">Contracts</button><button class=\"ds-nav-item\">Activity</button><button class=\"ds-nav-item\">Blocks</button></nav><div class=\"ds-status\"><a class=\"ds-slink\" href=\"#\"><span class=\"ds-dot\"></span><span class=\"ds-mono\">127.0.0.1:8545</span><span class=\"ds-sep\"></span><span class=\"ds-mono ds-t2\">31337</span></a><span class=\"ds-sep\"></span><a class=\"ds-slink\" href=\"#\"><span class=\"ds-mono\">#3,164</span><span class=\"ds-t2\">Manual</span></a><span class=\"ds-tools\"><button class=\"ds-tool\" aria-label=\"Revert the last block\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path d=\"M3 3v5h5\"/><path d=\"M12 7v5l4 2\"/></svg></button><button class=\"ds-tool ds-mine\" aria-label=\"Mine one block\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14.531 12.469 6.619 20.38a1 1 0 1 1-3-3l7.912-7.912\"/><path d=\"M15.686 4.314A12.5 12.5 0 0 0 5.461 2.958 1 1 0 0 0 5.58 4.71a22 22 0 0 1 6.318 3.393\"/><path d=\"M17.7 3.7a1 1 0 0 0-1.4 0l-4.6 4.6a1 1 0 0 0 0 1.4l2.6 2.6a1 1 0 0 0 1.4 0l4.6-4.6a1 1 0 0 0 0-1.4z\"/><path d=\"M19.686 8.314a12.501 12.501 0 0 1 1.356 10.225 1 1 0 0 1-1.751-.119 22 22 0 0 0-3.393-6.319\"/></svg></button></span></div></footer>",
+      "css": ".ds-foot { width: 340px; background: #f9f7f4; border-top: 1px solid #dcd9d4; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; } .ds-nav { display: flex; } .ds-nav-item { flex: 1; height: 36px; background: none; border: 0; border-left: 1px solid #ebe8e3; color: #5a5550; font: inherit; font-size: 13px; line-height: 17px; cursor: pointer; transition: background-color 120ms ease-out, color 120ms ease-out; } .ds-nav-item:first-child { border-left: 0; } .ds-nav-item:hover { background: #faf9f7; color: #2a2520; } .ds-nav-item[aria-current=\"page\"] { color: #2a2520; background: #fdfcfb; box-shadow: inset 0 1.5px 0 #00717f; } .ds-nav-item:focus-visible, .ds-tool:focus-visible, .ds-slink:focus-visible { outline: 1.5px solid #00717f; outline-offset: -1.5px; } .ds-status { display: flex; align-items: center; gap: 4px; height: 32px; padding: 0 4px 0 0; border-top: 1px solid #ebe8e3; font-size: 12px; line-height: 16px; color: #2a2520; } .ds-slink { display: flex; align-items: center; gap: 6px; height: 100%; padding: 0 6px; color: inherit; text-decoration: none; } .ds-slink:first-child { padding-left: 12px; } .ds-slink:hover { background: #faf9f7; } .ds-mono { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; } .ds-t2 { color: #5a5550; } .ds-dot { width: 8px; height: 8px; border-radius: 9999px; background: #2a9764; } .ds-sep { width: 1px; height: 14px; background: #dcd9d4; } .ds-tools { display: flex; gap: 2px; margin-left: auto; } .ds-tool { display: inline-flex; align-items: center; justify-content: center; height: 24px; min-width: 24px; padding: 0 6px; background: none; border: 0; color: #5a5550; cursor: pointer; } .ds-tool:hover { background: #faf9f7; color: #2a2520; } .ds-mine { color: #2a2520; border: 1px solid #dcd9d4; }"
+    },
+    {
+      "name": "Offline Banner",
       "kind": "custom",
-      "refersTo": "header-label",
-      "description": "Header strip cells: 9px uppercase tertiary label over a value, hairline-divided; machine values in mono.",
-      "html": "<div class=\"ds-strip\"><div class=\"ds-cell\"><div class=\"ds-lbl\">RPC URL</div><div class=\"ds-val ds-mono\"><span class=\"ds-dot\"></span>127.0.0.1:8545</div></div><div class=\"ds-cell\"><div class=\"ds-lbl\">Chain</div><div class=\"ds-val ds-mono\">31337</div></div><div class=\"ds-cell\"><div class=\"ds-lbl\">Block</div><div class=\"ds-val ds-mono\">1,204</div></div></div>",
-      "css": ".ds-strip { display: flex; width: 340px; background: #fdfcfb; border-top: 1px solid #dcd9d4; border-bottom: 1px solid #dcd9d4; } .ds-cell { flex: 1; padding: 8px 10px; } .ds-cell + .ds-cell { border-left: 1px solid #dcd9d4; } .ds-cell:hover { background: #faf9f7; } .ds-lbl { font: 400 9px/11px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.56px; text-transform: uppercase; color: #7a7570; margin-bottom: 6px; } .ds-val { font: 400 12px/15px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; color: #2a2520; white-space: nowrap; } .ds-mono { font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; letter-spacing: 0; } .ds-dot { display: inline-block; width: 8px; height: 8px; border-radius: 9999px; background: #2a9764; margin-right: 5px; vertical-align: 0; }"
+      "refersTo": "offline-banner",
+      "description": "Inline, non-blocking red-tint band under the strip when the node is unreachable; the last known state stays readable.",
+      "html": "<div class=\"ds-offline\" role=\"status\"><svg class=\"ds-offline-icon\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 20h.01\"/><path d=\"M8.5 16.429a5 5 0 0 1 7 0\"/><path d=\"M5 12.859a10 10 0 0 1 5.17-2.69\"/><path d=\"M19 12.859a10 10 0 0 0-2.007-1.523\"/><path d=\"M2 8.82a15 15 0 0 1 4.177-2.643\"/><path d=\"M22 8.82a15 15 0 0 0-11.288-3.764\"/><path d=\"m2 2 20 20\"/></svg><div class=\"ds-offline-main\"><div class=\"ds-offline-title\">Node offline</div><div class=\"ds-offline-body\">127.0.0.1:8545 isn't responding. Showing the last known state; it reconnects on its own.</div></div><button class=\"ds-offline-action\">Networks</button></div>",
+      "css": ".ds-offline { display: flex; align-items: flex-start; gap: 8px; width: 316px; padding: 10px 12px; background: #ffe5e4; color: #2a2520; border-bottom: 1px solid rgb(220 61 67 / 0.4); font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; } .ds-offline-icon { flex-shrink: 0; margin-top: 1px; color: #dc3d43; } .ds-offline-main { flex: 1; min-width: 0; } .ds-offline-title { font-size: 13px; font-weight: 600; line-height: 17px; color: #dc3d43; } .ds-offline-body { padding-top: 4px; font-size: 12px; line-height: 16px; letter-spacing: 0.1px; } .ds-offline-action { align-self: center; flex-shrink: 0; padding: 4px 8px; background: none; border: 1px solid rgb(220 61 67 / 0.5); border-radius: 0; color: inherit; font: inherit; font-size: 12px; cursor: pointer; } .ds-offline-action:hover { background: rgb(220 61 67 / 0.12); } .ds-offline-action:focus-visible { outline: 1.5px solid #00717f; outline-offset: -1.5px; }"
+    },
+    {
+      "name": "Account Plate",
+      "kind": "card",
+      "refersTo": "readout-label",
+      "description": "Signature: alias, full mono address, Balance/Nonce/Code readouts with hairline dividers, and three 28px actions. Washes with the accent on account switch.",
+      "html": "<section class=\"ds-plate\"><div class=\"ds-id\"><span class=\"ds-alias\">deployer</span><span class=\"ds-tag\">Impersonated</span></div><div class=\"ds-addr\">0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266</div><div class=\"ds-readouts\"><div class=\"ds-ro\"><div class=\"ds-lbl\">Balance</div><div class=\"ds-val\"><span class=\"ds-num\">10,000</span><span class=\"ds-unit\">ETH</span></div></div><div class=\"ds-ro\"><div class=\"ds-lbl\">Nonce</div><div class=\"ds-val\"><span class=\"ds-num\">0</span></div></div><div class=\"ds-ro\"><div class=\"ds-lbl\">Code</div><div class=\"ds-val\">None</div></div></div><div class=\"ds-acts\"><button class=\"ds-a ds-a-primary\">Send</button><button class=\"ds-a\">Edit state</button><button class=\"ds-a\">Impersonate</button></div></section>",
+      "css": "@keyframes ds-arrive { from { background-color: rgb(0 113 127 / 0.12); } to { background-color: transparent; } } .ds-plate { width: 316px; padding: 16px 12px; background: #fdfcfb; border-bottom: 1px solid #dcd9d4; color: #2a2520; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; animation: ds-arrive 600ms cubic-bezier(0.16, 1, 0.3, 1); } @media (prefers-reduced-motion: reduce) { .ds-plate { animation: none; } } .ds-id { display: flex; align-items: center; gap: 8px; min-height: 25px; } .ds-alias { font-size: 20px; font-weight: 500; line-height: 25px; letter-spacing: -0.3px; } .ds-tag { padding: 2px 6px; border: 1px solid #dcd9d4; color: #5a5550; font-size: 11px; font-weight: 500; line-height: 15px; } .ds-addr { margin-top: 6px; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 12px; line-height: 16px; color: #5a5550; word-break: break-all; } .ds-readouts { display: grid; grid-template-columns: 1.5fr 1fr 1fr; margin-top: 16px; } .ds-ro { min-width: 0; padding-right: 12px; } .ds-ro + .ds-ro { padding-left: 12px; border-left: 1px solid #dcd9d4; } .ds-lbl { font-size: 11px; line-height: 15px; letter-spacing: 0.1px; color: #7a7570; } .ds-val { display: flex; align-items: baseline; gap: 4px; padding-top: 6px; font-size: 14px; line-height: 20px; } .ds-num { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; } .ds-unit { font-size: 11px; color: #7a7570; } .ds-acts { display: flex; gap: 6px; margin-top: 16px; } .ds-a { flex: 1; height: 28px; padding: 0 12px; background: transparent; color: #2a2520; border: 1px solid #e8e5e0; border-radius: 0; font: inherit; font-size: 13px; cursor: pointer; } .ds-a:hover { background: rgb(42 37 32 / 0.05); } .ds-a-primary { background: #2a2520; color: #fdfcfb; border-color: #2a2520; font-weight: 500; } .ds-a-primary:hover { background: #2a2520; filter: brightness(0.92); } .ds-a:active { transform: scale(0.98); } .ds-a:focus-visible { outline: 1.5px solid #00717f; outline-offset: -1.5px; }"
     },
     {
       "name": "Account Row",
       "kind": "custom",
-      "description": "Signature list row: alias over truncated address, mono balance with unit label, 44px drawer pull; the selected row carries a 2px accent rule and faint wash.",
-      "html": "<div class=\"ds-accts\"><div class=\"ds-acct is-active\"><div class=\"ds-acct-main\"><div class=\"ds-acct-name\">Alice</div><div class=\"ds-acct-addr\">0x70997970…dc79C8</div></div><div class=\"ds-acct-bal\">10,000.00<small>ETH</small></div><button class=\"ds-pull\" aria-label=\"Edit\">›</button></div><div class=\"ds-acct\"><div class=\"ds-acct-main\"><div class=\"ds-acct-name\">deployer</div><div class=\"ds-acct-addr\">0xf39Fd6e5…b92266</div></div><div class=\"ds-acct-bal\">9,998.41<small>ETH</small></div><button class=\"ds-pull\" aria-label=\"Edit\">›</button></div></div>",
-      "css": ".ds-accts { width: 340px; background: #fdfcfb; border-top: 1px solid #ebe8e3; } .ds-acct { display: flex; align-items: stretch; border-bottom: 1px solid #ebe8e3; cursor: pointer; } .ds-acct:hover { background: #faf9f7; } .ds-acct.is-active { box-shadow: inset 2px 0 0 #00717f; background: rgb(0 113 127 / 0.06); cursor: default; } .ds-acct-main { flex: 1; min-width: 0; padding: 9px 10px 9px 12px; } .ds-acct-name { font: 500 12px/15px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.52px; color: #2a2520; } .ds-acct-addr { font: 400 11px/15px 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; color: #5a5550; margin-top: 3px; } .ds-acct.is-active .ds-acct-addr { color: #00717f; } .ds-acct-bal { align-self: center; padding: 0 10px; text-align: right; font: 400 12px/15px 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; color: #2a2520; } .ds-acct-bal small { display: block; font: 400 9px/11px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.56px; color: #7a7570; } .ds-pull { width: 44px; border: none; border-radius: 0; background: #faf9f7; color: #2a2520; font: 400 18px/1 Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; cursor: pointer; } .ds-pull:hover { background: #f5f3f0; } .ds-pull:focus-visible { outline: none; box-shadow: inset 0 0 0 1px #00717f; }"
+      "refersTo": "account-row-active",
+      "description": "All-accounts row: alias over truncated address, mono balance with an 11px unit, 44px drawer pull; the active row is the flat accent wash, no bar.",
+      "html": "<div class=\"ds-accts\"><div class=\"ds-acct is-active\"><div class=\"ds-acct-main\"><div class=\"ds-acct-name\">deployer</div><div class=\"ds-acct-addr\">0xf39F…2266</div></div><div class=\"ds-acct-bal\">10,000 <small>ETH</small></div><button class=\"ds-pull\" aria-label=\"Edit\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></button></div><div class=\"ds-acct\"><div class=\"ds-acct-main\"><div class=\"ds-acct-name\">alice</div><div class=\"ds-acct-addr\">0x7099…79C8</div></div><div class=\"ds-acct-bal\">9,998.41 <small>ETH</small></div><button class=\"ds-pull\" aria-label=\"Edit\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></button></div></div>",
+      "css": ".ds-accts { width: 340px; background: #fdfcfb; border-top: 1px solid #ebe8e3; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; } .ds-acct { display: flex; align-items: stretch; border-bottom: 1px solid #ebe8e3; cursor: pointer; } .ds-acct:hover { background: #faf9f7; } .ds-acct.is-active { background: #e3eff0; cursor: default; } .ds-acct-main { flex: 1; min-width: 0; padding: 9px 12px; } .ds-acct-name { font-size: 13px; font-weight: 500; line-height: 17px; color: #2a2520; } .ds-acct-addr { margin-top: 4px; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 12px; line-height: 16px; color: #5a5550; } .ds-acct-bal { align-self: center; padding: 0 10px; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 13px; line-height: 17px; color: #2a2520; } .ds-acct-bal small { font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 11px; color: #7a7570; } .ds-pull { width: 44px; border: none; border-radius: 0; background: #faf9f7; color: #2a2520; cursor: pointer; } .ds-pull:hover { background: #f5f3f0; } .ds-pull:focus-visible { outline: 1.5px solid #00717f; outline-offset: -1.5px; }"
     },
     {
       "name": "Toggle",
       "kind": "custom",
-      "description": "Softly squared switch (4px track, 2px knob); the only shadowed element. On state uses the theme accent.",
+      "description": "Softly squared switch (4px track, 2px knob); the only shadowed element. On uses the theme accent with a white knob (On Amber knob in dark).",
       "html": "<button class=\"ds-toggle\" role=\"switch\" aria-checked=\"true\" aria-label=\"Auto-mine\"></button> <button class=\"ds-toggle\" role=\"switch\" aria-checked=\"false\" aria-label=\"Interval mining\"></button>",
-      "css": ".ds-toggle { position: relative; width: 37px; height: 20px; border: none; border-radius: 4px; background: #e8e5e0; cursor: pointer; transition: background-color 200ms ease; vertical-align: middle; } .ds-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 2px; background: #ffffff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); transition: left 200ms ease; } .ds-toggle[aria-checked=\"true\"] { background: #00717f; } .ds-toggle[aria-checked=\"true\"]::after { left: 19px; } .ds-toggle:focus-visible { outline: none; box-shadow: 0 0 0 2px rgb(0 113 127 / 0.25); } @media (prefers-reduced-motion: reduce) { .ds-toggle, .ds-toggle::after { transition: none; } }"
-    },
-    {
-      "name": "Toast",
-      "kind": "custom",
-      "refersTo": "toast",
-      "description": "Square, 8px padding, 12px regular title, icons hidden; success and error use the signal tints.",
-      "html": "<div class=\"ds-toasts\"><div class=\"ds-toast\" role=\"status\">Contract imported from broadcast/</div><div class=\"ds-toast is-success\" role=\"status\">Balance set to 10,000 ETH</div><div class=\"ds-toast is-error\" role=\"alert\">Node unreachable at 127.0.0.1:8545</div></div>",
-      "css": ".ds-toasts { display: grid; gap: 6px; width: 300px; } .ds-toast { padding: 8px; border: 1px solid #e8e5e0; border-radius: 0; background: #fdfcfb; color: #2a2520; font: 400 12px/15px Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.52px; } .ds-toast.is-success { background: #ddf3e4; border-color: #ddf3e4; color: #2a9764; } .ds-toast.is-error { background: #ffe5e4; border-color: #ffe5e4; color: #dc3d43; }"
+      "css": ".ds-toggle { position: relative; width: 37px; height: 20px; border: none; border-radius: 4px; background: #e8e5e0; cursor: pointer; vertical-align: middle; } .ds-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 2px; background: #ffffff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); transition: left 200ms ease; } .ds-toggle[aria-checked=\"true\"] { background: #00717f; } .ds-toggle[aria-checked=\"true\"]::after { left: 19px; } .ds-toggle:focus-visible { outline: 1.5px solid #00717f; outline-offset: 2px; } @media (prefers-reduced-motion: reduce) { .ds-toggle::after { transition: none; } }"
     }
   ],
   "narrative": {
     "northStar": "The Terminal Sidecar",
-    "overview": "DevWallet is a terminal pane docked beside the browser. It sits in Chrome's side panel next to the dApp being built and reads like an instrument the developer glances at between keystrokes. Readouts are dense, every edge is hard, and color appears only when the chain has something to say. The interface is a narrow column of hairline-ruled cells: an instrument strip of account, network and block readouts across the top, equal-width tabs below it, then lists of rows. Hierarchy comes from type size, ink weight and tonal steps between surfaces. It never comes from cards, shadows or ornament.\n\nThere are two grounds and they are not mirror images. **Warm Paper** (light) is an unbleached off-white with warm grey-brown ink, a lab notebook on the bench. **Terminal Black** (dark) is pure black under a near-black working canvas with cool grey glyphs, the classic terminal. Each theme has exactly one accent: **Prompt Teal** on paper, taken from the cyan end of the logo's prompt glyph, and **Phosphor Amber** on black, after amber-phosphor CRTs. The accent marks what is active, selected or focused, and nothing else.\n\nType is split by who wrote the words. Humans get Inter: labels, headings, buttons, prose. Machines get IBM Plex Mono with tabular numerals: addresses, hashes, balances, block numbers, RPC URLs, calldata, ABI signatures. This pairing matches the obolos dApp's sans-serif faces. DevWallet does not use obolos's serif or script faces.\n\nConfirmed anti-references: DevWallet never looks like a **consumer crypto wallet** (rounded balance cards, gradients, glassy surfaces, hero coin numbers), a **generic SaaS dashboard** (card grids, soft drop shadows, pill badges, big rounded buttons), or **sci-fi HUD kitsch** (neon glow, scanlines, glitch effects, display fonts like Orbitron).",
+    "overview": "DevWallet is a terminal pane docked beside the browser. It sits in Chrome's side panel next to the dApp being built and reads like an instrument the developer glances at between keystrokes. Readouts are dense, every edge is hard, and color appears only when the chain has something to say. The panel is a narrow column of hairline-ruled cells framed by two ground-colored bands: an account strip across the top, and the section nav over a one-line node status at the bottom. Between them, on the raised canvas, sit the screen's plate and its lists of rows. Hierarchy comes from type size, ink weight and tonal steps between surfaces. It never comes from cards, shadows or ornament.\n\nThere are two grounds and they are not mirror images. **Warm Paper** (light) is an unbleached off-white with warm grey-brown ink, a lab notebook on the bench. **Terminal Black** (dark) is pure black under a near-black working canvas with cool grey glyphs, the classic terminal. Each theme has exactly one accent: **Prompt Teal** on paper, taken from the cyan end of the logo's prompt glyph, and **Phosphor Amber** on black, after amber-phosphor CRTs. The accent marks what is active, selected or focused, and nothing else.\n\nType is split by who wrote the words. Humans get Inter: labels, headings, buttons, prose. Machines get IBM Plex Mono with tabular numerals: addresses, hashes, balances, block numbers, RPC URLs, calldata, ABI signatures. This pairing matches the obolos dApp's sans-serif faces. DevWallet does not use obolos's serif or script faces.\n\nConfirmed anti-references: DevWallet never looks like a **consumer crypto wallet** (rounded balance cards, gradients, glassy surfaces, hero coin numbers), a **generic SaaS dashboard** (card grids, soft drop shadows, pill badges, big rounded buttons), or **sci-fi HUD kitsch** (neon glow, scanlines, glitch effects, display fonts like Orbitron).",
     "keyCharacteristics": [
-      "Narrow, dense, column-first. It is designed for the side panel, not the page.",
+      "Narrow, dense, column-first. It is designed for the side panel, not the page, and no functional text is set below 11px.",
       "Square corners everywhere. Circles appear only on status dots.",
       "1px hairlines and tonal steps instead of shadows.",
       "Inter for people, IBM Plex Mono for the machine.",
@@ -892,22 +969,32 @@
       },
       {
         "name": "The Data Wears Mono Rule",
-        "body": "If the chain produced it (an address, hash, number, calldata, ABI type, RPC URL or block), it is set in IBM Plex Mono with tabular numerals. If a person wrote it (a label, alias, button or sentence), it is set in Inter.",
+        "body": "If the chain produced it (an address, hash, number, token name, calldata, ABI type, RPC URL or block), it is set in IBM Plex Mono with tabular numerals. If a person wrote it (a label, alias, button or sentence), it is set in Inter.",
         "section": "typography"
       },
       {
-        "name": "The Nine-Pixel Label Rule",
-        "body": "Readout labels are 9px uppercase Inter in tertiary ink, placed above their value. A label never competes with the reading under it.",
+        "name": "The Eleven-Pixel Floor Rule",
+        "body": "No text goes below 11px, units included. Readout labels are 11px sentence-case Inter in tertiary ink, placed above their value, so a label never competes with the reading under it. A unit sits beside its number at the same 11px, in tertiary ink.",
         "section": "typography"
       },
       {
         "name": "The Panel Width Rule",
-        "body": "Design at side-panel width first. Nothing scrolls horizontally except code and calldata. Long values truncate in the middle (`0x7099…79C8`) and never wrap mid-address.",
+        "body": "Design at side-panel width first. Nothing scrolls horizontally except code, calldata and the account strip. Long values truncate in the middle (`0x7099…79C8`) in lists, chips and rows. The plate is the one place that shows a full address; at widths too narrow for one line it may break, and it is never truncated.",
+        "section": "layout"
+      },
+      {
+        "name": "The Two Bands Rule",
+        "body": "Chrome lives in two ground-colored bands, the account strip on top and the nav over the status line at the bottom. Screens never add a header strip of chain state; node state belongs to the status line.",
         "section": "layout"
       },
       {
         "name": "The Hairline Rule",
         "body": "Separate with a 1px rule or a step in tone, never a shadow. If something seems to need a shadow, it is in the wrong layer.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Joined Tab Rule",
+        "body": "The active chip or nav item takes the raised canvas color and an accent rule on the edge facing the content. It never takes an accent fill.",
         "section": "elevation"
       },
       {
@@ -917,22 +1004,26 @@
       }
     ],
     "dos": [
-      "**Do** set every chain-produced value (address, hash, balance, block, chain id, RPC URL, calldata) in IBM Plex Mono with tabular numerals, and every human label in Inter.",
+      "**Do** set every chain-produced value (address, hash, balance, block, chain id, RPC URL, token name, calldata) in IBM Plex Mono with tabular numerals, and every human label in Inter.",
       "**Do** keep corners square (0px) on every surface and control. Use circles only for status dots.",
       "**Do** separate content with 1px hairlines (#dcd9d4 on paper, #3c3f43 on black) and tonal steps instead of gaps, cards or shadows.",
-      "**Do** use Prompt Teal (#00717f) on Warm Paper and Phosphor Amber (#f9b64f) on Terminal Black, and only for active, selected and focused states.",
-      "**Do** label readouts with 9px uppercase tertiary Inter above the value.",
-      "**Do** truncate long hex in the middle and give the full value through a copy button or tooltip.",
-      "**Do** design at side-panel width first (about 320–480px) and keep the instrument strip readable at that width."
+      "**Do** use Prompt Teal (#00717f) on Warm Paper and Phosphor Amber (#f9b64f) on Terminal Black, and only for active, selected and focused states: a 1.5px rule on the active chip, nav item or tab, the wash on a selected row, a focus outline or border, the caret and the selection.",
+      "**Do** keep every piece of text at 11px or larger, units included; label readouts with 11px sentence-case tertiary Inter above the value.",
+      "**Do** truncate long hex in the middle in chips and rows, and give the full value through a copy button or tooltip.",
+      "**Do** keep node state in the status line and account switching in the strip, at side-panel width (about 320–480px).",
+      "**Do** report the node offline inline (red status line plus the banner) and leave the last known state readable.",
+      "**Do** turn off authored motion (the plate's arrival wash, the pickaxe swing) under `prefers-reduced-motion`."
     ],
     "donts": [
-      "**Don't** drift toward a consumer crypto wallet: no rounded balance cards, gradients, glassy surfaces or oversized hero balances.",
+      "**Don't** drift toward a consumer crypto wallet: no rounded balance cards, gradient fills, glassy surfaces or oversized hero balances. The strip's overflow fade is a mask, not a fill, and is the only gradient outside the logo.",
       "**Don't** drift toward a generic SaaS dashboard: no card grids, soft drop shadows, pill badges or big rounded buttons.",
       "**Don't** add sci-fi HUD kitsch: no neon glow, scanlines, glitch effects, the old #39ff14 neon green, or display fonts like Orbitron.",
       "**Don't** use the accent as a status color or a CTA fill. Primary actions stay ink-on-paper or white-on-black.",
       "**Don't** use Phosphor Amber for a warning. Warnings use the yellow tint plus an icon or label.",
       "**Don't** use serif or script faces. The obolos dApp's Gentium Plus, Newsreader and Allura do not belong in DevWallet.",
-      "**Don't** signal state with hue alone. Every colored dot, border or tint has a text label or icon beside it."
+      "**Don't** signal state with hue alone. Every colored dot, border or tint has a text label or icon beside it.",
+      "**Don't** block the panel when the node is offline; there is no offline dialog.",
+      "**Don't** set a label above a title or alias. Labels sit above readout values only."
     ]
   }
 }

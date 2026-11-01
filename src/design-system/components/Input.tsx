@@ -35,8 +35,8 @@ export const stylesForVariant = {
     borderColor: {
       default: 'surface/invert@0.2',
       hover: 'surface/invert@0.3',
-      focus: 'surface/invert@0.7',
-      hoverfocus: 'surface/invert@0.7',
+      focus: 'surface/accent',
+      hoverfocus: 'surface/accent',
     },
   },
 } satisfies Record<InputVariant, BoxStyles>

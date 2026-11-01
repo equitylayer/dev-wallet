@@ -101,7 +101,8 @@ globalStyle(
             defaultInheritedColor.accent.light,
           ),
           '--flash-color': '#2a2520',
-          '--toggle-active-bg': '74, 144, 226',
+          '--toggle-active-bg': '0, 113, 127',
+          '--toggle-active-knob': '255, 255, 255',
           '--toggle-inactive-bg': '232, 229, 224',
           ...assignVars(
             backgroundColorVars,
@@ -178,7 +179,8 @@ globalStyle(
         vars: {
           [inheritedColorVars.accent]: toRgb(defaultInheritedColor.accent.dark),
           '--flash-color': '#f9f7f4',
-          '--toggle-active-bg': '57, 255, 20',
+          '--toggle-active-bg': '249, 182, 79',
+          '--toggle-active-knob': '29, 20, 7',
           '--toggle-inactive-bg': '68, 71, 75',
           ...assignVars(
             backgroundColorVars,

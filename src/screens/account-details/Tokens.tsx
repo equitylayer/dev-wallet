@@ -45,11 +45,12 @@ export function Tokens({ accountAddress }: { accountAddress: Address }) {
                 <Separator />
             </Bleed>
             {/* Native ETH */}
-            <TokenRow accountAddress={accountAddress} />
+            <TokenRow accountAddress={accountAddress} bleed />
             {/* TODO: Handle empty state. */}
             {tokens?.map((token) =>
                 token.visible ? (
                     <TokenRow
+                        bleed
                         accountAddress={accountAddress}
                         tokenAddress={token.address}
                         key={token.address}

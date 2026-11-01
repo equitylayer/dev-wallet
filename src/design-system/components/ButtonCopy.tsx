@@ -28,6 +28,9 @@ export const checkmarkStylesForHeight = {
   '24px': {
     size: '11px',
   },
+  '28px': {
+    size: '12px',
+  },
   '36px': {
     size: '12px',
   },

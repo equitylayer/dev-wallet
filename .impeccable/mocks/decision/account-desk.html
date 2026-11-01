@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Account desk</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#191a1c;--ground:#000;--whisper:#212224;--fill:#2e2f30;--rule:#3c3f43;--faint:#2b2c2f;--t1:#fff;--t2:#c2c5cb;--t3:#9a9ba1;--accent:#f9b64f;--green:#30a46c;--red:#f2555a;--sans:'Inter',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,Menlo,monospace}
+*{box-sizing:border-box;margin:0}
+html,body{width:400px;height:860px;overflow:hidden;background:var(--bg);color:var(--t1);font:400 13px/17px var(--sans);letter-spacing:.4px}
+::selection{background:rgb(249 182 79/.3)}
+.page{height:860px;display:flex;flex-direction:column}
+.mono{font-family:var(--mono);letter-spacing:0;font-variant-numeric:tabular-nums}
+svg{width:14px;height:14px;flex:none}
+.lbl{font-size:11px;line-height:15px;letter-spacing:.3px;color:var(--t3)}
+.tag{font:500 11px/16px var(--sans);letter-spacing:.3px;padding:0 5px;border:1px solid var(--rule);color:var(--t2)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:5px 10px;border:1px solid var(--fill);color:var(--t1);font-size:12px}
+.btn.pri{background:var(--t1);color:#000;border-color:var(--t1);font-weight:500}
+.plate{padding:12px 10px 12px;border-bottom:1px solid var(--rule)}
+.plate .top{display:flex;align-items:center;gap:8px}
+.plate .top .sw{margin-left:auto;display:flex;align-items:center;gap:4px;color:var(--t2);font-size:12px}
+.plate h1{margin-top:8px;font:500 20px/25px var(--sans);letter-spacing:.36px}
+.plate .addr{margin-top:2px;display:flex;align-items:center;gap:6px;color:var(--t2);font:400 12px/16px var(--mono)}
+.deleg{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;padding:8px;background:var(--ground);border:1px solid var(--faint)}
+.deleg .chain{display:flex;align-items:center;gap:6px;font:400 12px/16px var(--mono);color:var(--t2);white-space:nowrap;overflow:hidden}
+.deleg .chain b{color:var(--t1);font-weight:500}
+.reads{margin-top:10px;display:grid;grid-template-columns:1.4fr 1fr 1.2fr}
+.reads>div{padding-right:10px}
+.reads>div+div{padding-left:10px;border-left:1px solid var(--rule)}
+.reads .v{margin-top:3px;font:400 13px/17px var(--mono)}
+.reads .v small{font:400 12px var(--sans);color:var(--t3)}
+.acts{display:flex;gap:6px;margin-top:12px}
+.acts .btn{flex:1}
+.batch{display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;margin:10px 10px 0;padding:7px 8px;border:1px dashed var(--rule);color:var(--t3);font-size:12px}
+.batch b{color:var(--t1);font-weight:500}
+.sec{margin-top:14px}
+.sh{display:flex;align-items:baseline;justify-content:space-between;padding:0 10px 6px;border-bottom:1px solid var(--rule)}
+.sh h2{font:500 13px/17px var(--sans);letter-spacing:.4px}
+.row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--faint)}
+.row .nm{font-weight:500}
+.row .sub{color:var(--t2);font:400 12px/16px var(--mono)}
+.row .r{margin-left:auto;text-align:right;font:400 13px/17px var(--mono)}
+.row .r small{display:block;color:var(--t3);font:400 12px/16px var(--mono)}
+.row .r small.bad{color:var(--red);font-family:var(--sans)}
+.row>svg{color:var(--t3)}
+.grow{flex:1}
+.bar{border-top:1px solid var(--rule);background:var(--ground)}
+.nav{display:flex}
+.nav a{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 0;color:var(--t2);font-size:12px;border-left:1px solid var(--faint)}
+.nav a:first-child{border-left:0;color:var(--t1);box-shadow:inset 0 1.5px 0 var(--accent)}
+.nav a .c{font:400 12px var(--mono);color:var(--t3)}
+.status{display:flex;align-items:center;gap:9px;padding:7px 10px;border-top:1px solid var(--faint);color:var(--t2);font-size:12px}
+.status .sep{width:1px;height:14px;background:var(--rule)}
+.dot{width:8px;height:8px;border-radius:9999px;background:var(--green);display:inline-block}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+<symbol id="i-call" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+<symbol id="i-set" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></symbol>
+</defs></svg>
+<div class="page">
+<section class="plate" aria-label="Active account">
+  <div class="top"><span class="lbl">Active account</span><span class="tag">Smart account</span><span class="sw">3 more <svg><use href="#i-down"/></svg></span><svg style="color:var(--t3)"><use href="#i-set"/></svg></div>
+  <h1>Alice</h1>
+  <div class="addr">0x70997970C51812dc3A010C7d01b50e0d17dc79C8 <svg><use href="#i-copy"/></svg></div>
+  <div class="deleg"><span class="lbl">Delegates to</span><span class="chain"><span>EIP-7702</span><svg><use href="#i-arrow"/></svg><b>Simple7702Account</b></span><span class="lbl">Gas paid by</span><span class="chain"><b>VerifyingPaymaster</b><span>0xCf7E…0Fc9</span></span></div>
+  <div class="reads"><div><div class="lbl">Balance</div><div class="v">10,000.00 <small>ETH</small></div></div><div><div class="lbl">Nonce</div><div class="v">14</div></div><div><div class="lbl">Impersonated</div><div class="v" style="font-family:var(--sans)">No</div></div></div>
+  <div class="acts"><span class="btn pri">Send</span><span class="btn">Edit state</span><span class="btn">Impersonate</span></div>
+</section>
+<div class="batch"><b>Batch</b><span class="mono">2 calls</span><span>app.obolos.local</span><span style="margin-left:auto">Reserved for batching</span></div>
+<section class="sec"><div class="sh"><h2>Tokens</h2><span class="lbl">Auto-detected</span></div>
+  <div class="row"><span class="nm">USDC</span><span class="sub">MockUSDC</span><span class="r">1,000.00</span></div>
+  <div class="row"><span class="nm">WETH</span><span class="sub">0x9A67…d7B1</span><span class="r">2.50</span></div>
+  <div class="row"><span class="nm">SHR-A</span><span class="sub">ShareRegistry</span><span class="r">10,000</span></div>
+</section>
+<section class="sec"><div class="sh"><h2>Connected</h2><span class="lbl">1 dApp</span></div>
+  <div class="row"><svg><use href="#i-link"/></svg><span class="nm">app.obolos.local</span><span class="sub" style="font-family:var(--sans)">3 min</span><span class="r" style="font:400 12px var(--sans);color:var(--t2)">Disconnect</span></div>
+</section>
+<section class="sec"><div class="sh"><h2>Recent activity</h2><span class="lbl">This account</span></div>
+  <div class="row"><svg><use href="#i-call"/></svg><div><div class="nm">MockUSDC <span class="mono">transfer</span></div><div class="sub">→ 0x3C44…93BC</div></div><span class="r">1,000.00<small>#1,204</small></span></div>
+  <div class="row" style="background:rgb(84 27 30/.35)"><svg style="color:var(--red)"><use href="#i-x"/></svg><div><div class="nm">CompanyFactory <span class="mono">createCompany</span></div><div class="sub">InvalidJurisdiction()</div></div><span class="r">—<small class="bad">Reverted</small></span></div>
+  <div class="row"><svg><use href="#i-call"/></svg><div><div class="nm">ShareRegistry <span class="mono">transfer</span></div><div class="sub">→ 0xf39F…2266</div></div><span class="r">250<small>#1,199</small></span></div>
+</section>
+<span class="grow"></span>
+<footer class="bar">
+  <nav class="nav"><a>Account</a><a>Contracts <span class="c">6</span></a><a>Activity <span class="c">41</span></a><a>Blocks</a></nav>
+  <div class="status"><span class="dot"></span><span class="mono">127.0.0.1:8545</span><span class="sep"></span><span class="mono">31337</span><span class="sep"></span><span class="mono" style="color:var(--t1)">#1,204</span><span>Auto</span><span class="btn" style="margin-left:auto;padding:2px 8px">Mine</span></div>
+</footer>
+</div>
+</body></html>

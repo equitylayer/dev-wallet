@@ -19,7 +19,10 @@ const stylesForHeight = {
     paddingHorizontal: '6px',
   },
   '24px': {
-    paddingHorizontal: '6px',
+    paddingHorizontal: '8px',
+  },
+  '28px': {
+    paddingHorizontal: '12px',
   },
   '36px': {
     paddingHorizontal: '12px',
@@ -31,7 +34,7 @@ const stylesForHeight = {
 
 const textStylesForHeight = {
   '16px': {
-    size: '9px',
+    size: '11px',
   },
   '18px': {
     size: '11px',
@@ -40,7 +43,10 @@ const textStylesForHeight = {
     size: '11px',
   },
   '24px': {
-    size: '11px',
+    size: '12px',
+  },
+  '28px': {
+    size: '13px',
   },
   '36px': {
     size: '15px',

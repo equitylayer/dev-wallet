@@ -1,6 +1,9 @@
 import { style, styleVariants } from '@vanilla-extract/css'
 
-import { backgroundColorVars, inheritedColorVars } from '../styles/theme.css'
+import {
+  backgroundColorVars,
+  foregroundColorVars,
+} from '../styles/theme.css'
 
 export const backgroundStyle = style({
   transition: 'border-color 100ms ease',
@@ -26,7 +29,7 @@ export const heightStyles = styleVariants(inputHeights, (height) => [
 
 export const placeholderStyle = style({
   '::placeholder': {
-    color: `rgb(${inheritedColorVars.text} / 0.4)`,
+    color: `rgb(${foregroundColorVars['text/tertiary']})`,
   },
 })
 

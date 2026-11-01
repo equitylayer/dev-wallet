@@ -146,8 +146,10 @@ export const TextBase = forwardRef<HTMLDivElement, TextProps>(
 
 const heightForSize = {
   '9px': '18px',
+  '10px': '18px',
   '11px': '18px',
   '12px': '20px',
+  '13px': '20px',
   '14px': '24px',
   '15px': '24px',
   '16px': '24px',

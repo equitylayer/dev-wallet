@@ -5,6 +5,7 @@ export const buttonHeight = {
   '18px': 18,
   '20px': 20,
   '24px': 24,
+  '28px': 28,
   '36px': 36,
   '44px': 44,
 } as const
