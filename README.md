@@ -260,7 +260,7 @@ An `eth_sendTransaction` from a smart account returns the hash of the transactio
 DevWallet answers `wallet_*` batch requests itself, per [EIP-5792](https://eips.ethereum.org/EIPS/eip-5792) v2:
 
 - `wallet_getCapabilities` reports only `atomic`, for the wallet's chain (`0x7a69` on a default node). Its status is `supported` for a Kernel account, `ready` for a Plain (upgradable) EOA, and `unsupported` otherwise.
-- `wallet_sendCalls` takes `version: "2.0.0"`, `chainId` (hex), `calls`, `atomicRequired`, and optionally `from` (the active account by default), `id` and `capabilities`. A smart account runs the calls as one atomic batch. A Plain (upgradable) account is upgraded first. Other accounts send one transaction per call, or fail with `5760` when `atomicRequired` is `true`. A contract deployment (a call without `to`) must be sent alone. DevWallet supports no `wallet_sendCalls` capability. One marked `optional: true`, at the top level or on a call, is accepted and ignored. Any other gets `5700`.
+- `wallet_sendCalls` takes `version: "2.0.0"`, `chainId` (hex), `calls`, `atomicRequired`, and optionally `from` (the active account by default), `id` and `capabilities`. A smart account runs the calls as one atomic batch. A Plain (upgradable) account is upgraded first. Other accounts send one transaction per call, or fail with `5760` when `atomicRequired` is `true`. `wallet_sendCalls` can't deploy a contract: a call without `to` gets `-32602`, even alone. Send a deployment with `eth_sendTransaction`, which goes out as a normal transaction from the account in every mode. DevWallet supports no `wallet_sendCalls` capability. One marked `optional: true`, at the top level or on a call, is accepted and ignored. Any other gets `5700`.
 - `wallet_getCallsStatus` returns `100` (pending), `200` (success), `500` (reverted) or `600` (partially reverted), with one receipt per transaction. For a user operation, that is the `handleOps` receipt, with the operation's own outcome and logs.
 - `wallet_showCallsStatus` opens the batch's transaction in the side panel.
 
@@ -279,7 +279,7 @@ These are the EIP-5792 errors a dApp can get. Other methods can also return `420
 | `5750` | You rejected the approval of a `wallet_sendCalls` that would upgrade a Plain (upgradable) account. |
 | `5760` | `atomicRequired` is `true`, but the account can't batch atomically. |
 | `3` | The wallet expects the batch to revert, and nobody chose to send it anyway. `data` holds the revert data when it is known. |
-| `-32602` | Malformed params: for example a wrong `version`, no `calls`, or a deployment in a batch with other calls. |
+| `-32602` | Malformed params: for example a wrong `version`, no `calls`, or a call without `to` (`wallet_sendCalls` can't deploy). |
 
 ### The batch queue
 

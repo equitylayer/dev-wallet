@@ -196,13 +196,12 @@ async function sendCalls(
     onchain: account.onchain,
     aaReady: aa.ok,
   })
-  // As the core would refuse it, but before the approval screen opens. A
-  // deployment is left to the core, whose -32602 comes first.
+  // As the core would refuse it, but before the approval screen opens.
+  // (`parseBatch` already refused a deployment.)
   if (
     !upgrade &&
     batch.atomicRequired &&
-    atomicStatus(account.mode, account.onchain) !== 'supported' &&
-    batch.calls.every((call) => call.to !== undefined)
+    atomicStatus(account.mode, account.onchain) !== 'supported'
   ) {
     throw atomicityUnsupported()
   }

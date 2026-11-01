@@ -449,6 +449,27 @@ describe('wallet_sendCalls', () => {
     expect(asked).toHaveLength(0)
   })
 
+  test('a deployment, even alone, is -32602 before anyone is asked (spec §4)', async () => {
+    for (const from of [smart, never]) {
+      const { ask, asked } = approve()
+      const before = await node.blockNumber()
+      const error = await codeOf(
+        handleSend({
+          rpcUrl,
+          request: sendCallsRequest(from, [{ data: '0x600060005360016000f3' }]),
+          ask,
+        }),
+      )
+      expect(error).toMatchObject({
+        code: -32602,
+        message:
+          "wallet_sendCalls can't deploy a contract; send it with eth_sendTransaction",
+      })
+      expect(asked).toHaveLength(0)
+      expect(await node.blockNumber()).toBe(before)
+    }
+  })
+
   test.each([
     ['rejected', 4001],
     ['expired', 4001],

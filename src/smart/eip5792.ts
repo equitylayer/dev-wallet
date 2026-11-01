@@ -86,13 +86,18 @@ function checkCapabilities(capabilities: unknown): void {
   }
 }
 
+/**
+ * A call without `to` would create a contract, which a smart account's batch
+ * can't (spec §4, R55): even alone, it goes out with `eth_sendTransaction`.
+ */
+const NO_DEPLOYMENTS =
+  "wallet_sendCalls can't deploy a contract; send it with eth_sendTransaction"
+
 function parseCall(call: unknown, index: number): Call {
   if (!isRecord(call)) throw invalidParams(`calls[${index}] must be an object`)
   const { to, value, data, capabilities } = call
-  if (
-    to !== undefined &&
-    !(typeof to === 'string' && isAddress(to, { strict: false }))
-  ) {
+  if (to === undefined || to === null) throw invalidParams(NO_DEPLOYMENTS)
+  if (!(typeof to === 'string' && isAddress(to, { strict: false }))) {
     throw invalidParams(`calls[${index}].to must be an address`)
   }
   if (value !== undefined && !isQuantity(value)) {
@@ -110,8 +115,8 @@ function parseCall(call: unknown, index: number): Call {
  * the active account and comes back as the known account's own spelling; a
  * missing `id` is generated.
  *
- * @throws WalletRpcError `-32602` for malformed params (including no calls),
- * `5710` for another chain, `4100` for a `from` the wallet doesn't hold,
+ * @throws WalletRpcError `-32602` for malformed params (including no calls,
+ * and a call without `to`: no deployments), `5710` for another chain, `4100` for a `from` the wallet doesn't hold,
  * `5720` for a duplicate id, `5700` for a required capability.
  */
 export function parseSendCalls(

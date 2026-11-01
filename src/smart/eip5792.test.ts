@@ -128,22 +128,31 @@ describe('parseSendCalls', () => {
       id: '0x1234',
       from: DEV_ACCOUNTS[1],
       atomicRequired: true,
-      calls: [
-        { to: X, value: '0x10', data: '0xabcd' },
-        { to: Y },
-        { data: '0x6000' },
-      ],
+      calls: [{ to: X, value: '0x10', data: '0xabcd' }, { to: Y }],
     })
     expect(parsed).toEqual({
       id: '0x1234',
       from: DEV_ACCOUNTS[1],
       atomicRequired: true,
-      calls: [
-        { to: X, value: 16n, data: '0xabcd' },
-        { to: Y },
-        { data: '0x6000' },
-      ],
+      calls: [{ to: X, value: 16n, data: '0xabcd' }, { to: Y }],
     })
+  })
+
+  // Spec §4 (R55): deployments go out with eth_sendTransaction.
+  test('a call without `to` is -32602, even alone: wallet_sendCalls cannot deploy', async () => {
+    for (const calls of [
+      [{ data: '0x6000' }],
+      [{ to: null, data: '0x6000' }],
+      [{ to: X }, { data: '0x6000' }],
+    ]) {
+      const error = await rejection(
+        Promise.resolve().then(() => parse({ calls })),
+      )
+      expect(error.code).toBe(-32602)
+      expect(error.message).toBe(
+        "wallet_sendCalls can't deploy a contract; send it with eth_sendTransaction",
+      )
+    }
   })
 
   test('a missing or other version is -32602', async () => {
