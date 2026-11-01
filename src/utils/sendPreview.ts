@@ -164,7 +164,11 @@ export function upgradesFirst(
   )
 }
 
-export function modeLabel(mode: AccountMode): string {
+/**
+ * The mode's name alone, for a narrow readout. `modeLabel` (`./accountMode`)
+ * reads it against the account's code.
+ */
+export function modeName(mode: AccountMode): string {
   switch (mode) {
     case 'smart':
       return 'Smart'

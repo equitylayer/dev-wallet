@@ -10,7 +10,7 @@ import {
   estimatedCost,
   ethAmount,
   gasShortfall,
-  modeLabel,
+  modeName,
   pathLabel,
   signAnyway,
   upgradesFirst,
@@ -104,7 +104,7 @@ function Readouts({
   return (
     <Box className={styles.readouts}>
       <Readout label="Mode">
-        <Word>{modeLabel(preview.mode)}</Word>
+        <Word>{modeName(preview.mode)}</Word>
       </Readout>
       <Readout label="Paid by" title={payer ?? undefined}>
         {path === null ? (

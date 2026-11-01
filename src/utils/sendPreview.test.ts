@@ -9,7 +9,7 @@ import {
   ethAmount,
   gasShortfall,
   locateCall,
-  modeLabel,
+  modeName,
   sendActions,
   signAnyway,
   tokenAmount,
@@ -229,10 +229,10 @@ describe('upgradesFirst', () => {
 })
 
 describe('labels and amounts', () => {
-  test('modeLabel', () => {
-    expect(modeLabel('smart')).toBe('Smart')
-    expect(modeLabel('plain-upgradable')).toBe('Plain (upgradable)')
-    expect(modeLabel('plain-never')).toBe('Plain')
+  test('modeName', () => {
+    expect(modeName('smart')).toBe('Smart')
+    expect(modeName('plain-upgradable')).toBe('Plain (upgradable)')
+    expect(modeName('plain-never')).toBe('Plain')
   })
 
   test('ethAmount: ETH like the balances, wei below a millionth', () => {
