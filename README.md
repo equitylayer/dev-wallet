@@ -256,14 +256,14 @@ DevWallet answers `wallet_*` batch requests itself, per [EIP-5792](https://eips.
 
 When the wallet expects a batch to revert, its approval says so, and **Sign anyway** sends it to revert on chain. With **Bypass Transaction Authorization** on, nobody is asked, so it is refused with code `3` and the revert data. The test dApp that `bun run dev` serves has buttons for all four methods.
 
-These are the errors a dApp can get:
+These are the EIP-5792 errors a dApp can get. Other methods can also return `4200` (unsupported method), `-32603` (internal), or an error the node passed through.
 
 | Code | When |
 |---|---|
 | `4001` | You rejected the request, or it waited 5 minutes for approval. A request waiting in the batch queue also gets it when the batch is discarded, the request is removed, or the network changes. |
 | `4100` | `from`, or the account `wallet_getCapabilities` is asked about, isn't one of the wallet's accounts. |
 | `5700` | A required capability, which the wallet doesn't support. |
-| `5710` | `chainId` is not the wallet's chain. |
+| `5710` | `wallet_sendCalls` with a `chainId` that is not the wallet's chain. (`wallet_getCapabilities` returns `{}` for it.) |
 | `5720` | `id` is already used by a batch on this network, or by one waiting in the batch queue. |
 | `5730` | `wallet_getCallsStatus` or `wallet_showCallsStatus` got an id with no batch on this network. |
 | `5750` | You rejected the approval of a `wallet_sendCalls` that would upgrade a Plain (upgradable) account. |
