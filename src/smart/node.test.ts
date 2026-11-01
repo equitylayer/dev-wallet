@@ -142,6 +142,140 @@ describe('node detection', () => {
     }
   })
 
+  // Anvil and Hardhat on the same url, one after the other: each refuses the
+  // other's cheats (Anvil -32601, Hardhat 3 -32004 "is not supported").
+  function switchingNode() {
+    const anvil = 'anvil/v1.7.1'
+    const hardhat = 'HardhatNetwork/3.21.2/@nomicfoundation/edr/0.3.8'
+    const state = { clientVersion: anvil, methods: [] as string[] }
+    const server = Bun.serve({
+      port: 0,
+      async fetch(req) {
+        const { id, method } = (await req.json()) as {
+          id: number
+          method: string
+        }
+        state.methods.push(method)
+        if (method === 'web3_clientVersion')
+          return Response.json({ jsonrpc: '2.0', id, result: state.clientVersion })
+        const isHardhat = state.clientVersion === hardhat
+        const foreign = isHardhat
+          ? method.startsWith('anvil_')
+          : method.startsWith('hardhat_')
+        if (foreign)
+          return Response.json({
+            jsonrpc: '2.0',
+            id,
+            error: isHardhat
+              ? { code: -32004, message: `Method ${method} is not supported` }
+              : { code: -32601, message: 'Method not found' },
+          })
+        return Response.json({ jsonrpc: '2.0', id, result: null })
+      },
+    })
+    return {
+      rpcUrl: `http://127.0.0.1:${server.port}`,
+      server,
+      state,
+      becomeHardhat: () => void (state.clientVersion = hardhat),
+      becomeAnvil: () => void (state.clientVersion = anvil),
+    }
+  }
+  const A = '0x000000000000000000000000000000000000c0de'
+
+  test('a node that turns into Hardhat on the same url is detected again at its first refused cheat', async () => {
+    const fake = switchingNode()
+    try {
+      const node = await connectNode({ rpcUrl: fake.rpcUrl })
+      expect(node.kind).toBe('anvil')
+
+      fake.becomeHardhat()
+      fake.state.methods.length = 0
+      await node.setCode(A, '0x6000')
+      expect(fake.state.methods).toEqual([
+        'anvil_setCode',
+        'web3_clientVersion',
+        'hardhat_setCode',
+      ])
+      expect(node.kind).toBe('hardhat')
+      // Everyone holding the node, and the cache, sees the new kind.
+      expect(await connectNode({ rpcUrl: fake.rpcUrl })).toBe(node)
+
+      fake.state.methods.length = 0
+      await node.request('anvil_mine')
+      expect(fake.state.methods).toEqual(['hardhat_mine'])
+
+      // And back: Anvil refuses hardhat_* here.
+      fake.becomeAnvil()
+      fake.state.methods.length = 0
+      await node.impersonate(A)
+      expect(fake.state.methods).toEqual([
+        'hardhat_impersonateAccount',
+        'web3_clientVersion',
+        'anvil_impersonateAccount',
+      ])
+      expect(node.kind).toBe('anvil')
+    } finally {
+      await fake.server.stop(true)
+    }
+  })
+
+  test("a page's cheat passed through is retried the same way; otherwise its error is the node's own", async () => {
+    const fake = switchingNode()
+    try {
+      const node = await connectNode({ rpcUrl: fake.rpcUrl })
+      fake.becomeHardhat()
+      fake.state.methods.length = 0
+      expect(
+        await node.forward({ jsonrpc: '2.0', id: 9, method: 'anvil_mine' }),
+      ).toEqual({ jsonrpc: '2.0', id: 9, result: null })
+      expect(fake.state.methods).toEqual([
+        'anvil_mine',
+        'web3_clientVersion',
+        'hardhat_mine',
+      ])
+
+      // Not a cheat the kind decides: passed on as it is, error and all.
+      fake.state.methods.length = 0
+      expect(
+        await node.forward({ jsonrpc: '2.0', id: 10, method: 'anvil_dumpState' }),
+      ).toMatchObject({ id: 10, error: { code: -32004 } })
+      expect(fake.state.methods).toEqual(['anvil_dumpState'])
+    } finally {
+      await fake.server.stop(true)
+    }
+  })
+
+  test('concurrent refused cheats are each sent again once, as the new kind', async () => {
+    const fake = switchingNode()
+    try {
+      const node = await connectNode({ rpcUrl: fake.rpcUrl })
+      fake.becomeHardhat()
+      fake.state.methods.length = 0
+      await Promise.all([node.setCode(A, '0x6000'), node.setBalance(A, 1n)])
+      expect(fake.state.methods.filter((m) => m.startsWith('hardhat_')).sort())
+        .toEqual(['hardhat_setBalance', 'hardhat_setCode'])
+    } finally {
+      await fake.server.stop(true)
+    }
+  })
+
+  test('a refused cheat on a node that is still the same kind is not retried', async () => {
+    const fake = switchingNode()
+    try {
+      const node = await connectNode({ rpcUrl: fake.rpcUrl })
+      fake.state.methods.length = 0
+      const error = (await node
+        .request('hardhat_setCode', [A, '0x'])
+        .catch((e) => e)) as WalletRpcError
+      // `hardhat_*` is never translated, so the kind can't be why.
+      expect(error.code).toBe(-32601)
+      expect(fake.state.methods).toEqual(['hardhat_setCode'])
+    } finally {
+      await fake.server.stop(true)
+    }
+  })
+
   test('an unreachable node rejects and is not cached', async () => {
     const fake = fakeNode('anvil/v1.0.0')
     const { rpcUrl } = fake

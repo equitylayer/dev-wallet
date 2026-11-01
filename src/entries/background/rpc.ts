@@ -1,5 +1,4 @@
 import { type Address, numberToHex } from 'viem'
-import { type HttpRpcClient, getHttpRpcClient } from 'viem/utils'
 
 import {
   UnauthorizedProviderError,
@@ -12,7 +11,7 @@ import type { Schema } from '~/messengers/schema'
 import { isPageSender } from '~/messengers/transports/guards'
 import type { CallbackOptions } from '~/messengers/transports/types'
 import { serializeError } from '~/smart/errors'
-import { connectNode, nodeMethod } from '~/smart/node'
+import { connectNode } from '~/smart/node'
 import { DEVWALLET_ORIGIN } from '~/smart/queue'
 import { withFrom } from '~/smart/transaction-call'
 import type { RpcRequest, RpcResponse } from '~/types/rpc'
@@ -94,7 +93,6 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
       requested: rpcUrl_,
       current: networkStore.getState().network.rpcUrl,
     })
-    const rpcClient = getHttpRpcClient(rpcUrl)
 
     const { getSession } = sessionsStore.getState()
     // The asking frame's own host, as sessions are stored.
@@ -175,7 +173,7 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
       })
       const response =
           'passThrough' in outcome
-              ? await execute(rpcUrl, rpcClient, outcome.passThrough)
+              ? await execute(rpcUrl, outcome.passThrough)
               : 'response' in outcome
                   ? outcome.response
                   : ({
@@ -196,7 +194,7 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
         return declinedResponse(request, decision.status)
 
       const { id, method, params } = decision.request
-      return execute(rpcUrl, rpcClient, {
+      return execute(rpcUrl, {
         method,
         params,
         id,
@@ -322,7 +320,7 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
       }
     }
 
-    return execute(rpcUrl, rpcClient, request)
+    return execute(rpcUrl, request)
   }
 }
 
@@ -349,11 +347,7 @@ function declinedResponse(
   } satisfies RpcResponse
 }
 
-async function execute(
-  rpcUrl: string,
-  rpcClient: HttpRpcClient,
-  request: RpcRequest,
-) {
+async function execute(rpcUrl: string, request: RpcRequest) {
   // Sent to the node as `eth_sign` (params swapped), which signs the same
   // EIP-191 personal message. Anvil 1.7.1 answers `personal_sign` too; one
   // method keeps every node on the same path.
@@ -362,9 +356,8 @@ async function execute(
     request.params = [request.params[1], request.params[0]]
   }
 
-  // Hardhat exposes the Anvil cheat methods under `hardhat_*`.
-  const { kind } = await connectNode({ rpcUrl })
-  return (await rpcClient.request({
-    body: { ...request, method: nodeMethod(kind, request.method) },
-  })) as unknown as RpcResponse
+  // Hardhat exposes the Anvil cheat methods under `hardhat_*`; the node
+  // notices when the node on the url changed kind.
+  const node = await connectNode({ rpcUrl })
+  return (await node.forward(request)) as unknown as RpcResponse
 }

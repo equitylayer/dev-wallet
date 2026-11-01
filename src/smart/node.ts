@@ -11,11 +11,40 @@ import { WalletRpcError } from './errors'
 
 export type NodeKind = 'anvil' | 'hardhat'
 
+/** A JSON-RPC request as a page or the wallet's UI sent it. */
+export type ForwardedRequest = {
+  method: string
+  params?: unknown
+  id?: number
+  jsonrpc?: '2.0'
+}
+
+/** The node's own answer to a request, error included. */
+export type ForwardedResponse = {
+  jsonrpc: '2.0'
+  id?: number
+  result?: unknown
+  error?: { code: number; message: string; data?: unknown }
+}
+
 export type Node = {
   rpcUrl: string
-  kind: NodeKind
-  /** JSON-RPC request. `anvil_*` cheat methods are translated for the node. */
+  /**
+   * What the node is, as last read. A different node on the same url is
+   * noticed when it refuses a translated cheat (`request`, `forward`).
+   */
+  readonly kind: NodeKind
+  /**
+   * JSON-RPC request. `anvil_*` cheat methods are translated for the node.
+   * One the node refuses as unknown has the node's kind read again, and is
+   * sent once more if it changed.
+   */
   request<T = unknown>(method: string, params?: unknown[]): Promise<T>
+  /**
+   * A request passed through for a page or the wallet's UI, translated and
+   * retried like `request`, that answers the node's raw response.
+   */
+  forward(body: ForwardedRequest): Promise<ForwardedResponse>
   chainId(): Promise<number>
   blockNumber(): Promise<bigint>
   getCode(a: Address): Promise<Hex>
@@ -50,6 +79,26 @@ export function nodeMethod(kind: NodeKind, method: string): string {
   return HARDHAT_CHEATS.has(suffix) ? `hardhat_${suffix}` : method
 }
 
+/** JSON-RPC "method not found", as Anvil answers an unknown method. */
+const METHOD_NOT_FOUND = -32601
+/** Hardhat 3's (EDR) answer to a method it lacks: "Method … is not supported". */
+const METHOD_NOT_SUPPORTED = -32004
+
+/**
+ * Whether the node's refusal of `method` may mean it is another kind of node
+ * than the one detected: a cheat whose name depends on the kind, refused as
+ * unknown. Anvil then Hardhat on the same url is the case: Hardhat refuses
+ * `anvil_setCode`.
+ */
+export function mayBeAnotherNode(method: string, code: number): boolean {
+  const unknown = code === METHOD_NOT_FOUND || code === METHOD_NOT_SUPPORTED
+  return (
+    unknown &&
+    method.startsWith('anvil_') &&
+    HARDHAT_CHEATS.has(method.slice('anvil_'.length))
+  )
+}
+
 function detectKind(clientVersion: unknown): NodeKind {
   if (typeof clientVersion !== 'string') return 'anvil'
   const version = clientVersion.toLowerCase()
@@ -76,31 +125,56 @@ export function connectNode({ rpcUrl }: { rpcUrl: string }): Promise<Node> {
 async function createNode(rpcUrl: string): Promise<Node> {
   const rpcClient = getHttpRpcClient(rpcUrl)
 
-  async function send<T>(method: string, params: unknown[] = []): Promise<T> {
-    const { result, error } = (await rpcClient.request({
-      body: { method, params },
-    })) as {
-      result?: T
-      error?: { code: number; message: string; data?: unknown }
+  // A node that rejects `web3_clientVersion` is treated as Anvil; a transport
+  // failure propagates so an unreachable node isn't cached with a guessed kind.
+  async function readKind(): Promise<NodeKind> {
+    const { result: clientVersion } = await rpcClient.request({
+      body: { method: 'web3_clientVersion' },
+    })
+    return detectKind(clientVersion)
+  }
+
+  // Kept for the worker's life, and read again only when the node refuses a
+  // cheat as unknown: cheaper than asking before each request, and the one
+  // place a stale kind shows. The cached node changes in place, so its
+  // holders see the new kind too.
+  let kind = await readKind()
+
+  async function forward(body: ForwardedRequest): Promise<ForwardedResponse> {
+    const sendAs = async (as: NodeKind) =>
+      (await rpcClient.request({
+        body: { ...body, method: nodeMethod(as, body.method) },
+      })) as ForwardedResponse
+    // Compared with the kind this request went as, not the latest: a
+    // concurrent request may have read the new kind already.
+    const tried = kind
+    const response = await sendAs(tried)
+    const { error } = response
+    if (!error || !mayBeAnotherNode(body.method, error.code)) return response
+    try {
+      kind = await readKind()
+    } catch {
+      return response
     }
+    return kind === tried ? response : sendAs(kind)
+  }
+
+  const request: Node['request'] = async <T>(
+    method: string,
+    params: unknown[] = [],
+  ) => {
+    const { result, error } = await forward({ method, params })
     if (error) throw new WalletRpcError(error.code, error.message, error.data)
     return result as T
   }
 
-  // A node that rejects `web3_clientVersion` is treated as Anvil; a transport
-  // failure propagates so an unreachable node isn't cached with a guessed kind.
-  const { result: clientVersion } = await rpcClient.request({
-    body: { method: 'web3_clientVersion' },
-  })
-  const kind = detectKind(clientVersion)
-
-  const request: Node['request'] = (method, params) =>
-    send(nodeMethod(kind, method), params)
-
   return {
     rpcUrl,
-    kind,
+    get kind() {
+      return kind
+    },
     request,
+    forward,
     async chainId() {
       return hexToNumber(await request<Hex>('eth_chainId'))
     },
