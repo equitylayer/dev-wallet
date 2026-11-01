@@ -40,25 +40,37 @@ export const actionLabels: Record<AccountModeAction, string> = {
   'plain-never': 'Plain',
 }
 
+export type PrimaryModeAction = {
+  action: 'smart' | 'switch-to-kernel' | 'revoke'
+  label: string
+}
+
 /**
- * The change the account screen leads with: a plain EOA switches to smart, a
- * foreign delegation to Kernel, and a Kernel can be revoked. Nothing for
- * contract code (DevWallet never touches it) or for a smart account the node
- * hasn't delegated yet.
+ * The change the account screen leads with, and its button's name: a plain
+ * EOA switches to smart, a foreign delegation to Kernel, and a Kernel can be
+ * revoked. A smart account the node hasn't delegated (after a node restart,
+ * say) is delegated again through the same smart path. Nothing for contract
+ * code: DevWallet never touches it.
  */
 export function primaryModeAction(
   mode: AccountMode,
   onchain: OnchainKind,
-): 'smart' | 'switch-to-kernel' | 'revoke' | null {
+): PrimaryModeAction | null {
   switch (onchain.kind) {
     case 'kernel':
-      return 'revoke'
+      return { action: 'revoke', label: actionLabels.revoke }
     case 'delegated':
-      return 'switch-to-kernel'
+      return {
+        action: 'switch-to-kernel',
+        label: actionLabels['switch-to-kernel'],
+      }
     case 'contract':
       return null
     case 'eoa':
-      return mode === 'smart' ? null : 'smart'
+      return {
+        action: 'smart',
+        label: mode === 'smart' ? 'Delegate to Kernel' : actionLabels.smart,
+      }
   }
 }
 
@@ -80,7 +92,7 @@ export function clearsDelegation(
 }
 
 const failures: Record<AccountModeAction, string> = {
-  smart: "Couldn't switch to smart",
+  smart: "Couldn't delegate to Kernel",
   'switch-to-kernel': "Couldn't switch to Kernel",
   revoke: "Couldn't revoke the delegation",
   'plain-upgradable': "Couldn't switch to Plain (upgradable)",

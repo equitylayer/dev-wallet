@@ -311,20 +311,23 @@ function GasSponsor({
                 }}
             >
                 <option value="devwallet">DevWallet sponsor</option>
-                <optgroup label="Accounts">
-                    {elsewhere && (
-                        <option value={sponsor.address}>
-                            {`${truncate(sponsor.address, { start: 6, end: 4 })} (not on this network)`}
-                        </option>
-                    )}
-                    {accounts.map((a) => (
-                        <option key={a.key} value={a.address}>
-                            {a.displayName
-                                ? `${a.displayName} · ${truncate(a.address, { start: 6, end: 4 })}`
-                                : truncate(a.address, { start: 6, end: 4 })}
-                        </option>
-                    ))}
-                </optgroup>
+                {/* An empty group would still render its label. */}
+                {(elsewhere || accounts.length > 0) && (
+                    <optgroup label="Accounts">
+                        {elsewhere && (
+                            <option value={sponsor.address}>
+                                {`${truncate(sponsor.address, { start: 6, end: 4 })} (not on this network)`}
+                            </option>
+                        )}
+                        {accounts.map((a) => (
+                            <option key={a.key} value={a.address}>
+                                {a.displayName
+                                    ? `${a.displayName} · ${truncate(a.address, { start: 6, end: 4 })}`
+                                    : truncate(a.address, { start: 6, end: 4 })}
+                            </option>
+                        ))}
+                    </optgroup>
+                )}
                 <option value="off">Off</option>
             </Select>
             <Text color="text/tertiary" size="11px">

@@ -57,23 +57,42 @@ describe('modeLabel', () => {
 
 describe('primaryModeAction', () => {
   test('a plain EOA can switch to smart', () => {
-    expect(primaryModeAction('plain-upgradable', eoa)).toBe('smart')
-    expect(primaryModeAction('plain-never', eoa)).toBe('smart')
+    for (const mode of ['plain-upgradable', 'plain-never'] as const) {
+      expect(primaryModeAction(mode, eoa)).toEqual({
+        action: 'smart',
+        label: 'Switch to smart',
+      })
+    }
+  })
+
+  test('a smart account the node has not delegated can be delegated', () => {
+    // After a node restart, say: the smart path delegates it again.
+    expect(primaryModeAction('smart', eoa)).toEqual({
+      action: 'smart',
+      label: 'Delegate to Kernel',
+    })
   })
 
   test('a foreign delegation can switch to Kernel', () => {
     for (const mode of MODES) {
-      expect(primaryModeAction(mode, delegated)).toBe('switch-to-kernel')
+      expect(primaryModeAction(mode, delegated)).toEqual({
+        action: 'switch-to-kernel',
+        label: 'Switch to Kernel',
+      })
     }
   })
 
   test('a Kernel can be revoked', () => {
-    for (const mode of MODES) expect(primaryModeAction(mode, kernel)).toBe('revoke')
+    for (const mode of MODES) {
+      expect(primaryModeAction(mode, kernel)).toEqual({
+        action: 'revoke',
+        label: 'Revoke delegation',
+      })
+    }
   })
 
-  test('nothing for contract code or a smart account still waiting', () => {
+  test('nothing for contract code', () => {
     for (const mode of MODES) expect(primaryModeAction(mode, contract)).toBeNull()
-    expect(primaryModeAction('smart', eoa)).toBeNull()
   })
 })
 
@@ -123,8 +142,10 @@ describe('modeChangeError', () => {
   })
 
   test('a smart account that was not delegated', () => {
+    // Worded for both buttons the smart action has: the mode is always
+    // stored, so only the delegation can fail.
     expect(modeChangeError('smart', { mode: 'smart', onchain: eoa })).toBe(
-      "Couldn't switch to smart: the account is Smart · not delegated.",
+      "Couldn't delegate to Kernel: the account is Smart · not delegated.",
     )
     expect(
       modeChangeError('switch-to-kernel', { mode: 'smart', onchain: delegated }),
@@ -139,6 +160,13 @@ describe('modeChangeError', () => {
     ).toBe(
       "Couldn't revoke the delegation: the account is Smart · Kernel v3.3.",
     )
+  })
+
+  test('a revoke that cleared the code but stored another mode', () => {
+    // A revoke stores Plain (upgradable); anything else didn't take.
+    expect(
+      modeChangeError('revoke', { mode: 'plain-never', onchain: eoa }),
+    ).toBe("Couldn't revoke the delegation: the account is Plain.")
   })
 
   test('a plain mode that kept its Kernel, or a mode that was not stored', () => {

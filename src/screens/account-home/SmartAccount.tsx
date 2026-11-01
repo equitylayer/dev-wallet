@@ -1,8 +1,9 @@
-import { Check, ChevronDown, CircleDashed } from 'lucide-react'
+import { Check, ChevronDown } from 'lucide-react'
 import { useId, useState } from 'react'
 
 import { ConfirmActions } from '~/components/Confirm'
 import { TextWithAddresses } from '~/components/TextWithAddresses'
+import { Spinner } from '~/components/svgs'
 import { Box, Button, Text } from '~/design-system'
 import {
   type AccountModeAction,
@@ -46,7 +47,8 @@ const progress: Record<AccountModeAction, string> = {
 /**
  * The plate's smart-account slot: what the account is (its mode against its
  * code), where it delegates and its EntryPoint nonce, and the mode changes.
- * Changes go to the background; one that clears a delegation asks first.
+ * Changes go to the background; one that clears a delegation asks first,
+ * and a change under way shows a spinning status line.
  */
 export function SmartAccount({
   account,
@@ -59,7 +61,8 @@ export function SmartAccount({
     address: account.address,
     enabled: isKernel,
   })
-  const [busy, setBusy] = useState<AccountModeAction | null>(null)
+  /** What the change under way is doing, as its status line reads. */
+  const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string>()
   const [confirming, setConfirming] = useState<AccountModeAction | null>(null)
   const [advanced, setAdvanced] = useState(false)
@@ -76,16 +79,22 @@ export function SmartAccount({
 
   const label = modeLabel(mode, onchain)
   const primary = primaryModeAction(mode, onchain)
+  // Switching to smart or Kernel delegates, which needs the AA contracts.
+  const upgrades = primary !== null && primary.action !== 'revoke'
   // DevWallet never touches contract code.
   const changeable = onchain.kind !== 'contract'
   const blocked = !online || busy !== null || confirming !== null
-  // Without the AA contracts nothing can be delegated to Kernel.
   const aaOff = status?.ok === false ? aaConflictWarning(status.conflicts) : null
 
   async function run(action: AccountModeAction) {
     setConfirming(null)
     setError(undefined)
-    setBusy(action)
+    setBusy(
+      // A smart account's smart action only delegates it again.
+      action === 'smart' && mode === 'smart'
+        ? 'Delegating to Kernel…'
+        : progress[action],
+    )
     try {
       await set(action)
     } catch (e) {
@@ -181,19 +190,15 @@ export function SmartAccount({
           <Box className={styles.smartActions}>
             {primary && (
               // A disabled button can't show its own reason.
-              <Box
-                title={
-                  aaOff && primary !== 'revoke' ? aaOff : undefined
-                }
-              >
+              <Box title={upgrades && aaOff ? aaOff : undefined}>
                 <Button
-                  disabled={blocked || (primary !== 'revoke' && aaOff !== null)}
+                  disabled={blocked || (upgrades && aaOff !== null)}
                   height="24px"
-                  variant={primary === 'revoke' ? 'ghost red' : 'stroked fill'}
+                  variant={upgrades ? 'stroked fill' : 'ghost red'}
                   width="fit"
-                  onClick={() => request(primary)}
+                  onClick={() => request(primary.action)}
                 >
-                  {actionLabels[primary]}
+                  {primary.label}
                 </Button>
               </Box>
             )}
@@ -202,7 +207,12 @@ export function SmartAccount({
               aria-controls={advancedId}
               aria-expanded={advanced}
               className={styles.disclosure}
-              onClick={() => setAdvanced(!advanced)}
+              onClick={() => {
+                // A plain mode's confirm lives in the panel: closing it
+                // cancels the question too.
+                if (advanced) setConfirming(null)
+                setAdvanced(!advanced)
+              }}
             >
               <Text size="12px">Advanced</Text>
               <ChevronDown
@@ -249,9 +259,9 @@ export function SmartAccount({
 
       {busy && (
         <div role="status" className={styles.smartNote}>
-          <CircleDashed size={14} strokeWidth={1.75} />
+          <Spinner color="currentColor" size="12px" />
           <Text color="text/tertiary" size="12px">
-            {progress[busy]}
+            {busy}
           </Text>
         </div>
       )}
