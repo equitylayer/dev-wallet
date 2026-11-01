@@ -8,7 +8,11 @@ import { atomicityUnsupported, unauthorizedAccount } from '~/smart/errors'
 import { executeCalls, planExecution } from '~/smart/execute'
 import { setDelegation } from '~/smart/kernel'
 import { atomicStatus } from '~/smart/modes'
-import { sendTransactionCall, upgradesBeforeSend } from '~/smart/resolve'
+import {
+  dropsExtras,
+  sendTransactionCall,
+  upgradesBeforeSend,
+} from '~/smart/resolve'
 import { findAccount, handleWalletRequest } from '~/smart/wallet-core'
 import type { RpcRequest, RpcResponse } from '~/types/rpc'
 import { accountModesStore } from '~/zustand'
@@ -90,6 +94,7 @@ async function sendTransaction(
   // anything it left out keeps the dApp's value.
   const tx = { ...firstParam(request), ...firstParam(approved.request) }
   const { from } = tx
+  // Without a string `from`, the node gets it whole (`dropsExtras`).
   if (typeof from !== 'string') return { passThrough: approved.request }
 
   const sent = await oneSendAtATime(rpcUrl, async () => {
@@ -100,7 +105,9 @@ async function sendTransaction(
     const { deps } = await reconcileSnapshot(rpcUrl, { fresh: true })
     const account = findAccount(deps.accounts, from)
     // Plain accounts, and addresses the wallet doesn't hold, send as before.
-    if (account?.mode !== 'smart') return { passThrough: approved.request }
+    // The approval shows the extra fields as dropped by this same rule.
+    if (!account || !dropsExtras(tx, account.mode))
+      return { passThrough: approved.request }
 
     try {
       // One call through the execution core, like a one-call batch. The

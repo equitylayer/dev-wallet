@@ -6,6 +6,7 @@ import { type Address, formatUnits } from 'viem'
 import type { ExecutionPath } from '~/smart/execute'
 import type { SendPreview } from '~/smart/preview'
 import { type BatchQueue, type QueuedItem, cannotJoin } from '~/smart/queue'
+import { dropsExtras } from '~/smart/transaction-call'
 import type { AccountMode, RpcCall } from '~/smart/types'
 
 import { formatEth } from './formatEth'
@@ -84,18 +85,19 @@ export function sendActions(args: {
 }
 
 /**
- * Whether the node gets the send as it is: a plain account's
- * `eth_sendTransaction` (`smart-sends.ts`). Its gas, fees and nonce then
- * count; a smart account's path picks its own.
+ * Whether the node gets the send as it is: an `eth_sendTransaction` the
+ * background passes through (`dropsExtras`, as `smart-sends.ts` decides). Its
+ * gas, fees and nonce then count; a smart account's path picks its own.
  */
 export function passesThrough(
   method: SendMethod,
   preview: SendPreview | undefined,
+  tx: Record<string, unknown>,
 ): boolean {
   return (
     method === 'eth_sendTransaction' &&
     preview !== undefined &&
-    preview.mode !== 'smart'
+    !dropsExtras(tx, preview.mode)
   )
 }
 
@@ -118,7 +120,7 @@ export function estimatedCost(
 ): bigint | null {
   const estimate =
     preview.estimatedCostWei === null ? null : BigInt(preview.estimatedCostWei)
-  if (!tx || !passesThrough(method, preview)) return estimate
+  if (!tx || !passesThrough(method, preview, tx)) return estimate
   const used = gasUsed(preview)
   const limit = quantity(tx.gas)
   const fee = quantity(tx.maxFeePerGas) ?? quantity(tx.gasPrice)
@@ -139,7 +141,7 @@ export function gasShortfall(
   preview: SendPreview,
   tx: Record<string, unknown> | undefined,
 ): { limit: bigint; used: bigint } | null {
-  if (!tx || !passesThrough(method, preview)) return null
+  if (!tx || !passesThrough(method, preview, tx)) return null
   const used = gasUsed(preview)
   const limit = quantity(tx.gas)
   return used !== null && limit !== null && limit < used

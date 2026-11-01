@@ -8,7 +8,7 @@ import type { AaStatus } from './setup'
 import type { AccountMode, OnchainKind } from './types'
 
 // Kept apart so the wallet UI can import it without the reconcile code.
-export { sendTransactionCall } from './transaction-call'
+export { dropsExtras, sendTransactionCall } from './transaction-call'
 
 /**
  * Whether the node was reset (or restarted) since `prev` was seen: its block

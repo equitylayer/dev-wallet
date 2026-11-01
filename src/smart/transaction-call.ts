@@ -4,7 +4,7 @@ import { type Address, type Hex, isAddress, isHex } from 'viem'
 
 import { isQuantity } from './eip5792'
 import { INVALID_PARAMS, WalletRpcError } from './errors'
-import { type Call, toCall } from './types'
+import { type AccountMode, type Call, toCall } from './types'
 
 function invalid(message: string): WalletRpcError {
   return new WalletRpcError(INVALID_PARAMS, message)
@@ -39,4 +39,17 @@ export function sendTransactionCall(tx: unknown): Call {
     ...(value !== undefined && { value }),
     ...(payload !== undefined && { data: payload as Hex }),
   })
+}
+
+/**
+ * Whether sending `tx` from an account in `mode` drops every field but `to`,
+ * `value` and `data`: only a smart account's transaction with a `from`, which
+ * goes through the execution core as one call. Without a string `from`, or
+ * from any other account, the node gets the transaction whole.
+ */
+export function dropsExtras(
+  tx: Record<string, unknown>,
+  mode: AccountMode | undefined,
+): boolean {
+  return typeof tx.from === 'string' && mode === 'smart'
 }

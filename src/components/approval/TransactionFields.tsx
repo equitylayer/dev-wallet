@@ -44,15 +44,15 @@ const EXTRAS_DROPPED_NOTE =
 
 /**
  * An `eth_sendTransaction`'s own fields: the gas limit, fees and nonce as the
- * dApp sent them (the node gets them as they are, unless the account is
- * smart), and Edit, which swaps them for inputs of every field, as the Account
+ * dApp sent them (the node gets them as they are, unless they are `dropped`),
+ * and Edit, which swaps them for inputs of every field, as the Account
  * plate's Edit state does. The approval sends the applied edits back. Every
  * other field the dApp sent follows, read-only (`ExtraFields`).
  */
 export function TransactionFields({
   original,
   tx,
-  smart,
+  dropped,
   editing,
   onEdit,
   onApply,
@@ -62,8 +62,11 @@ export function TransactionFields({
   original: RpcTransaction
   /** As it will be sent. */
   tx: RpcTransaction
-  /** The preview's account is smart. */
-  smart: boolean
+  /**
+   * The background sends only to, value and data (`dropsExtras`): a smart
+   * account's transaction with a `from`, as the preview has it now.
+   */
+  dropped: boolean
   editing: boolean
   onEdit: () => void
   onApply: (tx: RpcTransaction) => void
@@ -71,8 +74,8 @@ export function TransactionFields({
 }) {
   const edited = editedFields(original, tx)
   const extras = extraTxFields(tx)
-  // A plain account's transaction takes its authorization list to the node.
-  const setsCode = carriesAuthorizations(tx) && !smart
+  // A transaction the node gets whole takes its authorization list along.
+  const setsCode = carriesAuthorizations(tx) && !dropped
   return (
     <Section
       title="Transaction"
@@ -116,15 +119,19 @@ export function TransactionFields({
           <EditState
             tx={tx}
             fields={gasFields(original, tx)}
-            smart={smart}
+            dropped={dropped}
             onApply={onApply}
             onCancel={onCancel}
           />
         ) : (
-          <GasReadouts tx={tx} fields={gasFields(original, tx)} smart={smart} />
+          <GasReadouts
+            tx={tx}
+            fields={gasFields(original, tx)}
+            dropped={dropped}
+          />
         )}
         {extras.length > 0 && (
-          <ExtraFields fields={extras} setsCode={setsCode} smart={smart} />
+          <ExtraFields fields={extras} setsCode={setsCode} dropped={dropped} />
         )}
       </Box>
     </Section>
@@ -133,16 +140,16 @@ export function TransactionFields({
 
 /**
  * The fields the dApp sent that have no field above (type, access list,
- * authorization list, chain id, blob fields, …), as sent. A plain account's
- * transaction takes every one to the node, so an EIP-7702 authorization list
- * is flagged in red (`setsCode`): it sets account code. A smart account's
- * drops them.
+ * authorization list, chain id, blob fields, …), as sent. A transaction the
+ * node gets whole takes every one to it, so an EIP-7702 authorization list is
+ * flagged in red (`setsCode`): it sets account code. One that goes through a
+ * smart account's core drops them (`dropped`).
  */
 function ExtraFields({
   fields,
   setsCode,
-  smart,
-}: { fields: ExtraTxField[]; setsCode: boolean; smart: boolean }) {
+  dropped,
+}: { fields: ExtraTxField[]; setsCode: boolean; dropped: boolean }) {
   return (
     <>
       {setsCode && (
@@ -169,7 +176,7 @@ function ExtraFields({
       ))}
       <Box paddingTop="12px">
         <Text color="text/tertiary" size="12px">
-          {smart ? EXTRAS_DROPPED_NOTE : EXTRAS_SENT_NOTE}
+          {dropped ? EXTRAS_DROPPED_NOTE : EXTRAS_SENT_NOTE}
         </Text>
       </Box>
     </>
@@ -180,8 +187,8 @@ function ExtraFields({
 function GasReadouts({
   tx,
   fields,
-  smart,
-}: { tx: RpcTransaction; fields: TxField[]; smart: boolean }) {
+  dropped,
+}: { tx: RpcTransaction; fields: TxField[]; dropped: boolean }) {
   const form = txForm(tx)
   return (
     <>
@@ -222,7 +229,7 @@ function GasReadouts({
           )
         })}
       </Box>
-      {smart && (
+      {dropped && (
         <Box paddingTop="12px">
           <Text color="text/tertiary" size="12px">
             {SMART_NOTE}
@@ -240,13 +247,13 @@ const label = (field: TxField) =>
 function EditState({
   tx,
   fields,
-  smart,
+  dropped,
   onApply,
   onCancel,
 }: {
   tx: RpcTransaction
   fields: TxField[]
-  smart: boolean
+  dropped: boolean
   onApply: (tx: RpcTransaction) => void
   onCancel: () => void
 }) {
@@ -312,7 +319,7 @@ function EditState({
           </Readout>
         ))}
       </Box>
-      {smart && (
+      {dropped && (
         <Box paddingTop="12px">
           <Text color="text/tertiary" size="12px">
             {SMART_NOTE}

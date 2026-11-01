@@ -12,7 +12,7 @@ import {
 } from '~/components/approval'
 import * as styles from '~/components/approval/approval.css'
 import { Box, Text } from '~/design-system'
-import { sendTransactionCall } from '~/smart/transaction-call'
+import { dropsExtras, sendTransactionCall } from '~/smart/transaction-call'
 import { type RpcCall, toRpcCall } from '~/smart/types'
 import { asSent } from '~/utils/asSent'
 import { normalizeHost } from '~/utils/host'
@@ -160,7 +160,11 @@ function SendTransactionRequest({
         <TransactionFields
           original={original}
           tx={tx}
-          smart={preview.data?.mode === 'smart'}
+          // The background's rule, on the mode the preview has now: while
+          // it is pending, failed or a placeholder, nothing counts as dropped.
+          dropped={
+            !preview.isPlaceholderData && dropsExtras(tx, preview.data?.mode)
+          }
           editing={editing}
           onEdit={() => setEditing(true)}
           onApply={(edited) => {

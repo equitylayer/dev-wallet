@@ -337,6 +337,7 @@ describe('estimatedCost', () => {
   test('smart accounts pick their own gas and fees: the dApp\'s are ignored', () => {
     expect(
       estimatedCost('eth_sendTransaction', preview(), {
+        from: ACCOUNT,
         gas: '0x5208',
         maxFeePerGas: '0x12a05f200',
       }),
@@ -344,6 +345,15 @@ describe('estimatedCost', () => {
     expect(estimatedCost('wallet_sendCalls', plain(), undefined)).toBe(
       92_000n * GWEI,
     )
+  })
+
+  test("without a `from`, the node gets it whole: the dApp's gas and fees count, smart or not", () => {
+    expect(
+      estimatedCost('eth_sendTransaction', preview(), {
+        gas: '0x5208',
+        maxFeePerGas: '0x12a05f200',
+      }),
+    ).toBe(21_000n * 5n * GWEI)
   })
 })
 
@@ -362,11 +372,20 @@ describe('gasShortfall', () => {
     )
   })
 
+  test("a `from`-less send goes to the node whole: its limit counts, smart or not", () => {
+    expect(
+      gasShortfall('eth_sendTransaction', preview(), { gas: '0x5208' }),
+    ).toEqual({ limit: 21_000n, used: 46_000n })
+  })
+
   test('none when the limit is enough, absent, or ignored', () => {
     expect(gasShortfall('eth_sendTransaction', plain, { gas: '0xb3b0' })).toBeNull()
     expect(gasShortfall('eth_sendTransaction', plain, {})).toBeNull()
     expect(
-      gasShortfall('eth_sendTransaction', preview(), { gas: '0x5208' }),
+      gasShortfall('eth_sendTransaction', preview(), {
+        from: ACCOUNT,
+        gas: '0x5208',
+      }),
     ).toBeNull()
     expect(gasShortfall('eth_sendTransaction', reverting({ mode: 'plain-never' }), { gas: '0x1' })).toBeNull()
   })
