@@ -227,6 +227,19 @@ describe('extraTxFields', () => {
     ])
   })
 
+  test("a key named like Object's own is shown under its name, and never throws", () => {
+    // As JSON arrives: `__proto__` is an own key, not the prototype.
+    const tx = JSON.parse(
+      '{"from":"0x01","__proto__":"0x1","constructor":"0x2","toString":"0x3","hasOwnProperty":"0x4"}',
+    ) as Record<string, unknown>
+    expect(extraTxFields(tx)).toEqual([
+      { key: '__proto__', label: '__proto__', value: '0x1' },
+      { key: 'constructor', label: 'constructor', value: '0x2' },
+      { key: 'toString', label: 'toString', value: '0x3' },
+      { key: 'hasOwnProperty', label: 'hasOwnProperty', value: '0x4' },
+    ])
+  })
+
   test('the edited transaction keeps them as they were', () => {
     const tx = { ...dappTx(), authorizationList: [authorization] }
     const edited = applyTxForm(tx, { ...txForm(tx), gas: '30000' })

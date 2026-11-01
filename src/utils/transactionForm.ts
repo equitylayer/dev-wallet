@@ -185,16 +185,18 @@ export function editedFields(
 /** A field the dApp sent that the approval has no field of its own for. */
 export type ExtraTxField = { key: string; label: string; value: string }
 
-const EXTRA_LABELS: Record<string, string> = {
-  type: 'Type',
-  chainId: 'Chain id',
-  accessList: 'Access list',
-  authorizationList: 'Authorization list (EIP-7702)',
-  maxFeePerBlobGas: 'Max fee per blob gas',
-  blobVersionedHashes: 'Blob versioned hashes',
-  blobs: 'Blobs',
-  input: 'Input',
-}
+// A Map, not an object: a key like `__proto__` or `toString` must not find
+// one of Object's own members.
+const EXTRA_LABELS = new Map<string, string>([
+  ['type', 'Type'],
+  ['chainId', 'Chain id'],
+  ['accessList', 'Access list'],
+  ['authorizationList', 'Authorization list (EIP-7702)'],
+  ['maxFeePerBlobGas', 'Max fee per blob gas'],
+  ['blobVersionedHashes', 'Blob versioned hashes'],
+  ['blobs', 'Blobs'],
+  ['input', 'Input'],
+])
 
 /**
  * Every field of the transaction the approval doesn't show as one of its own
@@ -213,7 +215,7 @@ export function extraTxFields(tx: RpcTransaction): ExtraTxField[] {
     })
     .map(([key, value]) => ({
       key,
-      label: EXTRA_LABELS[key] ?? key,
+      label: EXTRA_LABELS.get(key) ?? key,
       value: asSent(value),
     }))
 }
