@@ -41,3 +41,25 @@ export function isRelayedConnection(
 ): connection is (typeof RELAYED_CONNECTIONS)[number] {
   return (RELAYED_CONNECTIONS as readonly unknown[]).includes(connection)
 }
+
+/** What a page's `openWallet` post becomes: its method, and nothing else. */
+export type OpenWalletMessage = {
+  type: 'openWallet'
+  payload: { method: string }
+}
+
+/**
+ * The page's `openWallet` post, rebuilt from its method alone, or `undefined`
+ * when it isn't one. The page controls the whole object, so passing it on as
+ * it is would let it put any `connection` or `topic` on the runtime channel,
+ * past the relay's allowlist.
+ */
+export function openWalletMessage(data: unknown): OpenWalletMessage | undefined {
+  if (typeof data !== 'object' || data === null) return undefined
+  const { type, payload } = data as { type?: unknown; payload?: unknown }
+  if (type !== 'openWallet') return undefined
+  if (typeof payload !== 'object' || payload === null) return undefined
+  const { method } = payload as { method?: unknown }
+  if (typeof method !== 'string') return undefined
+  return { type: 'openWallet', payload: { method } }
+}

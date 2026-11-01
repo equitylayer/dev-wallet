@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 
-import { isExtensionPageSender, isRelayedConnection } from './guards'
+import {
+  isExtensionPageSender,
+  isRelayedConnection,
+  openWalletMessage,
+} from './guards'
 
 const id = 'abcdefghijklmnopabcdefghijklmnop'
 const origin = `chrome-extension://${id}/`
@@ -106,5 +110,34 @@ describe('isRelayedConnection', () => {
     42,
   ])('%p is dropped', (connection) => {
     expect(isRelayedConnection(connection)).toBe(false)
+  })
+})
+
+describe('openWalletMessage', () => {
+  test('keeps the type and the method, and nothing else the page put in', () => {
+    expect(
+      openWalletMessage({
+        type: 'openWallet',
+        payload: { method: 'eth_requestAccounts', tabId: 3 },
+        connection: 'background:wallet',
+        topic: '> pendingRequest',
+        id: 1,
+      }),
+    ).toEqual({ type: 'openWallet', payload: { method: 'eth_requestAccounts' } })
+  })
+
+  test.each([
+    undefined,
+    null,
+    'openWallet',
+    { type: 'openwallet', payload: { method: 'eth_sign' } },
+    { type: 'openWallet' },
+    { type: 'openWallet', payload: null },
+    { type: 'openWallet', payload: 'eth_sign' },
+    { type: 'openWallet', payload: {} },
+    { type: 'openWallet', payload: { method: 42 } },
+    { type: 'openWallet', payload: { method: { toString: 'eth_sign' } } },
+  ])('%p is dropped', (data) => {
+    expect(openWalletMessage(data)).toBeUndefined()
   })
 })
