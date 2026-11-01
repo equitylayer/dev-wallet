@@ -90,7 +90,9 @@ export function pageEventFor(
   if (typeof event !== 'object' || event === null) return undefined
   const { topic, payload, hosts } = event as Partial<PageEvent>
   if (typeof topic !== 'string' || !TOPICS.includes(topic)) return undefined
-  if (!Array.isArray(hosts) || !hosts.includes(normalizeHost(host)))
+  // No host (an opaque origin) is no site: it hears no site's events.
+  const own = normalizeHost(host)
+  if (own === '' || !Array.isArray(hosts) || !hosts.includes(own))
     return undefined
   return { topic, payload } as PageMessage
 }

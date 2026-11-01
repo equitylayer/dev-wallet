@@ -17,11 +17,12 @@ function hostOf(url: string | undefined): string {
 }
 
 /**
- * The host of the frame that sent a message: its origin's, else its url's
- * (an opaque origin, `'null'`, has none). A subframe is its own host, never
- * its tab's. `''` when neither has one (a `file://` page).
+ * The host of the frame that sent a message: its origin's, else (no origin
+ * reported) its url's. A subframe is its own host, never its tab's. `''`, no
+ * site, for an opaque origin (`'null'`: a sandboxed frame keeps its url but
+ * is not that site) and when neither has one (a `file://` page).
  */
 export function senderHost(sender: { origin?: string; url?: string }): string {
-  const origin = sender.origin !== 'null' ? hostOf(sender.origin) : ''
-  return normalizeHost(origin || hostOf(sender.url))
+  if (sender.origin === 'null') return ''
+  return normalizeHost(hostOf(sender.origin) || hostOf(sender.url))
 }

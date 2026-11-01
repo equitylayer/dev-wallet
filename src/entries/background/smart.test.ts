@@ -64,6 +64,7 @@ const settings: {
   sponsor: SponsorSetting
   bypassSignatureAuth?: boolean
   bypassTransactionAuth?: boolean
+  bypassConnectAuth?: boolean
 } = { sponsor: { kind: 'devwallet' } }
 
 /** A fake store with `subscribe`, like zustand's: listeners get (next, prev). */
@@ -134,6 +135,8 @@ mock.module('~/zustand', () => ({
         connectedHosts === null || connectedHosts.has(host)
           ? { host }
           : undefined,
+      addSession: ({ session }: { session: { host: string } }) =>
+        void connectedHosts?.add(session.host),
     }),
   },
   pendingRequestsStore: {
@@ -1444,6 +1447,29 @@ describe('page requests', () => {
       }
       expect(pendingRequests).toHaveLength(0)
       expect(await node.getBalance(X)).toBe(0n)
+    })
+
+    test('a sandboxed frame of a connected site is no site: 4100, and it cannot connect', async () => {
+      // Its url is the site's, but its origin is opaque.
+      const sandboxed = { ...top('dapp.test'), origin: 'null' }
+      for (const [method, params] of keyed) {
+        expect(await ask(method, params, sandboxed)).toMatchObject({
+          error: { code: 4100 },
+        })
+      }
+      expect((await ask('wallet_getPermissions', [], sandboxed)).result).toEqual(
+        [],
+      )
+      settings.bypassConnectAuth = true
+      try {
+        expect(await ask('eth_requestAccounts', [], sandboxed)).toMatchObject({
+          error: { code: 4100 },
+        })
+      } finally {
+        delete settings.bypassConnectAuth
+      }
+      expect(connectedHosts).toEqual(new Set(['dapp.test']))
+      expect(pendingRequests).toHaveLength(0)
     })
 
     test("a subframe of a connected site isn't connected for them either", async () => {

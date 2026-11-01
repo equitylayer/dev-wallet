@@ -95,4 +95,10 @@ describe('pageEventFor', () => {
   ])('%p is not an event for any page', (event) => {
     expect(pageEventFor(event, 'dapp.test')).toBeUndefined()
   })
+
+  test('a frame with no host (an opaque origin) hears nothing, even for no host', () => {
+    expect(connectEvent('', '0x1').hosts).toEqual([''])
+    expect(pageEventFor(connectEvent('', '0x1'), '')).toBeUndefined()
+    expect(pageEventFor(disconnectEvent(''), '')).toBeUndefined()
+  })
 })

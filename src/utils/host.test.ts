@@ -49,10 +49,11 @@ describe('senderHost', () => {
     ).toBe('evil.test')
   })
 
-  test('an opaque origin falls back to the url', () => {
+  test("an opaque origin is no host: never its url's", () => {
+    // A sandboxed frame keeps its url, but is no longer that site.
     expect(
       senderHost({ origin: 'null', url: 'https://sandboxed.test/a' }),
-    ).toBe('sandboxed.test')
+    ).toBe('')
   })
 
   test('no origin falls back to the url', () => {

@@ -118,15 +118,7 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
     // Signing or sending with an account's key needs a connected site, bypass
     // or not: the bypass skips asking the user, not authorizing the site.
     if (isInpage && !session && needsSession(request.method))
-      return {
-        id: request.id,
-        jsonrpc: '2.0',
-        error: {
-          code: UnauthorizedProviderError.code,
-          message:
-            'The requested account and/or method has not been authorized by the user.',
-        },
-      } as RpcResponse
+      return unauthorized(request)
 
     // Sends go through the smart-account execution core, which asks for the
     // approval itself; plain `eth_sendTransaction`s come back to pass through.
@@ -193,6 +185,9 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
       // Connecting the site: shared by `eth_requestAccounts` and
       // `wallet_requestPermissions`, which differ only in what they return.
       const connect = async () => {
+        // A frame with no host (an opaque origin) is no site to connect.
+        if (!host) return { declined: unauthorized(request) }
+
         const authorize = () => {
           const { getAccounts } = accountStore.getState()
           const { network } = networkStore.getState()
@@ -290,6 +285,18 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
 
     return execute(rpcUrl, rpcClient, request)
   }
+}
+
+function unauthorized(request: RpcRequest) {
+  return {
+    id: request.id,
+    jsonrpc: '2.0',
+    error: {
+      code: UnauthorizedProviderError.code,
+      message:
+        'The requested account and/or method has not been authorized by the user.',
+    },
+  } as RpcResponse
 }
 
 function declinedResponse(

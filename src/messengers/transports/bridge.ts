@@ -54,11 +54,13 @@ export function setupBridgeTransportRelay() {
     const topic_: string = topic.replace('> ', '')
 
     // An event for the pages reaches every frame: this one passes on only
-    // its own host's, as the provider's topic and payload.
+    // its own host's, as the provider's topic and payload. A sandboxed
+    // frame's origin is opaque (`self.origin`), whatever its url's.
     if (topic_ === PAGE_EVENT) {
+      const origin = self.origin === 'null' ? 'null' : location.origin
       const event = pageEventFor(
         payload,
-        senderHost({ origin: location.origin, url: location.href }),
+        senderHost({ origin, url: location.href }),
       )
       if (!event) return
       return windowTransport.send(event.topic, event.payload, { connection })
