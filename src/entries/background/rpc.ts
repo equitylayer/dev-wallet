@@ -14,6 +14,7 @@ import {
   UserRejectedRequestError,
 } from '~/errors'
 import { type Messenger, getMessenger } from '~/messengers'
+import { connectNode, nodeMethod } from '~/smart/node'
 import type { RpcRequest, RpcResponse } from '~/types/rpc'
 import {
   accountStore,
@@ -80,7 +81,11 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
         return declinedResponse(request, decision.status)
 
       const { id, method, params } = decision.request
-      return execute(rpcClient, { method, params, id } as RpcRequest)
+      return execute(rpcUrl, rpcClient, {
+        method,
+        params,
+        id,
+      } as RpcRequest)
     }
 
     if (isInpage) {
@@ -222,7 +227,7 @@ export function setupRpcHandler({ messenger }: { messenger: Messenger }) {
       }
     }
 
-    return execute(rpcClient, request)
+    return execute(rpcUrl, rpcClient, request)
   })
 }
 
@@ -244,7 +249,11 @@ function declinedResponse(
   } satisfies RpcResponse
 }
 
-async function execute(rpcClient: HttpRpcClient, request: RpcRequest) {
+async function execute(
+  rpcUrl: string,
+  rpcClient: HttpRpcClient,
+  request: RpcRequest,
+) {
   // Anvil doesn't support `personal_sign` – use `eth_sign` instead.
   if (request.method === 'personal_sign') {
     request.method = 'eth_sign' as any
@@ -260,9 +269,12 @@ async function execute(rpcClient: HttpRpcClient, request: RpcRequest) {
       } as any)
     }
 
-    return rpcClient.request({
-      body: request,
-    })
+    // Hardhat exposes the Anvil cheat methods under `hardhat_*`.
+    return connectNode({ rpcUrl }).then(({ kind }) =>
+      rpcClient.request({
+        body: { ...request, method: nodeMethod(kind, request.method) },
+      }),
+    )
   })()) as unknown as RpcResponse
 
   if (
