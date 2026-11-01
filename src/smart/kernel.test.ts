@@ -25,7 +25,7 @@ import {
 } from './kernel'
 import { type Node, connectNode } from './node'
 import { ensureAaContracts } from './setup'
-import { DEV_ACCOUNTS, startAnvil } from './testing/anvil'
+import { DEV_ACCOUNTS, startAnvil, waitForReceipt } from './testing/anvil'
 import type { Call } from './types'
 
 const kernelAbi = parseAbi(['function execute(bytes32 mode, bytes data)'])
@@ -157,22 +157,9 @@ describe('on a real node', () => {
         ...(gas !== undefined && { gas: numberToHex(gas) }),
       },
     ])
-    return (await waitForReceipt(hash)).status === '0x1'
+    return (await waitForReceipt(node, hash)).status === '0x1'
       ? 'success'
       : 'reverted'
-  }
-
-  // Anvil answers `eth_sendTransaction` before the block is queryable.
-  async function waitForReceipt(hash: Hex): Promise<{ status: Hex }> {
-    for (let attempt = 0; attempt < 100; attempt++) {
-      const receipt = await node.request<{ status: Hex } | null>(
-        'eth_getTransactionReceipt',
-        [hash],
-      )
-      if (receipt) return receipt
-      await Bun.sleep(20)
-    }
-    throw new Error(`no receipt for ${hash}`)
   }
 
   test('setDelegation installs Kernel delegation code', async () => {

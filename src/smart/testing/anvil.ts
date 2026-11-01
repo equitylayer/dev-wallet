@@ -1,7 +1,9 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-import type { Address } from 'viem'
+import type { Address, Hex, RpcTransactionReceipt } from 'viem'
+
+import type { Node } from '../node'
 
 /** Anvil's default accounts 0-9 (10,000 ETH each on a fresh node). */
 export const DEV_ACCOUNTS = [
@@ -89,4 +91,23 @@ export async function startAnvil(
     if (!/in use/i.test(lastError)) break
   }
   throw new Error(`failed to start anvil: ${lastError}`)
+}
+
+/**
+ * Polls for a transaction's receipt. Anvil can answer `eth_sendTransaction`
+ * before the receipt is queryable, so tests wait instead of reading it once.
+ */
+export async function waitForReceipt(
+  node: Node,
+  hash: Hex,
+): Promise<RpcTransactionReceipt> {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const receipt = await node.request<RpcTransactionReceipt | null>(
+      'eth_getTransactionReceipt',
+      [hash],
+    )
+    if (receipt) return receipt
+    await Bun.sleep(20)
+  }
+  throw new Error(`no receipt for ${hash}`)
 }
