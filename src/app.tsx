@@ -7,6 +7,7 @@ import {
     createHashRouter,
     createMemoryRouter,
 } from 'react-router-dom'
+import { toast } from 'sonner'
 import { numberToHex } from 'viem'
 
 import { getTheme, setTheme } from '~/design-system'
@@ -39,6 +40,7 @@ import { type AppMeta, AppMetaContext } from './contexts'
 import { useSnapshot } from './hooks/useSnapshot'
 import Layout from './screens/_layout'
 import AccountDetails from './screens/account-details'
+import BatchReview from './screens/batch-review'
 import BlockConfig from './screens/block-config'
 import BlockDetails from './screens/block-details'
 import ContractDetails from './screens/contract-details'
@@ -78,6 +80,10 @@ export function init({ type = 'standalone' }: { type?: AppMeta['type'] } = {}) {
                 {
                     path: 'transfer/:accountAddress/:tokenAddress?',
                     element: <TokenTransfer />,
+                },
+                {
+                    path: 'batch',
+                    element: <BatchReview />,
                 },
                 {
                     path: 'block-config',
@@ -142,6 +148,11 @@ export function init({ type = 'standalone' }: { type?: AppMeta['type'] } = {}) {
         const { storageTheme, systemTheme } = getTheme()
         const theme = storageTheme || systemTheme
         setTheme(theme === 'dark' ? 'light' : 'dark')
+    })
+
+    // The background's word on what it did unasked, e.g. an account upgrade.
+    backgroundMessenger.reply('notice', async ({ message }) => {
+        toast(message)
     })
 
     backgroundMessenger.reply('transactionExecuted', async () => {

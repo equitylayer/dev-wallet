@@ -1,4 +1,5 @@
-import { useSyncExternalStoreWithTracked } from '~/hooks/useSyncExternalStoreWithTracked'
+import { useSyncExternalStore } from 'react'
+
 import type { BatchQueue } from '~/smart/queue'
 
 import { createStore } from './utils'
@@ -23,8 +24,12 @@ export const batchQueueStore = createStore<BatchQueueStore>(
   },
 )
 
-export const useBatchQueueStore = () =>
-  useSyncExternalStoreWithTracked(
+/**
+ * The open batch, or `null`. Not the tracked store hook: it can't take a
+ * `null` field (it reads one as an object).
+ */
+export const useBatchQueue = (): BatchQueue | null =>
+  useSyncExternalStore(
     batchQueueStore.subscribe,
-    batchQueueStore.getState,
+    () => batchQueueStore.getState().queue,
   )

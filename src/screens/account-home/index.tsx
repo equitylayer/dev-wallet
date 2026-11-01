@@ -1,3 +1,4 @@
+import { StartBatch } from '~/components/BatchBar'
 import { Text } from '~/design-system'
 import { useNetworkStatus } from '~/hooks/useNetworkStatus'
 import { useAccountStore } from '~/zustand'
@@ -31,8 +32,8 @@ export function AccountHome() {
   return (
     <div className={styles.scroll}>
       <AccountPlate account={account} online={Boolean(online)} />
-      {/* Batch slot: the queued-calls bar sits here once batching ships
-          (owned by the smart-accounts work). Renders nothing until then. */}
+      {/* The batch bar's empty state; an open batch shows in the footer. */}
+      <StartBatch account={account} />
       <TokensSection address={account.address} />
       <ConnectedSection />
       <RecentActivitySection address={account.address} />

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 
 import { Toaster } from '~/components'
+import { BatchBar } from '~/components/BatchBar'
 import {
   AccountSwitcher,
   BottomNav,
@@ -62,6 +63,7 @@ export default function Layout() {
       </Box>
       {onboarded && (
         <footer className={footer}>
+          {!hasPendingRequest && <BatchBar />}
           {!hasPendingRequest && <BottomNav />}
           <StatusLine offline={isNetworkOffline} />
         </footer>

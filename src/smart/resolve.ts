@@ -1,17 +1,14 @@
-import { type Address, type Hex, isAddress, isHex } from 'viem'
+import type { Address } from 'viem'
 
-import { isQuantity } from './eip5792'
-import { INVALID_PARAMS, WalletRpcError } from './errors'
 import { classifyCode } from './kernel'
-import {
-  type ReconcileResult,
-  atomicStatus,
-  defaultMode,
-  reconcileAccounts,
-} from './modes'
+import { atomicStatus, defaultMode } from './mode-rules'
+import { type ReconcileResult, reconcileAccounts } from './modes'
 import type { Node } from './node'
 import type { AaStatus } from './setup'
-import { type AccountMode, type Call, type OnchainKind, toCall } from './types'
+import type { AccountMode, OnchainKind } from './types'
+
+// Kept apart so the wallet UI can import it without the reconcile code.
+export { sendTransactionCall } from './transaction-call'
 
 /**
  * Whether the node was reset (or restarted) since `prev` was seen: its block
@@ -75,41 +72,6 @@ export function isAccountModeAction(
   action: unknown,
 ): action is AccountModeAction {
   return (ACCOUNT_MODE_ACTIONS as readonly unknown[]).includes(action)
-}
-
-function invalid(message: string): WalletRpcError {
-  return new WalletRpcError(INVALID_PARAMS, message)
-}
-
-/**
- * The call an `eth_sendTransaction` makes: its `to`, `value` and `data` (or
- * `input`). A missing or null `to` is a deployment.
- *
- * @throws WalletRpcError `-32602` for malformed fields.
- */
-export function sendTransactionCall(tx: unknown): Call {
-  if (typeof tx !== 'object' || tx === null || Array.isArray(tx)) {
-    throw invalid('Expected a transaction object')
-  }
-  const { to, value, data, input } = tx as Record<string, unknown>
-  const payload = data ?? input
-  if (
-    to !== undefined &&
-    to !== null &&
-    !(typeof to === 'string' && isAddress(to, { strict: false }))
-  ) {
-    throw invalid('`to` must be an address')
-  }
-  if (value !== undefined && !isQuantity(value)) {
-    throw invalid('`value` must be a hex quantity')
-  }
-  if (payload !== undefined && !(typeof payload === 'string' && isHex(payload)))
-    throw invalid('`data` must be hex')
-  return toCall({
-    ...(typeof to === 'string' && { to: to as Address }),
-    ...(value !== undefined && { value }),
-    ...(payload !== undefined && { data: payload as Hex }),
-  })
 }
 
 export type NetworkAccount = {

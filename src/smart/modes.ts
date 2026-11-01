@@ -4,7 +4,11 @@ import { KERNEL_V3_3 } from './constants'
 import { classifyCode, setDelegation } from './kernel'
 import type { Node } from './node'
 import { type AaStatus, ensureAaContracts } from './setup'
-import type { AccountMode, AtomicStatus, OnchainKind } from './types'
+import type { AccountMode, OnchainKind } from './types'
+
+// The pure rules live apart, so the wallet UI can use them without the node
+// setup (and the contracts' code) that reconciling needs.
+export { atomicStatus, defaultMode } from './mode-rules'
 
 export type ReconcileResult = {
   address: Address
@@ -12,39 +16,6 @@ export type ReconcileResult = {
   /** The account's on-chain state after any change. */
   onchain: OnchainKind
   changed: boolean
-}
-
-/**
- * The mode an account without a stored one gets. Accounts are smart by
- * default; an impersonated account keeps whatever code it already has, so it
- * is only smart when it is already a Kernel.
- */
-export function defaultMode({
-  impersonated,
-  onchain,
-}: { impersonated: boolean; onchain: OnchainKind }): AccountMode {
-  if (!impersonated) return 'smart'
-  return onchain.kind === 'kernel' ? 'smart' : 'plain-never'
-}
-
-/**
- * Whether an account can batch calls atomically. Compute it after reconcile:
- * a smart account that is still not a Kernel could not be delegated.
- */
-export function atomicStatus(
-  mode: AccountMode,
-  onchain: OnchainKind,
-): AtomicStatus {
-  if (mode === 'plain-never') return 'unsupported'
-  switch (onchain.kind) {
-    case 'kernel':
-      return 'supported'
-    case 'eoa':
-      return mode === 'plain-upgradable' ? 'ready' : 'unsupported'
-    case 'delegated':
-    case 'contract':
-      return 'unsupported'
-  }
 }
 
 /**

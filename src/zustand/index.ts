@@ -27,7 +27,7 @@ export {
   type BatchQueueState,
   type BatchQueueStore,
   batchQueueStore,
-  useBatchQueueStore,
+  useBatchQueue,
 } from './batch-queue'
 
 export {
