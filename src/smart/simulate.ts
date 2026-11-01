@@ -130,7 +130,7 @@ function nodeError(e: WalletRpcError): SimulationResult {
 }
 
 /** `eth_call` reports a revert with code 3 and/or the revert data. */
-function ethCallFailure(
+export function ethCallFailure(
   subject: string,
   failedIndex: number | null,
   e: WalletRpcError,
@@ -219,7 +219,11 @@ async function simulateV1(
   }
 }
 
-async function ethCall(
+/**
+ * `eth_call` from `call.from`: the node's error if it fails, else `null`. A
+ * call without `to` is a contract creation.
+ */
+export async function ethCall(
   node: Node,
   call: Call & { from: Address },
 ): Promise<WalletRpcError | null> {

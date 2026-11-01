@@ -114,7 +114,11 @@ async function depositToPaymaster(node: Node, from: Address): Promise<void> {
   await waitForSuccess(node, hash)
 }
 
-async function isKnownToNode(node: Node, address: Address): Promise<boolean> {
+/** Whether the node holds a key for `address` (it is in `eth_accounts`). */
+export async function isKnownToNode(
+  node: Node,
+  address: Address,
+): Promise<boolean> {
   const accounts = await node.request<Address[]>('eth_accounts')
   return accounts.some((a) => a.toLowerCase() === address.toLowerCase())
 }
