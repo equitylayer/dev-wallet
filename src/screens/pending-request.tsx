@@ -5,8 +5,8 @@ import {
   AddressLine,
   ApprovalFrame,
   DecisionActions,
-  Notice,
   SendApproval,
+  SignNotice,
   TransactionFields,
   TypedDataView,
 } from '~/components/approval'
@@ -14,6 +14,7 @@ import * as styles from '~/components/approval/approval.css'
 import { Box, Text } from '~/design-system'
 import { sendTransactionCall } from '~/smart/transaction-call'
 import { type RpcCall, toRpcCall } from '~/smart/types'
+import { signNotice } from '~/utils/signRequest'
 import type { RpcTransaction } from '~/utils/transactionForm'
 import { useAccountStore } from '~/zustand'
 import type { PendingRequest } from '~/zustand/pending-requests'
@@ -170,14 +171,15 @@ function SendTransactionRequest({
 // Signatures: plain signatures by the account's key, in every mode
 
 /**
- * `eth_sign`: bytes signed blind, with nothing to say what they are. The node
- * signs them as a personal message (EIP-191), which is how this account's
- * Kernel validator checks a user operation's hash: a 32-byte payload can be
- * one. So it warns before the payload, and Approve says what it does.
+ * `eth_sign`: the node signs the bytes as a personal message (EIP-191
+ * prefixed), as for `personal_sign`. A 32-byte payload looks like a hash, and
+ * a contract that checks a hash signed that way (Kernel's validator, for a
+ * user operation) accepts it: that gets a warning, and Approve says what it
+ * does.
  */
 function SignRequest({ request }: { request: ExtractRequest<'eth_sign'> }) {
   const [address, data] = request.params
-  const hash = isHex(data) && size(data) === 32
+  const notice = signNotice('eth_sign', data)
   return (
     <ApprovalFrame
       title="Sign data"
@@ -185,22 +187,13 @@ function SignRequest({ request }: { request: ExtractRequest<'eth_sign'> }) {
       footer={
         <DecisionActions
           request={request}
-          approve={hash ? 'Sign hash' : 'Sign data'}
-          risky
+          {...(notice === 'hash' && { approve: 'Sign hash', risky: true })}
         />
       }
     >
       <Box className={styles.block}>
         <AddressLine label="Account" address={address} />
-        <Notice tone="red" title="Blind signature">
-          <Text size="12px">
-            eth_sign signs these bytes without saying what they are. A 32-byte
-            hash signed this way can authorize anything that accepts a signed
-            hash, such as a user operation of this account's smart account:
-            it can move whatever the account holds. Sign only data you made
-            yourself.
-          </Text>
-        </Notice>
+        {notice === 'hash' && <SignNotice kind="hash" />}
         <Box paddingTop="16px">
           <Text color="text/tertiary" size="11px">
             {isHex(data) ? `Data · ${size(data)} bytes` : 'Data'}
@@ -211,37 +204,55 @@ function SignRequest({ request }: { request: ExtractRequest<'eth_sign'> }) {
             </Text>
           </Box>
         </Box>
+        {notice === 'prefixed' && <SignNotice kind="prefixed" />}
       </Box>
     </ApprovalFrame>
   )
 }
 
+/**
+ * `personal_sign`: the message as text. One that looks like a hash shows as
+ * hex under the same warning as `eth_sign`'s: it is the same signature.
+ */
 function SignMessageRequest({
   request,
 }: { request: ExtractRequest<'personal_sign'> }) {
   const [data, address] = request.params
+  const notice = signNotice('personal_sign', data)
+  const hash = notice === 'hash'
   const message = useMemo(() => {
+    if (hash) return data
     try {
       return isHex(data) ? hexToString(data) : data
     } catch {
       return data
     }
-  }, [data])
+  }, [data, hash])
 
   return (
     <ApprovalFrame
       title="Sign message"
       subtitle={originOf(request)}
-      footer={<DecisionActions request={request} />}
+      footer={
+        <DecisionActions
+          request={request}
+          {...(hash && { approve: 'Sign hash', risky: true })}
+        />
+      }
     >
       <Box className={styles.block}>
         <AddressLine label="Account" address={address} />
+        <SignNotice kind={notice} />
         <Box paddingTop="16px">
           <Text color="text/tertiary" size="11px">
-            Message
+            {hash ? 'Hash · 32 bytes' : 'Message'}
           </Text>
           <Box className={styles.hexBox}>
-            <Text size="13px" wrap="anywhere">
+            <Text
+              family={hash ? 'mono' : undefined}
+              size={hash ? '12px' : '13px'}
+              wrap="anywhere"
+            >
               {message}
             </Text>
           </Box>

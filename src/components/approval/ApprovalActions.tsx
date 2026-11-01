@@ -64,7 +64,8 @@ function RejectButton({
 
 /**
  * Reject and Approve, for requests that only need a yes or no. A `risky`
- * approval (a blind signature) is stroked red and says what it does.
+ * approval (signing what looks like a hash) is stroked red and says what it
+ * does.
  */
 export function DecisionActions({
   request,
