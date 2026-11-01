@@ -11,6 +11,8 @@ import {
   parseGwei,
 } from 'viem'
 
+import { asSent } from './asSent'
+
 /** An `eth_sendTransaction` param, as the dApp sent it (RPC hex). */
 export type RpcTransaction = Record<string, unknown>
 
@@ -178,4 +180,51 @@ export function editedFields(
   const before = txForm(original)
   const after = txForm(edited)
   return TX_FIELDS.filter((field) => before[field] !== after[field])
+}
+
+/** A field the dApp sent that the approval has no field of its own for. */
+export type ExtraTxField = { key: string; label: string; value: string }
+
+const EXTRA_LABELS: Record<string, string> = {
+  type: 'Type',
+  chainId: 'Chain id',
+  accessList: 'Access list',
+  authorizationList: 'Authorization list (EIP-7702)',
+  maxFeePerBlobGas: 'Max fee per blob gas',
+  blobVersionedHashes: 'Blob versioned hashes',
+  blobs: 'Blobs',
+  input: 'Input',
+}
+
+/**
+ * Every field of the transaction the approval doesn't show as one of its own
+ * (`TX_FIELDS`): its type, access list, EIP-7702 authorization list, chain id,
+ * blob fields, anything else. A plain account's transaction goes to the node
+ * with all of them, so they are shown as sent, in the dApp's order. `input`
+ * counts only when it differs from the `data` shown.
+ */
+export function extraTxFields(tx: RpcTransaction): ExtraTxField[] {
+  const shown: readonly string[] = TX_FIELDS
+  return Object.entries(tx)
+    .filter(([key, value]) => {
+      if (value === undefined) return false
+      if (key === 'input') return tx.data != null && tx.data !== value
+      return !shown.includes(key)
+    })
+    .map(([key, value]) => ({
+      key,
+      label: EXTRA_LABELS[key] ?? key,
+      value: asSent(value),
+    }))
+}
+
+/**
+ * Whether the transaction carries an EIP-7702 authorization list: each signed
+ * authorization in it sets its signer's account code. An empty list sets
+ * none; anything else the node is left to read is flagged.
+ */
+export function carriesAuthorizations(tx: RpcTransaction): boolean {
+  const list = tx.authorizationList
+  if (list === undefined || list === null) return false
+  return !(Array.isArray(list) && list.length === 0)
 }

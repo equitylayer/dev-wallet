@@ -2,18 +2,21 @@ import { useEffect, useRef, useState } from 'react'
 
 import { Box, Button, Input, Text } from '~/design-system'
 import {
+  type ExtraTxField,
   GAS_FIELDS,
   type RpcTransaction,
   TX_LABELS,
   type TxField,
   type TxForm,
   applyTxForm,
+  carriesAuthorizations,
   editedFields,
+  extraTxFields,
   txForm,
 } from '~/utils/transactionForm'
 
 import * as styles from './approval.css'
-import { Readout, Section } from './parts'
+import { Notice, Readout, Section } from './parts'
 
 const UNITS: Partial<Record<TxField, string>> = {
   value: 'ETH',
@@ -34,11 +37,17 @@ function gasFields(...txs: RpcTransaction[]): TxField[] {
 const SMART_NOTE =
   'Smart accounts ignore these: the path picks its own gas, fees and nonce.'
 
+const EXTRAS_SENT_NOTE =
+  'The node gets these as the dApp sent them. DevWallet does not edit them.'
+const EXTRAS_DROPPED_NOTE =
+  'A smart account sends only to, value and data: the node never gets these.'
+
 /**
  * An `eth_sendTransaction`'s own fields: the gas limit, fees and nonce as the
  * dApp sent them (the node gets them as they are, unless the account is
  * smart), and Edit, which swaps them for inputs of every field, as the Account
- * plate's Edit state does. The approval sends the applied edits back.
+ * plate's Edit state does. The approval sends the applied edits back. Every
+ * other field the dApp sent follows, read-only (`ExtraFields`).
  */
 export function TransactionFields({
   original,
@@ -61,11 +70,24 @@ export function TransactionFields({
   onCancel: () => void
 }) {
   const edited = editedFields(original, tx)
+  const extras = extraTxFields(tx)
+  // A plain account's transaction takes its authorization list to the node.
+  const setsCode = carriesAuthorizations(tx) && !smart
   return (
     <Section
       title="Transaction"
       aside={
         <Box className={styles.inline}>
+          {setsCode && (
+            <Box
+              className={styles.tagRed}
+              title="Carries an EIP-7702 authorization list: it sets account code"
+            >
+              <Text size="11px" weight="medium" wrap={false}>
+                Sets code
+              </Text>
+            </Box>
+          )}
           {edited.length > 0 && (
             <Box
               className={styles.tag}
@@ -101,8 +123,56 @@ export function TransactionFields({
         ) : (
           <GasReadouts tx={tx} fields={gasFields(original, tx)} smart={smart} />
         )}
+        {extras.length > 0 && (
+          <ExtraFields fields={extras} setsCode={setsCode} smart={smart} />
+        )}
       </Box>
     </Section>
+  )
+}
+
+/**
+ * The fields the dApp sent that have no field above (type, access list,
+ * authorization list, chain id, blob fields, …), as sent. A plain account's
+ * transaction takes every one to the node, so an EIP-7702 authorization list
+ * is flagged in red (`setsCode`): it sets account code. A smart account's
+ * drops them.
+ */
+function ExtraFields({
+  fields,
+  setsCode,
+  smart,
+}: { fields: ExtraTxField[]; setsCode: boolean; smart: boolean }) {
+  return (
+    <>
+      {setsCode && (
+        <Notice tone="red" title="This sets account code">
+          <Text size="12px">
+            The transaction carries an EIP-7702 authorization list. Each signed
+            authorization in it sets its signer's code to the contract it
+            names, and that contract then controls the account. Approve only a
+            list you made yourself.
+          </Text>
+        </Notice>
+      )}
+      {fields.map(({ key, label, value }) => (
+        <Box key={key} paddingTop="16px">
+          <Text color="text/tertiary" size="11px">
+            {label}
+          </Text>
+          <Box className={styles.hexBox}>
+            <Text family="mono" size="12px" wrap="anywhere">
+              {value}
+            </Text>
+          </Box>
+        </Box>
+      ))}
+      <Box paddingTop="12px">
+        <Text color="text/tertiary" size="12px">
+          {smart ? EXTRAS_DROPPED_NOTE : EXTRAS_SENT_NOTE}
+        </Text>
+      </Box>
+    </>
   )
 }
 

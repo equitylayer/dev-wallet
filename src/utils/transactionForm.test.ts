@@ -2,7 +2,9 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   applyTxForm,
+  carriesAuthorizations,
   editedFields,
+  extraTxFields,
   quantity,
   txForm,
 } from './transactionForm'
@@ -157,5 +159,95 @@ describe('editedFields', () => {
     expect(
       editedFields(tx, { ...tx, gas: '0xc350', nonce: undefined, value: '0x0de0b6b3a7640000' }),
     ).toEqual(['gas', 'nonce'])
+  })
+})
+
+describe('extraTxFields', () => {
+  const authorization = {
+    chainId: '0x7a69',
+    address: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
+    nonce: '0x0',
+    yParity: '0x1',
+    r: '0x01',
+    s: '0x02',
+  }
+
+  test('a transaction of only shown fields has none', () => {
+    const { chainId: _, ...tx } = dappTx()
+    expect(extraTxFields(tx)).toEqual([])
+    expect(extraTxFields({ ...tx, gasPrice: '0x1' })).toEqual([])
+  })
+
+  test("every other field the dApp sent, in its order, as it sent it", () => {
+    const tx = {
+      ...dappTx(),
+      type: '0x4',
+      accessList: [{ address: TO, storageKeys: [] }],
+      authorizationList: [authorization],
+      maxFeePerBlobGas: '0x1',
+      blobVersionedHashes: ['0x01aa'],
+      gasLimit: '0x5208',
+    }
+    expect(extraTxFields(tx)).toEqual([
+      { key: 'chainId', label: 'Chain id', value: '0x7a69' },
+      { key: 'type', label: 'Type', value: '0x4' },
+      {
+        key: 'accessList',
+        label: 'Access list',
+        value: `[{"address":"${TO}","storageKeys":[]}]`,
+      },
+      {
+        key: 'authorizationList',
+        label: 'Authorization list (EIP-7702)',
+        value: JSON.stringify([authorization]),
+      },
+      { key: 'maxFeePerBlobGas', label: 'Max fee per blob gas', value: '0x1' },
+      {
+        key: 'blobVersionedHashes',
+        label: 'Blob versioned hashes',
+        value: '["0x01aa"]',
+      },
+      // An unknown field shows under its own name.
+      { key: 'gasLimit', label: 'gasLimit', value: '0x5208' },
+    ])
+  })
+
+  test('input shows only when it differs from the data shown', () => {
+    expect(extraTxFields({ input: '0xab' })).toEqual([])
+    expect(extraTxFields({ data: '0xab', input: '0xab' })).toEqual([])
+    expect(extraTxFields({ data: '0xab', input: '0xcd' })).toEqual([
+      { key: 'input', label: 'Input', value: '0xcd' },
+    ])
+  })
+
+  test('a field sent as nothing is not shown; null is', () => {
+    expect(extraTxFields({ type: undefined })).toEqual([])
+    expect(extraTxFields({ type: null })).toEqual([
+      { key: 'type', label: 'Type', value: 'null' },
+    ])
+  })
+
+  test('the edited transaction keeps them as they were', () => {
+    const tx = { ...dappTx(), authorizationList: [authorization] }
+    const edited = applyTxForm(tx, { ...txForm(tx), gas: '30000' })
+    if (!('tx' in edited)) throw new Error('expected an edit')
+    expect(extraTxFields(edited.tx)).toEqual(extraTxFields(tx))
+  })
+})
+
+describe('carriesAuthorizations', () => {
+  test('an authorization list with entries can set account code', () => {
+    expect(carriesAuthorizations({ authorizationList: [{}] })).toBe(true)
+  })
+
+  test('so does one the node will have to make sense of', () => {
+    expect(carriesAuthorizations({ authorizationList: '0x01' })).toBe(true)
+  })
+
+  test('none, nothing or an empty list cannot', () => {
+    expect(carriesAuthorizations(dappTx())).toBe(false)
+    expect(carriesAuthorizations({ authorizationList: undefined })).toBe(false)
+    expect(carriesAuthorizations({ authorizationList: null })).toBe(false)
+    expect(carriesAuthorizations({ authorizationList: [] })).toBe(false)
   })
 })
